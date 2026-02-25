@@ -16,7 +16,7 @@ const WalletHistory = () => {
     queryKey: ["loyalty-history"],
     queryFn: async () => (await api.get("/loyalty/my-history")).data,
   });
-  const history: any[] = data?.data ?? data ?? [];
+  const history: any[] = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>

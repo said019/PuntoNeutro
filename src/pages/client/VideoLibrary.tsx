@@ -26,8 +26,8 @@ const VideoLibrary = () => {
       (await api.get(`/videos?search=${encodeURIComponent(debouncedSearch)}&category=${category}`)).data,
   });
 
-  const categories: any[] = catsData?.data ?? catsData ?? [];
-  const videos: any[] = videosData?.data ?? videosData ?? [];
+  const categories: any[] = Array.isArray(catsData?.data) ? catsData.data : Array.isArray(catsData) ? catsData : [];
+  const videos: any[] = Array.isArray(videosData?.data) ? videosData.data : Array.isArray(videosData) ? videosData : [];
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>

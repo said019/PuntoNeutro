@@ -3,10 +3,11 @@
    Gulfs Display  →  headings / display  (font-gulfs)
    Alilato        →  body / text         (font-alilato)
 
-   Fuentes fallback de Google Fonts (mientras se instalan las
-   fuentes propietarias en public/fonts/):
-     Gulfs   → Cormorant Garamond SemiBold (serif display elegante)
+   Fuentes fallback vía Google Fonts @import:
+     Gulfs   → Cormorant Garamond (serif display elegante)
      Alilato → Jost (geometric sans limpio)
+   Las fuentes propietarias Gulfs/Alilato se pueden añadir
+   después colocando los archivos en public/fonts/
    ────────────────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Jost:wght@300;400;500;600;700&display=swap');
 
@@ -14,11 +15,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* font-face aliases so we can use font-gulfs / font-alilato in Tailwind */
+/* ── font-face aliases: apuntan a las fuentes ya cargadas por @import
+   sin hardcodear URLs de gstatic que pueden cambiar de versión ── */
 @font-face {
   font-family: 'Gulfs';
   src: local('Cormorant Garamond SemiBold'),
-       url('https://fonts.gstatic.com/s/cormorantgaramond/v22/co3YmX5slCNuHLi8bLeY9MK7whWMhyjQAllvuQ.woff2') format('woff2');
+       local('Cormorant Garamond');
   font-weight: 600;
   font-style: normal;
   font-display: swap;
@@ -27,7 +29,7 @@
 @font-face {
   font-family: 'Alilato';
   src: local('Jost'),
-       url('https://fonts.gstatic.com/s/jost/v18/92zPtBhPNqw73oHH7BbQp4-B22cU.woff2') format('woff2');
+       local('Jost Regular');
   font-weight: 300 700;
   font-style: normal;
   font-display: swap;

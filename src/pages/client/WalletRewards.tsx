@@ -25,7 +25,7 @@ const WalletRewards = () => {
     queryFn: async () => (await api.get("/wallet/pass")).data,
   });
 
-  const rewards: any[] = rewardsData?.data ?? rewardsData ?? [];
+  const rewards: any[] = Array.isArray(rewardsData?.data) ? rewardsData.data : Array.isArray(rewardsData) ? rewardsData : [];
   const myPoints: number = walletData?.data?.points ?? walletData?.points ?? 0;
 
   const redeemMutation = useMutation({

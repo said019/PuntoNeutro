@@ -30,7 +30,7 @@ const Orders = () => {
     queryKey: ["my-orders"],
     queryFn: async () => (await api.get("/orders")).data,
   });
-  const orders: Order[] = data?.data ?? data ?? [];
+  const orders: Order[] = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>

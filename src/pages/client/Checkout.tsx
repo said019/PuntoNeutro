@@ -31,7 +31,7 @@ const Checkout = () => {
     queryKey: ["plans"],
     queryFn: async () => (await api.get("/plans")).data,
   });
-  const plans: any[] = plansData?.data ?? plansData ?? [];
+  const plans: any[] = Array.isArray(plansData?.data) ? plansData.data : Array.isArray(plansData) ? plansData : [];
 
   const validateCodeMutation = useMutation({
     mutationFn: () =>
