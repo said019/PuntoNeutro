@@ -1,9 +1,24 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import api from "@/lib/api";
 
-type StudentRow = Tables<"students">;
-type PackageRow = Tables<"packages">;
+type StudentRow = {
+  id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  package_id: string | null;
+  classes_remaining: number | null;
+  notes: string | null;
+  is_active: boolean;
+};
+
+type PackageRow = {
+  id: string;
+  category: string;
+  num_classes: string;
+  price: number;
+  sort_order: number;
+};
 
 const AdminStudents = () => {
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -14,12 +29,12 @@ const AdminStudents = () => {
   const [search, setSearch] = useState("");
 
   const fetchData = async () => {
-    const [{ data: s }, { data: p }] = await Promise.all([
-      supabase.from("students").select("*").order("full_name"),
-      supabase.from("packages").select("*").order("category").order("sort_order"),
+    const [sr, pr] = await Promise.all([
+      api.get<{ data: StudentRow[] }>("/clients?sort=display_name"),
+      api.get<{ data: PackageRow[] }>("/plans?is_active=true"),
     ]);
-    if (s) setStudents(s);
-    if (p) setPackages(p);
+    if (sr.data?.data) setStudents(sr.data.data);
+    if (pr.data?.data) setPackages(pr.data.data);
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -27,17 +42,17 @@ const AdminStudents = () => {
   const handleSave = async () => {
     if (!form.full_name.trim()) return;
     const payload = {
-      full_name: form.full_name,
+      display_name: form.full_name,
       phone: form.phone || null,
       email: form.email || null,
-      package_id: form.package_id || null,
+      plan_id: form.package_id || null,
       classes_remaining: form.classes_remaining,
       notes: form.notes || null,
     };
     if (editId) {
-      await supabase.from("students").update(payload).eq("id", editId);
+      await api.put(`/users/${editId}`, payload);
     } else {
-      await supabase.from("students").insert(payload);
+      await api.post("/clients", payload);
     }
     setForm({ full_name: "", phone: "", email: "", package_id: "", classes_remaining: 0, notes: "" });
     setEditId(null); setShowForm(false);
@@ -51,7 +66,7 @@ const AdminStudents = () => {
   };
 
   const toggleActive = async (s: StudentRow) => {
-    await supabase.from("students").update({ is_active: !s.is_active }).eq("id", s.id);
+    await api.patch(`/users/${s.id}`, { is_active: !s.is_active });
     fetchData();
   };
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuthStore } from "@/stores/authStore";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
@@ -38,10 +38,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const logout = useAuthStore((s) => s.logout);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/auth");
+    logout();
+    navigate("/auth/login");
   };
 
   return (

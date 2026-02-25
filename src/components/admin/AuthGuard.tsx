@@ -1,33 +1,40 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuthStore } from "@/stores/authStore";
 
-const ALLOWED_ROLES = ["admin", "instructor", "coach", "super_admin", "reception"];
+const ADMIN_ROLES = ["admin", "super_admin", "reception", "instructor"];
 
 interface AuthGuardProps {
   children: React.ReactNode;
   requiredRoles?: string[];
 }
 
-export const AuthGuard = ({ children, requiredRoles = ["admin"] }: AuthGuardProps) => {
+export const AuthGuard = ({ children, requiredRoles = ADMIN_ROLES }: AuthGuardProps) => {
   const navigate = useNavigate();
-  const [ok, setOk] = useState(false);
+  const { user, isAuthenticated, checkAuth } = useAuthStore();
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        navigate("/auth");
-      } else {
-        setOk(true);
+    (async () => {
+      if (!isAuthenticated) {
+        await checkAuth();
       }
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (!session) navigate("/auth");
-    });
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+      setChecked(true);
+    })();
+  }, []);
 
-  if (!ok)
+  useEffect(() => {
+    if (!checked) return;
+    if (!isAuthenticated || !user) {
+      navigate("/auth/login");
+      return;
+    }
+    if (!requiredRoles.includes(user.role)) {
+      navigate("/app");
+    }
+  }, [checked, isAuthenticated, user]);
+
+  if (!checked)
     return (
       <div className="min-h-screen bg-background flex items-center justify-center text-foreground">
         Cargando...

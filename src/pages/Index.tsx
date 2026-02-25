@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import ophelia14 from "@/assets/ophelia-14.jpg";
 import ophelia15 from "@/assets/ophelia-15.jpg";
 import ophelia28 from "@/assets/ophelia-28.jpg";
@@ -22,9 +22,9 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    supabase.from("packages").select("*").eq("is_active", true).order("sort_order").then(({ data }) => {
-      if (data) setPackages(data);
-    });
+    api.get<{ data: PackageRow[] }>("/plans?is_active=true").then(({ data }) => {
+      if (data?.data) setPackages(data.data);
+    }).catch(() => {/* silently ignore if backend not ready */});
   }, []);
 
   // Scroll reveal
