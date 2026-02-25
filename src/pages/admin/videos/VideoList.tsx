@@ -1,0 +1,102 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { AuthGuard } from "@/components/admin/AuthGuard";
+import AdminLayout from "@/components/admin/AdminLayout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useDebounce } from "@/hooks/use-debounce";
+
+interface Video {
+  id: string;
+  title: string;
+  description?: string;
+  access_type: "gratuito" | "miembros";
+  is_published: boolean;
+  thumbnail_url?: string;
+  duration_seconds: number;
+  sales_enabled: boolean;
+  sales_price_mxn: number | null;
+  level: string;
+}
+
+const VideoList = () => {
+  const navigate = useNavigate();
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
+
+  const { data, isLoading } = useQuery<{ data: Video[]; total: number }>({
+    queryKey: ["videos", debouncedSearch],
+    queryFn: async () => (await api.get(`/videos?search=${debouncedSearch}&limit=20`)).data,
+  });
+  const videos = data?.data ?? [];
+
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/videos/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["videos"] }); toast({ title: "Video eliminado" }); },
+  });
+
+  const formatDuration = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  };
+
+  return (
+    <AuthGuard>
+      <AdminLayout>
+        <div className="p-6 max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-bold">Videos</h1>
+            <Button size="sm" onClick={() => navigate("/admin/videos/upload")}>
+              <Plus size={14} className="mr-1" />Nuevo video
+            </Button>
+          </div>
+
+          <div className="relative mb-4 max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-8" placeholder="Buscar videos..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {isLoading
+              ? Array(8).fill(0).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)
+              : videos.map((v) => (
+                <div key={v.id} className="rounded-xl border border-border overflow-hidden bg-secondary hover:bg-muted transition-colors">
+                  {v.thumbnail_url
+                    ? <img src={v.thumbnail_url} alt={v.title} className="w-full h-28 object-cover" />
+                    : <div className="w-full h-28 bg-muted flex items-center justify-center text-muted-foreground text-xs">Sin miniatura</div>
+                  }
+                  <div className="p-3">
+                    <p className="font-medium text-sm truncate">{v.title}</p>
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      <Badge variant={v.access_type === "gratuito" ? "default" : "secondary"} className="text-[0.6rem]">{v.access_type}</Badge>
+                      {!v.is_published && <Badge variant="outline" className="text-[0.6rem]">Borrador</Badge>}
+                      {v.sales_enabled && v.sales_price_mxn && (
+                        <Badge variant="outline" className="text-[0.6rem]">${v.sales_price_mxn}</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{formatDuration(v.duration_seconds ?? 0)}</p>
+                    <div className="flex gap-2 mt-3">
+                      <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => navigate(`/admin/videos/upload?id=${v.id}`)}>Editar</Button>
+                      <Button size="sm" variant="destructive" className="text-xs" onClick={() => deleteMutation.mutate(v.id)}>Eliminar</Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      </AdminLayout>
+    </AuthGuard>
+  );
+};
+
+export default VideoList;
