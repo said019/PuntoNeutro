@@ -9,12 +9,57 @@ import ophelia32 from "@/assets/ophelia-32.jpg";
 import ophelia38 from "@/assets/ophelia-38.jpg";
 import ophelia50 from "@/assets/ophelia-50.jpg";
 
-type PackageRow = { id: string; category: string; num_classes: string; price: number; sort_order: number };
+type PlanRow = {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  currency: string;
+  duration_days: number;
+  class_limit: number | null;
+  features: string[] | string;
+  is_active: boolean;
+  sort_order: number;
+};
+
+// Fallback hardcoded plans mientras el backend no tenga datos
+const FALLBACK_PLANS: PlanRow[] = [
+  { id: "f1", name: "4 Clases", description: null, price: 380, currency: "MXN", duration_days: 30, class_limit: 4, features: [], is_active: true, sort_order: 0 },
+  { id: "f2", name: "8 Clases", description: null, price: 700, currency: "MXN", duration_days: 30, class_limit: 8, features: [], is_active: true, sort_order: 1 },
+  { id: "f3", name: "12 Clases", description: null, price: 980, currency: "MXN", duration_days: 30, class_limit: 12, features: [], is_active: true, sort_order: 2 },
+  { id: "f4", name: "Ilimitado", description: null, price: 1350, currency: "MXN", duration_days: 30, class_limit: null, features: [], is_active: true, sort_order: 3 },
+];
+
+// Horario semanal estático
+const SCHEDULE = [
+  { time: "7:00 am",  mon: "Jumping Basics", tue: "Power Jump",   wed: "Jumping Basics", thu: "Power Jump",   fri: "Jump & Stretch", sat: "Jumping Basics", sun: null },
+  { time: "9:00 am",  mon: "Power Jump",     tue: "Jumping Basics", wed: "Power Jump",   thu: "Jumping Basics", fri: "Power Jump",   sat: "Power Jump",     sun: null },
+  { time: "11:00 am", mon: "Jump & Stretch", tue: null,           wed: "Jump & Stretch", thu: null,            fri: "Jumping Basics", sat: "Jump & Stretch", sun: null },
+  { time: "6:00 pm",  mon: "Jumping Basics", tue: "Power Jump",   wed: "Jumping Basics", thu: "Power Jump",   fri: "Power Jump",   sat: null,             sun: null },
+  { time: "7:30 pm",  mon: "Power Jump",     tue: "Jump & Stretch", wed: "Power Jump",  thu: "Jump & Stretch", fri: null,          sat: null,             sun: null },
+];
+const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat"] as const;
+
+const CLASS_COLORS: Record<string, string> = {
+  "Jumping Basics": "bg-primary/20 text-primary border border-primary/30",
+  "Power Jump":     "bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30",
+  "Jump & Stretch": "bg-[#E7EB6E]/20 text-[#E7EB6E] border border-[#E7EB6E]/30",
+};
+
+const TESTIMONIOS = [
+  { name: "Karla M.", stars: 5, text: "¡Llevo 6 meses y no puedo parar! Bajé 8 kg y me siento increíble. El ambiente del studio es único, las instructoras te motivan a dar lo mejor.", avatar: "KM" },
+  { name: "Sofía R.", stars: 5, text: "Empecé sin forma física y ahora hago Power Jump sin problema. La comunidad de Ophelia es lo mejor, todas nos apoyamos.", avatar: "SR" },
+  { name: "Daniela V.", stars: 5, text: "El jumping fue lo que necesitaba. Cuida mis rodillas y aun así siento que entrené duro. Las clases de 7am me cambiaron la mañana.", avatar: "DV" },
+  { name: "Mariana L.", stars: 5, text: "Desde el primer día me sentí bienvenida. El studio es hermoso, la música increíble y los resultados hablan solos. 100% recomendado.", avatar: "ML" },
+  { name: "Valeria P.", stars: 5, text: "Probé mil clases y ninguna me enganchó como el jumping. Es adictivo en el mejor sentido, cada clase es diferente y divertidísima.", avatar: "VP" },
+  { name: "Fernanda T.", stars: 5, text: "Las instructoras son excelentes, siempre atentas a la técnica. Me encanta que hay clases para todos los niveles. Ophelia es mi lugar favorito.", avatar: "FT" },
+];
 
 const Index = () => {
   const [navScrolled, setNavScrolled] = useState(false);
-  const [packages, setPackages] = useState<PackageRow[]>([]);
-  const [activeTab, setActiveTab] = useState("jumping");
+  const [plans, setPlans] = useState<PlanRow[]>([]);
+  const [activeTestimonial, setActiveTestimonial] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,9 +69,16 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    api.get<{ data: PackageRow[] }>("/plans?is_active=true").then(({ data }) => {
-      if (data?.data) setPackages(data.data);
-    }).catch(() => {/* silently ignore if backend not ready */});
+    api.get<{ data: PlanRow[] }>("/plans").then(({ data }) => {
+      const rows = Array.isArray(data?.data) ? data.data : [];
+      setPlans(rows.length > 0 ? rows : FALLBACK_PLANS);
+    }).catch(() => setPlans(FALLBACK_PLANS));
+  }, []);
+
+  // Auto-rotate testimonials
+  useEffect(() => {
+    const t = setInterval(() => setActiveTestimonial((p) => (p + 1) % TESTIMONIOS.length), 5000);
+    return () => clearInterval(t);
   }, []);
 
   // Scroll reveal
@@ -63,16 +115,20 @@ const Index = () => {
         <a href="#" className="font-syne font-extrabold text-xl tracking-tight text-foreground">
           Ophelia<span className="text-primary">.</span>
         </a>
-        <ul className="hidden lg:flex gap-10 list-none">
-          {["Clases", "Beneficios", "Paquetes", "Contacto"].map((item) => (
-            <li key={item}>
+        <ul className="hidden lg:flex gap-8 list-none">
+          {[
+            { label: "Clases",      id: "clases" },
+            { label: "Horario",     id: "horario" },
+            { label: "Paquetes",    id: "membresias" },
+            { label: "Instructoras",id: "instructoras" },
+            { label: "Contacto",    id: "contacto" },
+          ].map((item) => (
+            <li key={item.id}>
               <button
-                onClick={() =>
-                  scrollTo(item === "Paquetes" ? "membresias" : item.toLowerCase().replace("í", "i"))
-                }
-                className="text-muted-foreground text-[0.85rem] font-normal tracking-widest uppercase hover:text-foreground transition-colors bg-transparent border-none cursor-pointer"
+                onClick={() => scrollTo(item.id)}
+                className="text-muted-foreground text-[0.82rem] font-normal tracking-widest uppercase hover:text-foreground transition-colors bg-transparent border-none cursor-pointer"
               >
-                {item}
+                {item.label}
               </button>
             </li>
           ))}
@@ -243,63 +299,324 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ── PAQUETES ── */}
-      <section id="membresias" className="py-20 lg:py-[120px] px-6 lg:px-[60px]">
+      {/* ── HORARIO ── */}
+      <section id="horario" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Paquetes
+            Disponibilidad
           </div>
-          <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
-            NUESTROS<br />PAQUETES
-          </h2>
-        </div>
-
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 flex gap-2 mt-10 mb-10">
-          {[
-            { key: "jumping", label: "Jumping" },
-            { key: "pilates", label: "Pilates" },
-            { key: "mixtos", label: "Mixtos" },
-          ].map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className={`px-6 py-3 rounded-full text-sm font-medium tracking-wider uppercase transition-all ${
-                activeTab === t.key
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {packages
-            .filter((p) => p.category === activeTab)
-            .map((p) => (
-              <div
-                key={p.id}
-                className={`rounded-2xl p-6 text-center hover:-translate-y-1 transition-all ${
-                  p.num_classes === "ILIMITADO"
-                    ? "bg-primary border border-primary col-span-2 sm:col-span-1"
-                    : "bg-secondary border border-border hover:border-primary"
-                }`}
-              >
-                <div className={`font-syne font-bold text-base mb-2 ${p.num_classes === "ILIMITADO" ? "text-primary-foreground" : "text-foreground"}`}>
-                  {p.num_classes === "ILIMITADO" ? "ILIMITADO" : `${p.num_classes} CLASES`}
-                </div>
-                <div className={`font-bebas text-[3rem] leading-none ${p.num_classes === "ILIMITADO" ? "text-primary-foreground" : "text-primary"}`}>
-                  ${p.price.toLocaleString()}
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
+            <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
+              HORARIO<br />SEMANAL
+            </h2>
+            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
+              Clases de lunes a sábado. Elige el horario que mejor se adapte a tu día y reserva tu lugar desde la app.
+            </p>
+          </div>
+          {/* Leyenda */}
+          <div className="flex flex-wrap gap-3 mb-8">
+            {Object.entries(CLASS_COLORS).map(([name, cls]) => (
+              <span key={name} className={`text-[0.7rem] tracking-wider px-3 py-1 rounded-full font-medium ${cls}`}>{name}</span>
+            ))}
+          </div>
+          {/* Tabla desktop */}
+          <div className="hidden lg:block rounded-2xl overflow-hidden border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-background/60">
+                  <th className="py-4 px-5 text-left text-[0.7rem] tracking-widest uppercase text-muted-foreground font-medium w-[90px]">Hora</th>
+                  {DAYS.map(d => (
+                    <th key={d} className="py-4 px-3 text-[0.7rem] tracking-widest uppercase text-muted-foreground font-medium text-center">{d}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {SCHEDULE.map((row, i) => (
+                  <tr key={i} className="border-t border-border hover:bg-background/40 transition-colors">
+                    <td className="py-4 px-5 text-foreground font-medium text-[0.82rem] whitespace-nowrap">{row.time}</td>
+                    {DAY_KEYS.map(day => (
+                      <td key={day} className="py-3 px-3 text-center">
+                        {row[day] ? (
+                          <span className={`inline-block text-[0.68rem] tracking-wide px-2 py-[5px] rounded-lg font-medium ${CLASS_COLORS[row[day] as string] ?? "bg-secondary text-foreground"}`}>
+                            {row[day]}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/20 text-[0.8rem]">—</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Cards mobile */}
+          <div className="lg:hidden flex flex-col gap-3">
+            {SCHEDULE.map((row, i) => (
+              <div key={i} className="rounded-xl border border-border bg-background/40 p-4">
+                <div className="text-foreground font-semibold text-sm mb-3">{row.time}</div>
+                <div className="flex flex-wrap gap-2">
+                  {DAY_KEYS.map((day, di) => row[day] ? (
+                    <div key={day} className="flex flex-col items-center gap-1">
+                      <span className="text-[0.6rem] text-muted-foreground">{DAYS[di]}</span>
+                      <span className={`text-[0.65rem] px-2 py-[3px] rounded-md font-medium ${CLASS_COLORS[row[day] as string] ?? ""}`}>{row[day]}</span>
+                    </div>
+                  ) : null)}
                 </div>
               </div>
             ))}
+          </div>
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => navigate("/auth/register")}
+              className="bg-primary text-primary-foreground px-8 py-4 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:-translate-y-1 hover:shadow-[0_15px_40px_hsl(var(--primary)/0.35)] transition-all inline-flex items-center gap-2"
+            >
+              Reservar mi lugar
+              <span className="text-[0.7rem]">↗</span>
+            </button>
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-6 text-center">
-          Cada paquete tiene una vigencia de 30 días · Aplican términos y condiciones.
-          {activeTab === "mixtos" && " Combina Jumping & Pilates."}
-        </p>
+      </section>
+
+      {/* ── GALERÍA ── */}
+      <section id="galeria" className="py-20 lg:py-[120px] px-6 lg:px-[60px]">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
+          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
+            <span className="w-[30px] h-[1px] bg-primary inline-block" />
+            Galería
+          </div>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
+            <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
+              VIVE LA<br />EXPERIENCIA
+            </h2>
+            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
+              Cada sesión es única. Capturamos los mejores momentos de nuestras alumnas en el studio.
+            </p>
+          </div>
+          {/* Masonry grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-[200px]">
+            {[
+              { src: ophelia31, span: "md:col-span-2 md:row-span-2", h: "h-full" },
+              { src: ophelia14, span: "", h: "h-full" },
+              { src: ophelia50, span: "", h: "h-full" },
+              { src: ophelia28, span: "md:row-span-2", h: "h-full" },
+              { src: ophelia15, span: "", h: "h-full" },
+              { src: ophelia38, span: "", h: "h-full" },
+              { src: ophelia32, span: "md:col-span-2", h: "h-full" },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className={`relative overflow-hidden rounded-2xl group cursor-pointer ${item.span}`}
+              >
+                <img
+                  src={item.src}
+                  alt={`Ophelia Studio ${i + 1}`}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
+                  <span className="text-[0.7rem] tracking-widest uppercase text-primary bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full">
+                    Ophelia Studio
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── PAQUETES ── */}
+      <section id="membresias" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
+          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
+            <span className="w-[30px] h-[1px] bg-primary inline-block" />
+            Inversión
+          </div>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
+            <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
+              ELIGE TU<br />PAQUETE
+            </h2>
+            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
+              Todos los paquetes incluyen acceso a cualquier tipo de clase durante 30 días. Sin compromisos.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {plans.map((p, i) => {
+              const isUnlimited = p.class_limit === null;
+              const isPopular = i === plans.length - 2;
+              return (
+                <div
+                  key={p.id}
+                  className={`relative rounded-3xl p-8 flex flex-col gap-4 transition-all hover:-translate-y-2 ${
+                    isUnlimited
+                      ? "bg-primary border-2 border-primary shadow-[0_20px_60px_hsl(var(--primary)/0.35)]"
+                      : isPopular
+                      ? "bg-background border-2 border-primary/60 shadow-[0_10px_40px_hsl(var(--primary)/0.15)]"
+                      : "bg-background border border-border hover:border-primary/50"
+                  }`}
+                >
+                  {isPopular && !isUnlimited && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#CA71E1] text-white text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium">
+                      Más popular
+                    </div>
+                  )}
+                  {isUnlimited && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-foreground text-primary text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium">
+                      ✦ Mejor valor
+                    </div>
+                  )}
+                  <div className={`text-[0.7rem] tracking-[0.15em] uppercase font-medium ${isUnlimited ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                    {p.duration_days} días de vigencia
+                  </div>
+                  <div className={`font-bebas text-[0.95rem] tracking-wide ${isUnlimited ? "text-primary-foreground" : "text-foreground"}`}>
+                    {isUnlimited ? "ILIMITADO" : `${p.class_limit} CLASES`}
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`font-bebas text-[3.5rem] leading-none ${isUnlimited ? "text-primary-foreground" : "text-primary"}`}>
+                      ${p.price.toLocaleString()}
+                    </span>
+                    <span className={`text-[0.75rem] ${isUnlimited ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                      MXN
+                    </span>
+                  </div>
+                  {!isUnlimited && p.class_limit && (
+                    <div className={`text-[0.78rem] ${isUnlimited ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                      ${(p.price / p.class_limit).toFixed(0)}/clase
+                    </div>
+                  )}
+                  <div className="mt-auto">
+                    <button
+                      onClick={() => navigate("/auth/register")}
+                      className={`w-full py-3 rounded-full text-[0.78rem] font-medium tracking-wider uppercase transition-all ${
+                        isUnlimited
+                          ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                          : "border border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                      }`}
+                    >
+                      Elegir plan
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground mt-8 text-center">
+            Vigencia de 30 días desde la primera clase · Aplican términos y condiciones · Precios en MXN
+          </p>
+        </div>
+      </section>
+
+      {/* ── INSTRUCTORAS ── */}
+      <section id="instructoras" className="py-20 lg:py-[120px] px-6 lg:px-[60px]">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
+          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
+            <span className="w-[30px] h-[1px] bg-primary inline-block" />
+            El equipo
+          </div>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
+            <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
+              NUESTRAS<br />INSTRUCTORAS
+            </h2>
+            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
+              Certificadas, apasionadas y dedicadas a que cada clase sea tu mejor versión.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { name: "Fernanda G.", role: "Fundadora · Jumping & Pilates", exp: "8 años de experiencia", certs: "FISAF · FitJump · Pilates Mat", img: ophelia38, color: "from-primary/20" },
+              { name: "Valeria M.", role: "Instructora Senior · Power Jump", exp: "5 años de experiencia", certs: "FitJump · HIIT Certified", img: ophelia15, color: "from-[#CA71E1]/20" },
+              { name: "Camila R.", role: "Instructora · Jumping Basics", exp: "3 años de experiencia", certs: "FitJump · Stretching Pro", img: ophelia32, color: "from-[#E7EB6E]/20" },
+            ].map((inst, i) => (
+              <div key={i} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 hover:-translate-y-2 transition-all">
+                <div className="h-[280px] relative overflow-hidden">
+                  <img src={inst.img} alt={inst.name} className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500" />
+                  <div className={`absolute inset-0 bg-gradient-to-t ${inst.color} to-transparent`} />
+                </div>
+                <div className="p-7">
+                  <h3 className="font-syne font-bold text-[1.1rem] text-foreground mb-1">{inst.name}</h3>
+                  <p className="text-primary text-[0.78rem] tracking-wide font-medium mb-3">{inst.role}</p>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground text-[0.78rem] flex items-center gap-2">
+                      <span className="text-[0.9rem]">🏅</span>{inst.exp}
+                    </span>
+                    <span className="text-muted-foreground text-[0.78rem] flex items-center gap-2">
+                      <span className="text-[0.9rem]">📋</span>{inst.certs}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TESTIMONIOS ── */}
+      <section id="testimonios" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(var(--primary)/0.08)_0%,transparent_60%)] pointer-events-none" />
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 relative z-10">
+          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
+            <span className="w-[30px] h-[1px] bg-primary inline-block" />
+            Comunidad
+          </div>
+          <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground mb-16">
+            LO QUE DICEN<br />NUESTRAS ALUMNAS
+          </h2>
+          {/* Featured testimonial */}
+          <div className="max-w-[700px] mx-auto text-center mb-12">
+            <div className="flex justify-center gap-1 mb-6">
+              {Array.from({ length: TESTIMONIOS[activeTestimonial].stars }).map((_, i) => (
+                <span key={i} className="text-primary text-xl">★</span>
+              ))}
+            </div>
+            <blockquote className="text-[1.1rem] text-foreground leading-[1.8] font-light mb-8 min-h-[80px] transition-all">
+              "{TESTIMONIOS[activeTestimonial].text}"
+            </blockquote>
+            <div className="flex items-center justify-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-[#CA71E1] flex items-center justify-center text-white font-bold text-sm">
+                {TESTIMONIOS[activeTestimonial].avatar}
+              </div>
+              <span className="font-syne font-semibold text-foreground">{TESTIMONIOS[activeTestimonial].name}</span>
+            </div>
+          </div>
+          {/* Dots */}
+          <div className="flex justify-center gap-2 mb-12">
+            {TESTIMONIOS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveTestimonial(i)}
+                className={`rounded-full transition-all ${i === activeTestimonial ? "w-8 h-2 bg-primary" : "w-2 h-2 bg-border hover:bg-primary/50"}`}
+              />
+            ))}
+          </div>
+          {/* Grid de mini testimonials */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {TESTIMONIOS.map((t, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveTestimonial(i)}
+                className={`text-left rounded-2xl p-6 border transition-all ${
+                  i === activeTestimonial
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-background/40 hover:border-primary/40"
+                }`}
+              >
+                <div className="flex gap-1 mb-3">
+                  {Array.from({ length: t.stars }).map((_, s) => (
+                    <span key={s} className="text-primary text-sm">★</span>
+                  ))}
+                </div>
+                <p className="text-[0.82rem] text-muted-foreground leading-[1.6] mb-4 line-clamp-2">{t.text}</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/40 to-[#CA71E1]/40 flex items-center justify-center text-[0.65rem] font-bold text-primary">
+                    {t.avatar}
+                  </div>
+                  <span className="text-[0.78rem] font-medium text-foreground">{t.name}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* ── CTA ── */}
@@ -313,9 +630,9 @@ const Index = () => {
             TE ESPERA
           </h2>
           <p className="text-[1.1rem] text-muted-foreground max-w-[500px] mx-auto mb-12 leading-[1.7]">
-            Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Prueba tu primera clase sin costo.
+            Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Tu primera clase es gratis.
           </p>
-          <div className="flex gap-4 justify-center items-center flex-wrap">
+          <div className="flex gap-4 justify-center items-center flex-wrap mb-16">
             <button
               onClick={() => navigate("/auth/register")}
               className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all"
@@ -323,13 +640,30 @@ const Index = () => {
               Crear cuenta gratis
               <span className="w-[22px] h-[22px] bg-primary-foreground/20 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
             </button>
-            <button
-              onClick={() => navigate("/auth/login")}
-              className="text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity bg-transparent border-none cursor-pointer"
+            <a
+              href="https://wa.me/524421234567?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Ophelia%20Studio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-border text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-3 px-8 py-[18px] rounded-full opacity-70 hover:opacity-100 hover:border-primary transition-all no-underline"
             >
-              <span className="w-[42px] h-[42px] border border-foreground/20 rounded-full flex items-center justify-center text-[0.8rem]">→</span>
-              Iniciar sesión
-            </button>
+              <span className="text-[1.1rem]">📱</span>
+              WhatsApp
+            </a>
+          </div>
+          {/* Datos de contacto */}
+          <div className="flex flex-wrap justify-center gap-8 border-t border-border pt-12">
+            {[
+              { icon: "📍", label: "Ubicación", value: "San Juan del Río, Querétaro" },
+              { icon: "📞", label: "Teléfono", value: "+52 442 123 4567" },
+              { icon: "✉️", label: "Email", value: "info@opheliajumping.mx" },
+              { icon: "🕐", label: "Horarios", value: "Lun–Vie 6am–9pm · Sáb 7am–2pm" },
+            ].map((c) => (
+              <div key={c.label} className="text-center">
+                <div className="text-[1.6rem] mb-2">{c.icon}</div>
+                <div className="text-[0.65rem] tracking-widest uppercase text-muted-foreground mb-1">{c.label}</div>
+                <div className="text-[0.85rem] text-foreground">{c.value}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -345,16 +679,20 @@ const Index = () => {
               El jumping studio que eleva tu cuerpo y transforma tu vida, salto a salto.
             </p>
             <div className="flex gap-3 mt-6">
-              {["ig", "fb", "tt"].map((s) => (
-                <a key={s} href="#" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">{s}</a>
-              ))}
+              <a href="https://instagram.com/opheliajumping" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">ig</a>
+              <a href="https://facebook.com/opheliajumping" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">fb</a>
+              <a href="https://tiktok.com/@opheliajumping" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">tt</a>
             </div>
           </div>
           <div>
             <div className="text-[0.72rem] tracking-widest uppercase text-muted-foreground mb-5">Estudio</div>
             <ul className="flex flex-col gap-[10px] list-none">
-              {["Clases", "Beneficios", "Paquetes", "Instructoras"].map((l) => (
-                <li key={l}><a href="#" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">{l}</a></li>
+              {[["Clases", "clases"], ["Horario", "horario"], ["Paquetes", "membresias"], ["Instructoras", "instructoras"]].map(([label, id]) => (
+                <li key={id}>
+                  <button onClick={() => scrollTo(id)} className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none cursor-pointer p-0">
+                    {label}
+                  </button>
+                </li>
               ))}
             </ul>
           </div>
@@ -369,14 +707,15 @@ const Index = () => {
           <div>
             <div className="text-[0.72rem] tracking-widest uppercase text-muted-foreground mb-5">Contacto</div>
             <ul className="flex flex-col gap-[10px] list-none">
-              {["San Juan del Río, Qro.", "info@opheliajumping.mx", "WhatsApp", "Horarios"].map((l) => (
-                <li key={l}><a href="#" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">{l}</a></li>
-              ))}
+              <li><span className="text-[0.85rem] text-muted-foreground">San Juan del Río, Qro.</span></li>
+              <li><a href="mailto:info@opheliajumping.mx" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">info@opheliajumping.mx</a></li>
+              <li><a href="https://wa.me/524421234567" target="_blank" rel="noopener noreferrer" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">WhatsApp</a></li>
+              <li><button onClick={() => scrollTo("horario")} className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none cursor-pointer p-0">Horarios</button></li>
             </ul>
           </div>
         </div>
         <div className="border-t border-border py-5 flex flex-col sm:flex-row justify-between items-center gap-2">
-          <p className="text-[0.75rem] text-muted-foreground/50">© 2025 Ophelia Jumping Studio. Todos los derechos reservados.</p>
+          <p className="text-[0.75rem] text-muted-foreground/50">© 2026 Ophelia Jumping Studio. Todos los derechos reservados.</p>
           <p className="text-[0.75rem] text-muted-foreground/50">Hecho con ♥ en San Juan del Río</p>
         </div>
       </footer>
