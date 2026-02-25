@@ -11,7 +11,10 @@ import ophelia28 from "@/assets/ophelia-28.jpg";
 const schema = z.object({
   displayName: z.string().min(2, "Mínimo 2 caracteres"),
   email: z.string().email("Email inválido"),
-  phone: z.string().regex(/^\+52[0-9]{10}$/, "Formato: +521234567890"),
+  phone: z
+    .string()
+    .transform((v) => v.replace(/\D/g, ""))           // quitar no-dígitos
+    .refine((v) => v.length === 10, "Debe tener 10 dígitos"),
   password: z
     .string()
     .min(8, "Mínimo 8 caracteres")
@@ -54,12 +57,15 @@ const Register = () => {
 
   const onSubmit = async (data: FormValues) => {
     clearError();
+    // normalizar teléfono: quitar no-dígitos y agregar prefijo +52
+    const rawPhone = data.phone.replace(/\D/g, "");
+    const phone = rawPhone.startsWith("52") ? `+${rawPhone}` : `+52${rawPhone}`;
     try {
       await registerUser({
         email: data.email,
         password: data.password,
         displayName: data.displayName,
-        phone: data.phone,
+        phone,
         acceptsTerms: data.acceptsTerms,
         acceptsCommunications: data.acceptsCommunications,
         ...(refCode ? { referralCode: refCode } : {}),
@@ -178,7 +184,8 @@ const Register = () => {
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs text-muted-foreground uppercase tracking-widest font-medium">Teléfono</label>
                 <input
-                  placeholder="+521234567890"
+                  placeholder="4271234567"
+                  inputMode="numeric"
                   {...register("phone")}
                   className="bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-all"
                 />
