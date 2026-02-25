@@ -1,42 +1,95 @@
+/* ──────────────────────────────────────────────────────────────
+   OPHELIA STUDIO — TIPOGRAFÍAS OFICIALES
+   Gulfs Display  →  headings / display  (font-gulfs)
+   Alilato        →  body / text         (font-alilato)
+
+   Fuentes fallback de Google Fonts (mientras se instalan las
+   fuentes propietarias en public/fonts/):
+     Gulfs   → Cormorant Garamond SemiBold (serif display elegante)
+     Alilato → Jost (geometric sans limpio)
+   ────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Jost:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Syne:wght@700;800&display=swap');
+/* font-face aliases so we can use font-gulfs / font-alilato in Tailwind */
+@font-face {
+  font-family: 'Gulfs';
+  src: local('Cormorant Garamond SemiBold'),
+       url('https://fonts.gstatic.com/s/cormorantgaramond/v22/co3YmX5slCNuHLi8bLeY9MK7whWMhyjQAllvuQ.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Alilato';
+  src: local('Jost'),
+       url('https://fonts.gstatic.com/s/jost/v18/92zPtBhPNqw73oHH7BbQp4-B22cU.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   PALETA OFICIAL OPHELIA STUDIO
+   Principal  : #1F0047  (morado oscuro profundo)
+   Primario   : #E15CB8  (rosa magenta vibrante)
+   Acento 1   : #CA71E1  (lila/violeta)
+   Acento 2   : #E7EB6E  (amarillo neón)
+   Crema      : #F9F7E8  (foreground cálido)
+   Sec 1      : #ECD6FB  (lila pastel)
+   Sec 2      : #FEA5DC  (rosa claro)
+   ────────────────────────────────────────────────────────────── */
 
 @layer base {
   :root {
-    --background: 0 0% 3.1%;
-    --foreground: 39 38% 89%;
+    /* Fondo oscuro morado profundo */
+    --background: 265 100% 14%;          /* #1F0047 */
+    --foreground: 53 74% 94%;            /* #F9F7E8 */
 
-    --card: 0 0% 5.9%;
-    --card-foreground: 39 38% 89%;
+    --card: 265 100% 10%;
+    --card-foreground: 53 74% 94%;
 
-    --popover: 0 0% 5.9%;
-    --popover-foreground: 39 38% 89%;
+    --popover: 265 100% 10%;
+    --popover-foreground: 53 74% 94%;
 
-    --primary: 309 63% 55%;
+    /* Primario: rosa magenta #E15CB8 */
+    --primary: 316 70% 61%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 8.6%;
-    --secondary-foreground: 39 38% 89%;
+    /* Secundario: morado más claro */
+    --secondary: 265 60% 20%;
+    --secondary-foreground: 53 74% 94%;
 
-    --muted: 0 0% 16.5%;
-    --muted-foreground: 0 0% 53%;
+    --muted: 265 40% 22%;
+    --muted-foreground: 265 20% 65%;
 
-    --accent: 309 63% 55%;
+    /* Acento: lila #CA71E1 */
+    --accent: 291 65% 66%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 16.5%;
-    --input: 0 0% 16.5%;
-    --ring: 309 63% 55%;
+    --border: 265 40% 26%;
+    --input: 265 40% 22%;
+    --ring: 316 70% 61%;
 
     --radius: 0.75rem;
 
-    --pink-glow: 309 63% 55%;
+    /* Tokens de color Ophelia */
+    --ophelia-purple:    265 100% 14%;   /* #1F0047 */
+    --ophelia-magenta:   316 70% 61%;    /* #E15CB8 */
+    --ophelia-violet:    291 65% 66%;    /* #CA71E1 */
+    --ophelia-lime:      62 75% 68%;     /* #E7EB6E */
+    --ophelia-cream:     53 74% 94%;     /* #F9F7E8 */
+    --ophelia-lilac:     285 86% 91%;    /* #ECD6FB */
+    --ophelia-pinklight: 327 96% 82%;    /* #FEA5DC */
+
+    --pink-glow: 316 70% 61%;
   }
 }
 
@@ -47,24 +100,37 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Alilato', 'Jost', sans-serif;
     overflow-x: hidden;
   }
 
-  h1, h2, h3.bebas {
-    font-family: 'Bebas Neue', sans-serif;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Gulfs', 'Cormorant Garamond', serif;
+    font-weight: 600;
+  }
+
+  .font-gulfs {
+    font-family: 'Gulfs', 'Cormorant Garamond', serif;
+  }
+
+  .font-alilato {
+    font-family: 'Alilato', 'Jost', sans-serif;
+  }
+
+  /* Keep legacy classes working */
+  .font-bebas {
+    font-family: 'Gulfs', 'Cormorant Garamond', serif;
+    font-weight: 700;
+    letter-spacing: 0.02em;
   }
 
   .font-syne {
-    font-family: 'Syne', sans-serif;
-  }
-
-  .font-bebas {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: 'Alilato', 'Jost', sans-serif;
+    font-weight: 700;
   }
 
   .font-dm {
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Alilato', 'Jost', sans-serif;
   }
 }
 

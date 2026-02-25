@@ -47,6 +47,16 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        /* ── Ophelia Studio brand palette ── */
+        ophelia: {
+          purple:      "#1F0047",
+          magenta:     "#E15CB8",
+          violet:      "#CA71E1",
+          lime:        "#E7EB6E",
+          cream:       "#F9F7E8",
+          lilac:       "#ECD6FB",
+          pinklight:   "#FEA5DC",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -54,9 +64,13 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        bebas: ['"Bebas Neue"', 'sans-serif'],
-        syne: ['"Syne"', 'sans-serif'],
-        dm: ['"DM Sans"', 'sans-serif'],
+        /* ── Official brand fonts ── */
+        gulfs:   ['"Gulfs"', '"Cormorant Garamond"', 'serif'],
+        alilato: ['"Alilato"', '"Jost"', 'sans-serif'],
+        /* ── Backwards-compat aliases ── */
+        bebas:   ['"Gulfs"', '"Cormorant Garamond"', 'serif'],
+        syne:    ['"Alilato"', '"Jost"', 'sans-serif'],
+        dm:      ['"Alilato"', '"Jost"', 'sans-serif'],
       },
       keyframes: {
         "accordion-down": {
