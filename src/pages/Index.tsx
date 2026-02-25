@@ -9,56 +9,109 @@ import ophelia32 from "@/assets/ophelia-32.jpg";
 import ophelia38 from "@/assets/ophelia-38.jpg";
 import ophelia50 from "@/assets/ophelia-50.jpg";
 
-type PlanRow = {
+type ClassTypeRow = {
   id: string;
   name: string;
-  description?: string;
-  price: number;
-  currency: string;
-  duration_days: number;
-  class_limit: number | null;
-  features: string[] | string;
+  subtitle: string | null;
+  description: string | null;
+  category: "jumping" | "pilates" | "mixto";
+  intensity: "ligera" | "media" | "pesada" | "todas";
+  color: string;
+  emoji: string;
+  level: string;
+  duration_min: number;
+  capacity: number;
   is_active: boolean;
   sort_order: number;
 };
 
-// Fallback hardcoded plans mientras el backend no tenga datos
-const FALLBACK_PLANS: PlanRow[] = [
-  { id: "f1", name: "4 Clases", description: null, price: 380, currency: "MXN", duration_days: 30, class_limit: 4, features: [], is_active: true, sort_order: 0 },
-  { id: "f2", name: "8 Clases", description: null, price: 700, currency: "MXN", duration_days: 30, class_limit: 8, features: [], is_active: true, sort_order: 1 },
-  { id: "f3", name: "12 Clases", description: null, price: 980, currency: "MXN", duration_days: 30, class_limit: 12, features: [], is_active: true, sort_order: 2 },
-  { id: "f4", name: "Ilimitado", description: null, price: 1350, currency: "MXN", duration_days: 30, class_limit: null, features: [], is_active: true, sort_order: 3 },
+type PackageRow = {
+  id: string;
+  name: string;
+  num_classes: string;
+  price: number;
+  category: "jumping" | "pilates" | "mixtos";
+  validity_days: number;
+  is_active: boolean;
+  sort_order: number;
+};
+
+type ScheduleSlot = {
+  id: string;
+  time_slot: string;
+  day_of_week: number;
+  class_label: "JUMPING" | "PILATES" | "SORPRESA";
+  shift: "morning" | "evening";
+  is_active: boolean;
+};
+
+const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
+  { id: "c1", name: "Jumping Basics", subtitle: "El punto de partida perfecto", description: "Aprende los fundamentos del jumping fitness con movimientos accesibles y musica motivadora.", category: "jumping", intensity: "ligera", color: "#E040FB", emoji: "🚀", level: "Principiante", duration_min: 50, capacity: 15, is_active: true, sort_order: 1 },
+  { id: "c2", name: "Power Jump", subtitle: "Lleva tu limite al siguiente nivel", description: "Coreografias dinamicas, intervalos HIIT y musica que no para. Para quienes ya dominan las bases.", category: "jumping", intensity: "pesada", color: "#CA71E1", emoji: "⚡", level: "Intermedio", duration_min: 55, capacity: 12, is_active: true, sort_order: 2 },
+  { id: "c3", name: "Jump & Stretch", subtitle: "Muevete y recuperate", description: "Combina jumping con yoga y stretching profundo. Ideal para relajar y ganar flexibilidad.", category: "mixto", intensity: "ligera", color: "#E7EB6E", emoji: "🌸", level: "Todos los niveles", duration_min: 60, capacity: 10, is_active: true, sort_order: 3 },
 ];
 
-// Horario semanal estático
-const SCHEDULE = [
-  { time: "7:00 am",  mon: "Jumping Basics", tue: "Power Jump",   wed: "Jumping Basics", thu: "Power Jump",   fri: "Jump & Stretch", sat: "Jumping Basics", sun: null },
-  { time: "9:00 am",  mon: "Power Jump",     tue: "Jumping Basics", wed: "Power Jump",   thu: "Jumping Basics", fri: "Power Jump",   sat: "Power Jump",     sun: null },
-  { time: "11:00 am", mon: "Jump & Stretch", tue: null,           wed: "Jump & Stretch", thu: null,            fri: "Jumping Basics", sat: "Jump & Stretch", sun: null },
-  { time: "6:00 pm",  mon: "Jumping Basics", tue: "Power Jump",   wed: "Jumping Basics", thu: "Power Jump",   fri: "Power Jump",   sat: null,             sun: null },
-  { time: "7:30 pm",  mon: "Power Jump",     tue: "Jump & Stretch", wed: "Power Jump",  thu: "Jump & Stretch", fri: null,          sat: null,             sun: null },
+const FALLBACK_PACKAGES: PackageRow[] = [
+  { id: "p1", name: "4 Clases Jumping", num_classes: "4", price: 380, category: "jumping", validity_days: 30, is_active: true, sort_order: 1 },
+  { id: "p2", name: "8 Clases Jumping", num_classes: "8", price: 700, category: "jumping", validity_days: 30, is_active: true, sort_order: 2 },
+  { id: "p3", name: "12 Clases Jumping", num_classes: "12", price: 980, category: "jumping", validity_days: 30, is_active: true, sort_order: 3 },
+  { id: "p4", name: "Ilimitado Jumping", num_classes: "ILIMITADO", price: 1350, category: "jumping", validity_days: 30, is_active: true, sort_order: 4 },
+  { id: "p5", name: "4 Clases Pilates", num_classes: "4", price: 400, category: "pilates", validity_days: 30, is_active: true, sort_order: 1 },
+  { id: "p6", name: "8 Clases Pilates", num_classes: "8", price: 740, category: "pilates", validity_days: 30, is_active: true, sort_order: 2 },
+  { id: "p7", name: "12 Clases Pilates", num_classes: "12", price: 1050, category: "pilates", validity_days: 30, is_active: true, sort_order: 3 },
+  { id: "p8", name: "Ilimitado Pilates", num_classes: "ILIMITADO", price: 1400, category: "pilates", validity_days: 30, is_active: true, sort_order: 4 },
+  { id: "p9", name: "4 Clases Mixto", num_classes: "4", price: 420, category: "mixtos", validity_days: 30, is_active: true, sort_order: 1 },
+  { id: "p10", name: "8 Clases Mixto", num_classes: "8", price: 780, category: "mixtos", validity_days: 30, is_active: true, sort_order: 2 },
+  { id: "p11", name: "12 Clases Mixto", num_classes: "12", price: 1100, category: "mixtos", validity_days: 30, is_active: true, sort_order: 3 },
+  { id: "p12", name: "Ilimitado Mixto", num_classes: "ILIMITADO", price: 1500, category: "mixtos", validity_days: 30, is_active: true, sort_order: 4 },
 ];
-const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
-const CLASS_COLORS: Record<string, string> = {
-  "Jumping Basics": "bg-primary/20 text-primary border border-primary/30",
-  "Power Jump":     "bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30",
-  "Jump & Stretch": "bg-[#E7EB6E]/20 text-[#E7EB6E] border border-[#E7EB6E]/30",
+const FALLBACK_SCHEDULE: ScheduleSlot[] = [
+  { id: "s1",  time_slot: "7:00am",  day_of_week: 1, class_label: "JUMPING",  shift: "morning", is_active: true },
+  { id: "s2",  time_slot: "7:00am",  day_of_week: 2, class_label: "PILATES",  shift: "morning", is_active: true },
+  { id: "s3",  time_slot: "7:00am",  day_of_week: 3, class_label: "JUMPING",  shift: "morning", is_active: true },
+  { id: "s4",  time_slot: "7:00am",  day_of_week: 4, class_label: "PILATES",  shift: "morning", is_active: true },
+  { id: "s5",  time_slot: "7:00am",  day_of_week: 5, class_label: "SORPRESA", shift: "morning", is_active: true },
+  { id: "s6",  time_slot: "9:00am",  day_of_week: 1, class_label: "PILATES",  shift: "morning", is_active: true },
+  { id: "s7",  time_slot: "9:00am",  day_of_week: 2, class_label: "JUMPING",  shift: "morning", is_active: true },
+  { id: "s8",  time_slot: "9:00am",  day_of_week: 3, class_label: "PILATES",  shift: "morning", is_active: true },
+  { id: "s9",  time_slot: "9:00am",  day_of_week: 4, class_label: "JUMPING",  shift: "morning", is_active: true },
+  { id: "s10", time_slot: "9:00am",  day_of_week: 6, class_label: "JUMPING",  shift: "morning", is_active: true },
+  { id: "s11", time_slot: "6:00pm",  day_of_week: 1, class_label: "JUMPING",  shift: "evening", is_active: true },
+  { id: "s12", time_slot: "6:00pm",  day_of_week: 2, class_label: "PILATES",  shift: "evening", is_active: true },
+  { id: "s13", time_slot: "6:00pm",  day_of_week: 3, class_label: "JUMPING",  shift: "evening", is_active: true },
+  { id: "s14", time_slot: "6:00pm",  day_of_week: 4, class_label: "PILATES",  shift: "evening", is_active: true },
+  { id: "s15", time_slot: "6:00pm",  day_of_week: 5, class_label: "JUMPING",  shift: "evening", is_active: true },
+  { id: "s16", time_slot: "7:30pm",  day_of_week: 1, class_label: "PILATES",  shift: "evening", is_active: true },
+  { id: "s17", time_slot: "7:30pm",  day_of_week: 2, class_label: "JUMPING",  shift: "evening", is_active: true },
+  { id: "s18", time_slot: "7:30pm",  day_of_week: 3, class_label: "SORPRESA", shift: "evening", is_active: true },
+  { id: "s19", time_slot: "7:30pm",  day_of_week: 4, class_label: "JUMPING",  shift: "evening", is_active: true },
+  { id: "s20", time_slot: "7:30pm",  day_of_week: 5, class_label: "PILATES",  shift: "evening", is_active: true },
+];
+
+const DAYS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
+
+const LABEL_STYLE: Record<string, string> = {
+  JUMPING:  "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30",
+  PILATES:  "bg-pink-500/20 text-pink-300 border border-pink-500/30",
+  SORPRESA: "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30",
 };
 
 const TESTIMONIOS = [
-  { name: "Karla M.", stars: 5, text: "¡Llevo 6 meses y no puedo parar! Bajé 8 kg y me siento increíble. El ambiente del studio es único, las instructoras te motivan a dar lo mejor.", avatar: "KM" },
-  { name: "Sofía R.", stars: 5, text: "Empecé sin forma física y ahora hago Power Jump sin problema. La comunidad de Ophelia es lo mejor, todas nos apoyamos.", avatar: "SR" },
-  { name: "Daniela V.", stars: 5, text: "El jumping fue lo que necesitaba. Cuida mis rodillas y aun así siento que entrené duro. Las clases de 7am me cambiaron la mañana.", avatar: "DV" },
-  { name: "Mariana L.", stars: 5, text: "Desde el primer día me sentí bienvenida. El studio es hermoso, la música increíble y los resultados hablan solos. 100% recomendado.", avatar: "ML" },
-  { name: "Valeria P.", stars: 5, text: "Probé mil clases y ninguna me enganchó como el jumping. Es adictivo en el mejor sentido, cada clase es diferente y divertidísima.", avatar: "VP" },
-  { name: "Fernanda T.", stars: 5, text: "Las instructoras son excelentes, siempre atentas a la técnica. Me encanta que hay clases para todos los niveles. Ophelia es mi lugar favorito.", avatar: "FT" },
+  { name: "Karla M.", stars: 5, text: "Llevo 6 meses y no puedo parar! Baje 8 kg y me siento increible. El ambiente del studio es unico, las instructoras te motivan a dar lo mejor.", avatar: "KM" },
+  { name: "Sofia R.", stars: 5, text: "Empece sin forma fisica y ahora hago Power Jump sin problema. La comunidad de Ophelia es lo mejor, todas nos apoyamos.", avatar: "SR" },
+  { name: "Daniela V.", stars: 5, text: "El jumping fue lo que necesitaba. Cuida mis rodillas y aun asi siento que entene duro. Las clases de 7am me cambiaron la manana.", avatar: "DV" },
+  { name: "Mariana L.", stars: 5, text: "Desde el primer dia me senti bienvenida. El studio es hermoso, la musica increible y los resultados hablan solos. 100% recomendado.", avatar: "ML" },
+  { name: "Valeria P.", stars: 5, text: "Probe mil clases y ninguna me engancho como el jumping. Es adictivo en el mejor sentido, cada clase es diferente y divertidisima.", avatar: "VP" },
+  { name: "Fernanda T.", stars: 5, text: "Las instructoras son excelentes, siempre atentas a la tecnica. Me encanta que hay clases para todos los niveles. Ophelia es mi lugar favorito.", avatar: "FT" },
 ];
 
 const Index = () => {
   const [navScrolled, setNavScrolled] = useState(false);
-  const [plans, setPlans] = useState<PlanRow[]>([]);
+  const [classTypes, setClassTypes] = useState<ClassTypeRow[]>(FALLBACK_CLASS_TYPES);
+  const [packages, setPackages] = useState<PackageRow[]>(FALLBACK_PACKAGES);
+  const [schedule, setSchedule] = useState<ScheduleSlot[]>(FALLBACK_SCHEDULE);
+  const [activePkgTab, setActivePkgTab] = useState<"jumping" | "pilates" | "mixtos">("jumping");
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const navigate = useNavigate();
 
@@ -69,10 +122,24 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    api.get<{ data: PlanRow[] }>("/plans").then(({ data }) => {
+    api.get<{ data: ClassTypeRow[] }>("/admin/class-types").then(({ data }) => {
+      const rows = Array.isArray(data?.data) ? data.data.filter((c) => c.is_active) : [];
+      if (rows.length > 0) setClassTypes(rows);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    api.get<{ data: PackageRow[] }>("/packages").then(({ data }) => {
       const rows = Array.isArray(data?.data) ? data.data : [];
-      setPlans(rows.length > 0 ? rows : FALLBACK_PLANS);
-    }).catch(() => setPlans(FALLBACK_PLANS));
+      if (rows.length > 0) setPackages(rows);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    api.get<{ data: ScheduleSlot[] }>("/admin/schedule").then(({ data }) => {
+      const rows = Array.isArray(data?.data) ? data.data.filter((s) => s.is_active) : [];
+      if (rows.length > 0) setSchedule(rows);
+    }).catch(() => {});
   }, []);
 
   // Auto-rotate testimonials
@@ -271,31 +338,39 @@ const Index = () => {
           <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">NUESTRAS CLASES</h2>
         </div>
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-16">
-          {[
-            { img: ophelia14, emoji: "🚀", level: "Principiante", title: "Jumping Basics", desc: "La clase perfecta para comenzar. Aprende los fundamentos del jumping fitness con música motivadora y movimientos accesibles.", dur: "50 min", cap: "Max. 15", days: "L-V", gradient: "from-[#1a0820] to-[#2d0a30]" },
-            { img: ophelia28, emoji: "⚡", level: "Intermedio", title: "Power Jump", desc: "Lleva tu entrenamiento al siguiente nivel con coreografías dinámicas, intervalos HIIT y música que no para.", dur: "55 min", cap: "Max. 12", days: "L-S", gradient: "from-[#0d1a20] to-[#0a2030]" },
-            { img: ophelia50, emoji: "🌸", level: "Todos los niveles", title: "Jump & Stretch", desc: "Combina el jumping con yoga y stretching profundo. Ideal para relajar, ganar flexibilidad y recuperarte activamente.", dur: "60 min", cap: "Max. 10", days: "Sáb", gradient: "from-[#1a1a0d] to-[#2a2010]" },
-          ].map((c, i) => (
-            <div key={i} className="rounded-3xl overflow-hidden bg-secondary border border-border hover:-translate-y-2 hover:border-primary transition-all group">
-              <div className="h-[220px] relative overflow-hidden">
-                <img src={c.img} alt={c.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
-                <div className={`absolute inset-0 bg-gradient-to-br ${c.gradient} opacity-60`} />
-                <span className="absolute top-4 right-4 z-10 text-[0.65rem] tracking-widest uppercase px-3 py-[5px] rounded-full bg-primary/20 text-primary border border-primary/30">{c.level}</span>
-                <span className="relative z-10 flex items-center justify-center h-full text-[4rem] drop-shadow-[0_0_30px_hsl(var(--primary)/0.5)]">{c.emoji}</span>
-              </div>
-              <div className="p-7">
-                <h3 className="font-syne font-bold text-[1.1rem] mb-2">{c.title}</h3>
-                <p className="text-[0.84rem] text-muted-foreground leading-[1.6] mb-5">{c.desc}</p>
-                <div className="flex gap-4">
-                  {[["⏱", c.dur], ["👥", c.cap], ["📅", c.days]].map(([icon, val]) => (
-                    <span key={val} className="text-[0.75rem] text-muted-foreground flex items-center gap-[6px]">
-                      {icon} <span className="text-foreground font-medium">{val}</span>
-                    </span>
-                  ))}
+          {classTypes.slice(0, 6).map((c, i) => {
+            const imgs = [ophelia14, ophelia28, ophelia50, ophelia31, ophelia15, ophelia32];
+            const gradients = [
+              "from-[#1a0820] to-[#2d0a30]",
+              "from-[#0d1a20] to-[#0a2030]",
+              "from-[#1a1a0d] to-[#2a2010]",
+              "from-[#1a0820] to-[#2d0a30]",
+              "from-[#0d1a20] to-[#0a2030]",
+              "from-[#1a1a0d] to-[#2a2010]",
+            ];
+            return (
+              <div key={c.id} className="rounded-3xl overflow-hidden bg-secondary border border-border hover:-translate-y-2 hover:border-primary transition-all group">
+                <div className="h-[220px] relative overflow-hidden">
+                  <img src={imgs[i % imgs.length]} alt={c.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
+                  <div className={`absolute inset-0 bg-gradient-to-br ${gradients[i % gradients.length]} opacity-60`} />
+                  <span className="absolute top-4 right-4 z-10 text-[0.65rem] tracking-widest uppercase px-3 py-[5px] rounded-full bg-primary/20 text-primary border border-primary/30">{c.level}</span>
+                  <span className="relative z-10 flex items-center justify-center h-full text-[4rem] drop-shadow-[0_0_30px_hsl(var(--primary)/0.5)]">{c.emoji}</span>
+                </div>
+                <div className="p-7">
+                  <h3 className="font-syne font-bold text-[1.1rem] mb-1">{c.name}</h3>
+                  {c.subtitle && <p className="text-xs text-primary mb-2">{c.subtitle}</p>}
+                  <p className="text-[0.84rem] text-muted-foreground leading-[1.6] mb-5">{c.description}</p>
+                  <div className="flex gap-4">
+                    {[["⏱", `${c.duration_min} min`], ["👥", `Max. ${c.capacity}`]].map(([icon, val]) => (
+                      <span key={val} className="text-[0.75rem] text-muted-foreground flex items-center gap-[6px]">
+                        {icon} <span className="text-foreground font-medium">{val}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -311,62 +386,76 @@ const Index = () => {
               HORARIO<br />SEMANAL
             </h2>
             <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Clases de lunes a sábado. Elige el horario que mejor se adapte a tu día y reserva tu lugar desde la app.
+              Clases de lunes a sabado. Elige el horario que mejor se adapte a tu dia y reserva tu lugar desde la app.
             </p>
           </div>
           {/* Leyenda */}
           <div className="flex flex-wrap gap-3 mb-8">
-            {Object.entries(CLASS_COLORS).map(([name, cls]) => (
-              <span key={name} className={`text-[0.7rem] tracking-wider px-3 py-1 rounded-full font-medium ${cls}`}>{name}</span>
+            {(["JUMPING", "PILATES", "SORPRESA"] as const).map((label) => (
+              <span key={label} className={`text-[0.7rem] tracking-wider px-3 py-1 rounded-full font-medium ${LABEL_STYLE[label]}`}>{label}</span>
             ))}
           </div>
           {/* Tabla desktop */}
-          <div className="hidden lg:block rounded-2xl overflow-hidden border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-background/60">
-                  <th className="py-4 px-5 text-left text-[0.7rem] tracking-widest uppercase text-muted-foreground font-medium w-[90px]">Hora</th>
-                  {DAYS.map(d => (
-                    <th key={d} className="py-4 px-3 text-[0.7rem] tracking-widest uppercase text-muted-foreground font-medium text-center">{d}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {SCHEDULE.map((row, i) => (
-                  <tr key={i} className="border-t border-border hover:bg-background/40 transition-colors">
-                    <td className="py-4 px-5 text-foreground font-medium text-[0.82rem] whitespace-nowrap">{row.time}</td>
-                    {DAY_KEYS.map(day => (
-                      <td key={day} className="py-3 px-3 text-center">
-                        {row[day] ? (
-                          <span className={`inline-block text-[0.68rem] tracking-wide px-2 py-[5px] rounded-lg font-medium ${CLASS_COLORS[row[day] as string] ?? "bg-secondary text-foreground"}`}>
-                            {row[day]}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground/20 text-[0.8rem]">—</span>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {/* Cards mobile */}
-          <div className="lg:hidden flex flex-col gap-3">
-            {SCHEDULE.map((row, i) => (
-              <div key={i} className="rounded-xl border border-border bg-background/40 p-4">
-                <div className="text-foreground font-semibold text-sm mb-3">{row.time}</div>
-                <div className="flex flex-wrap gap-2">
-                  {DAY_KEYS.map((day, di) => row[day] ? (
-                    <div key={day} className="flex flex-col items-center gap-1">
-                      <span className="text-[0.6rem] text-muted-foreground">{DAYS[di]}</span>
-                      <span className={`text-[0.65rem] px-2 py-[3px] rounded-md font-medium ${CLASS_COLORS[row[day] as string] ?? ""}`}>{row[day]}</span>
-                    </div>
-                  ) : null)}
+          {(() => {
+            const times = [...new Set(schedule.map((s) => s.time_slot))].sort();
+            return (
+              <>
+                <div className="hidden lg:block rounded-2xl overflow-hidden border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-background/60">
+                        <th className="py-4 px-5 text-left text-[0.7rem] tracking-widest uppercase text-muted-foreground font-medium w-[90px]">Hora</th>
+                        {DAYS.map((d) => (
+                          <th key={d} className="py-4 px-3 text-[0.7rem] tracking-widest uppercase text-muted-foreground font-medium text-center">{d}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {times.map((time) => (
+                        <tr key={time} className="border-t border-border hover:bg-background/40 transition-colors">
+                          <td className="py-4 px-5 text-foreground font-medium text-[0.82rem] whitespace-nowrap">{time}</td>
+                          {[1, 2, 3, 4, 5, 6].map((day) => {
+                            const cell = schedule.find((s) => s.time_slot === time && s.day_of_week === day);
+                            return (
+                              <td key={day} className="py-3 px-3 text-center">
+                                {cell ? (
+                                  <span className={`inline-block text-[0.68rem] tracking-wide px-2 py-[5px] rounded-lg font-medium ${LABEL_STYLE[cell.class_label] ?? "bg-secondary text-foreground"}`}>
+                                    {cell.class_label}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground/20 text-[0.8rem]">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            ))}
-          </div>
+                {/* Cards mobile */}
+                <div className="lg:hidden flex flex-col gap-3">
+                  {times.map((time) => (
+                    <div key={time} className="rounded-xl border border-border bg-background/40 p-4">
+                      <div className="text-foreground font-semibold text-sm mb-3">{time}</div>
+                      <div className="flex flex-wrap gap-2">
+                        {[1, 2, 3, 4, 5, 6].map((day) => {
+                          const cell = schedule.find((s) => s.time_slot === time && s.day_of_week === day);
+                          if (!cell) return null;
+                          return (
+                            <div key={day} className="flex flex-col items-center gap-1">
+                              <span className="text-[0.6rem] text-muted-foreground">{DAYS[day - 1]}</span>
+                              <span className={`text-[0.65rem] px-2 py-[3px] rounded-md font-medium ${LABEL_STYLE[cell.class_label] ?? ""}`}>{cell.class_label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
           <div className="mt-8 text-center">
             <button
               onClick={() => navigate("/auth/register")}
@@ -431,78 +520,98 @@ const Index = () => {
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Inversión
+            Inversion
           </div>
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
             <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
               ELIGE TU<br />PAQUETE
             </h2>
             <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Todos los paquetes incluyen acceso a cualquier tipo de clase durante 30 días. Sin compromisos.
+              Paquetes para todos los gustos. Vigencia de 30 dias. Sin compromisos.
             </p>
           </div>
+          {/* Category tabs */}
+          <div className="flex gap-2 mb-8 flex-wrap">
+            {(["jumping", "pilates", "mixtos"] as const).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActivePkgTab(cat)}
+                className={`px-5 py-2 rounded-full text-[0.78rem] font-medium tracking-wide uppercase transition-all ${
+                  activePkgTab === cat
+                    ? "bg-primary text-primary-foreground shadow-[0_4px_20px_hsl(var(--primary)/0.3)]"
+                    : "border border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          {/* Package grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {plans.map((p, i) => {
-              const isUnlimited = p.class_limit === null;
-              const isPopular = i === plans.length - 2;
-              return (
-                <div
-                  key={p.id}
-                  className={`relative rounded-3xl p-8 flex flex-col gap-4 transition-all hover:-translate-y-2 ${
-                    isUnlimited
-                      ? "bg-primary border-2 border-primary shadow-[0_20px_60px_hsl(var(--primary)/0.35)]"
-                      : isPopular
-                      ? "bg-background border-2 border-primary/60 shadow-[0_10px_40px_hsl(var(--primary)/0.15)]"
-                      : "bg-background border border-border hover:border-primary/50"
-                  }`}
-                >
-                  {isPopular && !isUnlimited && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#CA71E1] text-white text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium">
-                      Más popular
+            {packages
+              .filter((p) => p.category === activePkgTab && p.is_active)
+              .sort((a, b) => a.sort_order - b.sort_order)
+              .map((p, i, arr) => {
+                const isUnlimited = p.num_classes?.toString().toUpperCase() === "ILIMITADO";
+                const isPopular = i === arr.length - 2 && !isUnlimited;
+                return (
+                  <div
+                    key={p.id}
+                    className={`relative rounded-3xl p-8 flex flex-col gap-4 transition-all hover:-translate-y-2 ${
+                      isUnlimited
+                        ? "bg-primary border-2 border-primary shadow-[0_20px_60px_hsl(var(--primary)/0.35)]"
+                        : isPopular
+                        ? "bg-background border-2 border-primary/60 shadow-[0_10px_40px_hsl(var(--primary)/0.15)]"
+                        : "bg-background border border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {isPopular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#CA71E1] text-white text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium whitespace-nowrap">
+                        Mas popular
+                      </div>
+                    )}
+                    {isUnlimited && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-foreground text-primary text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium whitespace-nowrap">
+                        Mejor valor
+                      </div>
+                    )}
+                    <div className={`text-[0.7rem] tracking-[0.15em] uppercase font-medium ${isUnlimited ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                      {p.validity_days ?? 30} dias de vigencia
                     </div>
-                  )}
-                  {isUnlimited && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-foreground text-primary text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium">
-                      ✦ Mejor valor
+                    <div className={`font-bebas text-[0.95rem] tracking-wide ${isUnlimited ? "text-primary-foreground" : "text-foreground"}`}>
+                      {isUnlimited ? "ILIMITADO" : `${p.num_classes} CLASES`}
                     </div>
-                  )}
-                  <div className={`text-[0.7rem] tracking-[0.15em] uppercase font-medium ${isUnlimited ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                    {p.duration_days} días de vigencia
-                  </div>
-                  <div className={`font-bebas text-[0.95rem] tracking-wide ${isUnlimited ? "text-primary-foreground" : "text-foreground"}`}>
-                    {isUnlimited ? "ILIMITADO" : `${p.class_limit} CLASES`}
-                  </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`font-bebas text-[3.5rem] leading-none ${isUnlimited ? "text-primary-foreground" : "text-primary"}`}>
-                      ${p.price.toLocaleString()}
-                    </span>
-                    <span className={`text-[0.75rem] ${isUnlimited ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                      MXN
-                    </span>
-                  </div>
-                  {!isUnlimited && p.class_limit && (
-                    <div className={`text-[0.78rem] ${isUnlimited ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                      ${(p.price / p.class_limit).toFixed(0)}/clase
+                    <div className="flex items-baseline gap-1">
+                      <span className={`font-bebas text-[3.5rem] leading-none ${isUnlimited ? "text-primary-foreground" : "text-primary"}`}>
+                        ${Number(p.price).toLocaleString()}
+                      </span>
+                      <span className={`text-[0.75rem] ${isUnlimited ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                        MXN
+                      </span>
                     </div>
-                  )}
-                  <div className="mt-auto">
-                    <button
-                      onClick={() => navigate("/auth/register")}
-                      className={`w-full py-3 rounded-full text-[0.78rem] font-medium tracking-wider uppercase transition-all ${
-                        isUnlimited
-                          ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                          : "border border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                      }`}
-                    >
-                      Elegir plan
-                    </button>
+                    {!isUnlimited && Number(p.num_classes) > 0 && (
+                      <div className={`text-[0.78rem] ${isUnlimited ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                        ${(Number(p.price) / Number(p.num_classes)).toFixed(0)}/clase
+                      </div>
+                    )}
+                    <div className="mt-auto">
+                      <button
+                        onClick={() => navigate("/auth/register")}
+                        className={`w-full py-3 rounded-full text-[0.78rem] font-medium tracking-wider uppercase transition-all ${
+                          isUnlimited
+                            ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                            : "border border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                        }`}
+                      >
+                        Elegir paquete
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
           <p className="text-xs text-muted-foreground mt-8 text-center">
-            Vigencia de 30 días desde la primera clase · Aplican términos y condiciones · Precios en MXN
+            Vigencia desde la primera clase · Aplican terminos y condiciones · Precios en MXN
           </p>
         </div>
       </section>
