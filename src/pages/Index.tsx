@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import ophelia14 from "@/assets/ophelia-14.jpg";
 import ophelia15 from "@/assets/ophelia-15.jpg";
@@ -14,6 +15,7 @@ const Index = () => {
   const [navScrolled, setNavScrolled] = useState(false);
   const [packages, setPackages] = useState<PackageRow[]>([]);
   const [activeTab, setActiveTab] = useState("jumping");
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => setNavScrolled(window.scrollY > 50);
@@ -76,7 +78,7 @@ const Index = () => {
           ))}
         </ul>
         <button
-          onClick={() => scrollTo("contacto")}
+          onClick={() => navigate("/auth/register")}
           className="bg-primary text-primary-foreground px-7 py-3 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:scale-[1.04] hover:shadow-[0_0_30px_hsl(var(--pink-glow)/0.35)] transition-all"
         >
           Unirse ahora
@@ -104,7 +106,7 @@ const Index = () => {
           </p>
           <div className="mt-11 flex gap-4 items-center animate-fade-up delay-800">
             <button
-              onClick={() => scrollTo("contacto")}
+              onClick={() => navigate("/auth/register")}
               className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all"
             >
               Comenzar hoy
@@ -314,14 +316,20 @@ const Index = () => {
             Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Prueba tu primera clase sin costo.
           </p>
           <div className="flex gap-4 justify-center items-center flex-wrap">
-            <a href="https://wa.me/524271234567" target="_blank" rel="noopener noreferrer" className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all no-underline">
-              Clase gratis via WhatsApp
+            <button
+              onClick={() => navigate("/auth/register")}
+              className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all"
+            >
+              Crear cuenta gratis
               <span className="w-[22px] h-[22px] bg-primary-foreground/20 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
-            </a>
-            <a href="tel:+524271234567" className="text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity no-underline">
-              <span className="w-[42px] h-[42px] border border-foreground/20 rounded-full flex items-center justify-center text-[0.8rem]">📞</span>
-              Llamar ahora
-            </a>
+            </button>
+            <button
+              onClick={() => navigate("/auth/login")}
+              className="text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity bg-transparent border-none cursor-pointer"
+            >
+              <span className="w-[42px] h-[42px] border border-foreground/20 rounded-full flex items-center justify-center text-[0.8rem]">→</span>
+              Iniciar sesión
+            </button>
           </div>
         </div>
       </section>
