@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import ophelia14 from "@/assets/ophelia-14.jpg";
 import ophelia15 from "@/assets/ophelia-15.jpg";
 import ophelia28 from "@/assets/ophelia-28.jpg";
@@ -7,13 +8,23 @@ import ophelia32 from "@/assets/ophelia-32.jpg";
 import ophelia38 from "@/assets/ophelia-38.jpg";
 import ophelia50 from "@/assets/ophelia-50.jpg";
 
+type PackageRow = { id: string; category: string; num_classes: string; price: number; sort_order: number };
+
 const Index = () => {
   const [navScrolled, setNavScrolled] = useState(false);
+  const [packages, setPackages] = useState<PackageRow[]>([]);
+  const [activeTab, setActiveTab] = useState("jumping");
 
   useEffect(() => {
     const handleScroll = () => setNavScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    supabase.from("packages").select("*").eq("is_active", true).order("sort_order").then(({ data }) => {
+      if (data) setPackages(data);
+    });
   }, []);
 
   // Scroll reveal
@@ -51,11 +62,11 @@ const Index = () => {
           Ophelia<span className="text-primary">.</span>
         </a>
         <ul className="hidden lg:flex gap-10 list-none">
-          {["Clases", "Beneficios", "Membresías", "Contacto"].map((item) => (
+          {["Clases", "Beneficios", "Paquetes", "Contacto"].map((item) => (
             <li key={item}>
               <button
                 onClick={() =>
-                  scrollTo(item.toLowerCase().replace("í", "i"))
+                  scrollTo(item === "Paquetes" ? "membresias" : item.toLowerCase().replace("í", "i"))
                 }
                 className="text-muted-foreground text-[0.85rem] font-normal tracking-widest uppercase hover:text-foreground transition-colors bg-transparent border-none cursor-pointer"
               >
@@ -74,7 +85,6 @@ const Index = () => {
 
       {/* ── HERO ── */}
       <section className="min-h-screen grid grid-cols-1 lg:grid-cols-2 items-center px-6 lg:px-[60px] pt-[140px] pb-20 relative overflow-hidden gap-10 lg:gap-[60px]">
-        {/* BG circles */}
         <div className="absolute w-[600px] h-[600px] rounded-full blur-[80px] bg-[radial-gradient(circle,hsl(var(--primary)/0.18)_0%,transparent_70%)] -top-[100px] -right-[100px] animate-float pointer-events-none" />
         <div className="absolute w-[400px] h-[400px] rounded-full blur-[80px] bg-[radial-gradient(circle,hsl(var(--primary)/0.1)_0%,transparent_70%)] bottom-0 left-[100px] animate-float-reverse pointer-events-none" />
 
@@ -110,19 +120,12 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Hero right */}
         <div className="relative hidden lg:flex flex-col gap-5 animate-fade-up delay-500">
           <div className="bg-secondary border border-border rounded-[28px] overflow-hidden relative h-[420px]">
-            <img
-              src={ophelia31}
-              alt="Alumnas saltando en trampolines en Ophelia Jumping Studio"
-              className="w-full h-full object-cover"
-            />
+            <img src={ophelia31} alt="Alumnas saltando en trampolines en Ophelia Jumping Studio" className="w-full h-full object-cover" />
             <div className="absolute bottom-[-18px] right-[30px] bg-primary rounded-[18px] px-[22px] py-4 flex items-center gap-3 shadow-[0_20px_60px_hsl(var(--primary)/0.4)]">
               <span className="font-bebas text-[2.2rem] leading-none text-primary-foreground">+500</span>
-              <span className="text-[0.72rem] text-primary-foreground/80 uppercase tracking-wider leading-tight">
-                Alumnas<br />activas
-              </span>
+              <span className="text-[0.72rem] text-primary-foreground/80 uppercase tracking-wider leading-tight">Alumnas<br />activas</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 mt-6">
@@ -148,10 +151,7 @@ const Index = () => {
           { num: "5", label: "Años de experiencia" },
           { num: "98%", label: "Lo recomiendan" },
         ].map((s, i) => (
-          <div
-            key={i}
-            className="py-10 px-5 border-r border-border last:border-r-0 hover:bg-primary/5 transition-colors"
-          >
+          <div key={i} className="py-10 px-5 border-r border-border last:border-r-0 hover:bg-primary/5 transition-colors">
             <div className="font-bebas text-[3.2rem] text-foreground leading-none mb-[6px]">
               {s.num.includes("+") || s.num.includes("%") ? (
                 <>
@@ -192,10 +192,7 @@ const Index = () => {
             { num: "05", icon: "🦋", title: "Sistema linfático", text: "Los rebotes activan el drenaje linfático de forma natural, reduciendo la retención de líquidos y la celulitis." },
             { num: "06", icon: "🏆", title: "Comunidad de élite", text: "Entrena rodeada de mujeres que se inspiran mutuamente. Nuestro ambiente motiva y celebra cada logro tuyo." },
           ].map((b) => (
-            <div
-              key={b.num}
-              className="bg-background p-[44px_36px] relative overflow-hidden group hover:bg-secondary transition-colors"
-            >
+            <div key={b.num} className="bg-background p-[44px_36px] relative overflow-hidden group hover:bg-secondary transition-colors">
               <div className="absolute -bottom-[60px] -right-[60px] w-[150px] h-[150px] bg-[radial-gradient(circle,hsl(var(--primary)/0.1)_0%,transparent_70%)] rounded-full transition-transform duration-400 group-hover:scale-[2]" />
               <div className="font-bebas text-[5rem] text-foreground/[0.06] leading-none -mb-[10px]">{b.num}</div>
               <div className="text-[2rem] mb-[18px]">{b.icon}</div>
@@ -217,67 +214,22 @@ const Index = () => {
         </div>
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-16">
           {[
-            {
-              img: ophelia14,
-              emoji: "🚀",
-              level: "Principiante",
-              title: "Jumping Basics",
-              desc: "La clase perfecta para comenzar. Aprende los fundamentos del jumping fitness con música motivadora y movimientos accesibles.",
-              dur: "50 min",
-              cap: "Max. 15",
-              days: "L-V",
-              gradient: "from-[#1a0820] to-[#2d0a30]",
-            },
-            {
-              img: ophelia28,
-              emoji: "⚡",
-              level: "Intermedio",
-              title: "Power Jump",
-              desc: "Lleva tu entrenamiento al siguiente nivel con coreografías dinámicas, intervalos HIIT y música que no para.",
-              dur: "55 min",
-              cap: "Max. 12",
-              days: "L-S",
-              gradient: "from-[#0d1a20] to-[#0a2030]",
-            },
-            {
-              img: ophelia50,
-              emoji: "🌸",
-              level: "Todos los niveles",
-              title: "Jump & Stretch",
-              desc: "Combina el jumping con yoga y stretching profundo. Ideal para relajar, ganar flexibilidad y recuperarte activamente.",
-              dur: "60 min",
-              cap: "Max. 10",
-              days: "Sáb",
-              gradient: "from-[#1a1a0d] to-[#2a2010]",
-            },
+            { img: ophelia14, emoji: "🚀", level: "Principiante", title: "Jumping Basics", desc: "La clase perfecta para comenzar. Aprende los fundamentos del jumping fitness con música motivadora y movimientos accesibles.", dur: "50 min", cap: "Max. 15", days: "L-V", gradient: "from-[#1a0820] to-[#2d0a30]" },
+            { img: ophelia28, emoji: "⚡", level: "Intermedio", title: "Power Jump", desc: "Lleva tu entrenamiento al siguiente nivel con coreografías dinámicas, intervalos HIIT y música que no para.", dur: "55 min", cap: "Max. 12", days: "L-S", gradient: "from-[#0d1a20] to-[#0a2030]" },
+            { img: ophelia50, emoji: "🌸", level: "Todos los niveles", title: "Jump & Stretch", desc: "Combina el jumping con yoga y stretching profundo. Ideal para relajar, ganar flexibilidad y recuperarte activamente.", dur: "60 min", cap: "Max. 10", days: "Sáb", gradient: "from-[#1a1a0d] to-[#2a2010]" },
           ].map((c, i) => (
-            <div
-              key={i}
-              className="rounded-3xl overflow-hidden bg-secondary border border-border hover:-translate-y-2 hover:border-primary transition-all group"
-            >
+            <div key={i} className="rounded-3xl overflow-hidden bg-secondary border border-border hover:-translate-y-2 hover:border-primary transition-all group">
               <div className="h-[220px] relative overflow-hidden">
-                <img
-                  src={c.img}
-                  alt={c.title}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
-                />
+                <img src={c.img} alt={c.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
                 <div className={`absolute inset-0 bg-gradient-to-br ${c.gradient} opacity-60`} />
-                <span className="absolute top-4 right-4 z-10 text-[0.65rem] tracking-widest uppercase px-3 py-[5px] rounded-full bg-primary/20 text-primary border border-primary/30">
-                  {c.level}
-                </span>
-                <span className="relative z-10 flex items-center justify-center h-full text-[4rem] drop-shadow-[0_0_30px_hsl(var(--primary)/0.5)]">
-                  {c.emoji}
-                </span>
+                <span className="absolute top-4 right-4 z-10 text-[0.65rem] tracking-widest uppercase px-3 py-[5px] rounded-full bg-primary/20 text-primary border border-primary/30">{c.level}</span>
+                <span className="relative z-10 flex items-center justify-center h-full text-[4rem] drop-shadow-[0_0_30px_hsl(var(--primary)/0.5)]">{c.emoji}</span>
               </div>
               <div className="p-7">
                 <h3 className="font-syne font-bold text-[1.1rem] mb-2">{c.title}</h3>
                 <p className="text-[0.84rem] text-muted-foreground leading-[1.6] mb-5">{c.desc}</p>
                 <div className="flex gap-4">
-                  {[
-                    ["⏱", c.dur],
-                    ["👥", c.cap],
-                    ["📅", c.days],
-                  ].map(([icon, val]) => (
+                  {[["⏱", c.dur], ["👥", c.cap], ["📅", c.days]].map(([icon, val]) => (
                     <span key={val} className="text-[0.75rem] text-muted-foreground flex items-center gap-[6px]">
                       {icon} <span className="text-foreground font-medium">{val}</span>
                     </span>
@@ -289,159 +241,63 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ── MEMBERSHIPS ── */}
+      {/* ── PAQUETES ── */}
       <section id="membresias" className="py-20 lg:py-[120px] px-6 lg:px-[60px]">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Planes
+            Paquetes
           </div>
           <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
-            ENCUENTRA TU<br />MEMBRESÍA
+            NUESTROS<br />PAQUETES
           </h2>
         </div>
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-16">
+
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 flex gap-2 mt-10 mb-10">
           {[
-            {
-              name: "Starter",
-              price: "$599",
-              period: "/ al mes · 8 clases",
-              featured: false,
-              features: [
-                { text: "8 clases al mes", active: true },
-                { text: "Acceso a Jumping Basics", active: true },
-                { text: "App de reservas", active: true },
-                { text: "Power Jump", active: false },
-                { text: "Evaluación mensual", active: false },
-                { text: "Asesoría nutricional", active: false },
-              ],
-            },
-            {
-              name: "Pro",
-              price: "$899",
-              period: "/ al mes · Clases ilimitadas",
-              featured: true,
-              features: [
-                { text: "Clases ilimitadas", active: true },
-                { text: "Todas las clases incluidas", active: true },
-                { text: "App con tracking", active: true },
-                { text: "Evaluación mensual", active: true },
-                { text: "1 sesión de asesoría", active: true },
-                { text: "Nutrición personalizada", active: false },
-              ],
-            },
-            {
-              name: "Elite",
-              price: "$1,299",
-              period: "/ al mes · Todo incluido",
-              featured: false,
-              features: [
-                { text: "Clases ilimitadas", active: true },
-                { text: "Todas las clases", active: true },
-                { text: "App con tracking avanzado", active: true },
-                { text: "Evaluación semanal", active: true },
-                { text: "Asesoría nutricional completa", active: true },
-                { text: "Acceso prioritario", active: true },
-              ],
-            },
-          ].map((plan, i) => (
-            <div
-              key={i}
-              className={`rounded-3xl p-10 border relative overflow-hidden hover:-translate-y-[6px] transition-all ${
-                plan.featured
-                  ? "bg-primary border-primary"
-                  : "bg-secondary border-border"
+            { key: "jumping", label: "Jumping" },
+            { key: "pilates", label: "Pilates" },
+            { key: "mixtos", label: "Mixtos" },
+          ].map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`px-6 py-3 rounded-full text-sm font-medium tracking-wider uppercase transition-all ${
+                activeTab === t.key
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
               }`}
             >
-              {plan.featured && (
-                <span className="absolute top-5 right-5 bg-primary-foreground/20 text-primary-foreground text-[0.65rem] tracking-widest uppercase px-3 py-[5px] rounded-full">
-                  ⭐ Popular
-                </span>
-              )}
-              <div className={`text-[0.8rem] tracking-[0.12em] uppercase mb-6 ${plan.featured ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                {plan.name}
-              </div>
-              <div className={`font-bebas text-[4.5rem] leading-none mb-1 ${plan.featured ? "text-primary-foreground" : "text-foreground"}`}>
-                {plan.price}
-              </div>
-              <div className={`text-[0.8rem] mb-8 ${plan.featured ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                {plan.period}
-              </div>
-              <div className={`h-[1px] mb-7 ${plan.featured ? "bg-primary-foreground/10" : "bg-foreground/10"}`} />
-              <ul className="flex flex-col gap-[14px] mb-9 list-none">
-                {plan.features.map((f, j) => (
-                  <li
-                    key={j}
-                    className={`text-[0.87rem] flex items-center gap-[10px] ${
-                      f.active
-                        ? plan.featured
-                          ? "text-primary-foreground"
-                          : "text-foreground"
-                        : plan.featured
-                        ? "text-primary-foreground/40"
-                        : "text-muted-foreground/60"
-                    }`}
-                  >
-                    <span
-                      className={`w-[18px] h-[18px] rounded-full flex-shrink-0 flex items-center justify-center text-[0.6rem] ${
-                        f.active
-                          ? plan.featured
-                            ? "bg-primary-foreground/20 text-primary-foreground"
-                            : "bg-primary/20 text-primary"
-                          : "bg-foreground/5 text-muted-foreground/30"
-                      }`}
-                    >
-                      {f.active ? "✓" : "—"}
-                    </span>
-                    {f.text}
-                  </li>
-                ))}
-              </ul>
-              <button
-                className={`block w-full text-center py-4 rounded-full text-[0.85rem] font-medium tracking-wider uppercase transition-all ${
-                  plan.featured
-                    ? "bg-primary-foreground text-primary hover:scale-[1.02] hover:shadow-[0_10px_30px_rgba(0,0,0,0.3)]"
-                    : "border border-border text-foreground bg-transparent hover:bg-primary hover:border-primary hover:text-primary-foreground"
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {packages
+            .filter((p) => p.category === activeTab)
+            .map((p) => (
+              <div
+                key={p.id}
+                className={`rounded-2xl p-6 text-center hover:-translate-y-1 transition-all ${
+                  p.num_classes === "ILIMITADO"
+                    ? "bg-primary border border-primary col-span-2 sm:col-span-1"
+                    : "bg-secondary border border-border hover:border-primary"
                 }`}
               >
-                Elegir plan
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── TESTIMONIALS ── */}
-      <section className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary overflow-hidden">
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 mb-16">
-          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
-            <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Testimonios
-          </div>
-          <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
-            LO QUE DICEN<br />NUESTRAS ALUMNAS
-          </h2>
-        </div>
-        <div className="animate-scroll-left flex gap-6 w-max">
-          {[...testimonials, ...testimonials].map((t, i) => (
-            <div
-              key={i}
-              className="bg-secondary border border-border rounded-3xl p-9 w-[380px] flex-shrink-0"
-            >
-              <div className="text-primary text-[0.9rem] mb-5 tracking-[4px]">★★★★★</div>
-              <p className="text-[0.92rem] leading-[1.7] text-muted-foreground mb-7 italic">"{t.text}"</p>
-              <div className="flex items-center gap-[14px]">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-[#8B1F8B] flex items-center justify-center font-syne font-bold text-primary-foreground flex-shrink-0">
-                  {t.initial}
+                <div className={`font-syne font-bold text-base mb-2 ${p.num_classes === "ILIMITADO" ? "text-primary-foreground" : "text-foreground"}`}>
+                  {p.num_classes === "ILIMITADO" ? "ILIMITADO" : `${p.num_classes} CLASES`}
                 </div>
-                <div>
-                  <div className="font-syne text-[0.9rem] font-bold text-foreground">{t.name}</div>
-                  <div className="text-[0.75rem] text-muted-foreground">{t.role}</div>
+                <div className={`font-bebas text-[3rem] leading-none ${p.num_classes === "ILIMITADO" ? "text-primary-foreground" : "text-primary"}`}>
+                  ${p.price.toLocaleString()}
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
+        <p className="text-xs text-muted-foreground mt-6 text-center">
+          Cada paquete tiene una vigencia de 30 días · Aplican términos y condiciones.
+          {activeTab === "mixtos" && " Combina Jumping & Pilates."}
+        </p>
       </section>
 
       {/* ── CTA ── */}
@@ -458,19 +314,11 @@ const Index = () => {
             Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Prueba tu primera clase sin costo.
           </p>
           <div className="flex gap-4 justify-center items-center flex-wrap">
-            <a
-              href="https://wa.me/524271234567"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all no-underline"
-            >
+            <a href="https://wa.me/524271234567" target="_blank" rel="noopener noreferrer" className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all no-underline">
               Clase gratis via WhatsApp
               <span className="w-[22px] h-[22px] bg-primary-foreground/20 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
             </a>
-            <a
-              href="tel:+524271234567"
-              className="text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity no-underline"
-            >
+            <a href="tel:+524271234567" className="text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity no-underline">
               <span className="w-[42px] h-[42px] border border-foreground/20 rounded-full flex items-center justify-center text-[0.8rem]">📞</span>
               Llamar ahora
             </a>
@@ -490,23 +338,15 @@ const Index = () => {
             </p>
             <div className="flex gap-3 mt-6">
               {["ig", "fb", "tt"].map((s) => (
-                <a
-                  key={s}
-                  href="#"
-                  className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline"
-                >
-                  {s}
-                </a>
+                <a key={s} href="#" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">{s}</a>
               ))}
             </div>
           </div>
           <div>
             <div className="text-[0.72rem] tracking-widest uppercase text-muted-foreground mb-5">Estudio</div>
             <ul className="flex flex-col gap-[10px] list-none">
-              {["Clases", "Beneficios", "Membresías", "Instructoras"].map((l) => (
-                <li key={l}>
-                  <a href="#" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">{l}</a>
-                </li>
+              {["Clases", "Beneficios", "Paquetes", "Instructoras"].map((l) => (
+                <li key={l}><a href="#" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">{l}</a></li>
               ))}
             </ul>
           </div>
@@ -514,9 +354,7 @@ const Index = () => {
             <div className="text-[0.72rem] tracking-widest uppercase text-muted-foreground mb-5">Legal</div>
             <ul className="flex flex-col gap-[10px] list-none">
               {["Aviso de privacidad", "Términos y condiciones", "Política de cancelación"].map((l) => (
-                <li key={l}>
-                  <a href="#" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">{l}</a>
-                </li>
+                <li key={l}><a href="#" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">{l}</a></li>
               ))}
             </ul>
           </div>
@@ -524,9 +362,7 @@ const Index = () => {
             <div className="text-[0.72rem] tracking-widest uppercase text-muted-foreground mb-5">Contacto</div>
             <ul className="flex flex-col gap-[10px] list-none">
               {["San Juan del Río, Qro.", "info@opheliajumping.mx", "WhatsApp", "Horarios"].map((l) => (
-                <li key={l}>
-                  <a href="#" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">{l}</a>
-                </li>
+                <li key={l}><a href="#" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">{l}</a></li>
               ))}
             </ul>
           </div>
@@ -539,13 +375,5 @@ const Index = () => {
     </div>
   );
 };
-
-const testimonials = [
-  { initial: "S", name: "Sofía Martínez", role: "Miembro Pro · 8 meses", text: "Llevo 8 meses en Ophelia y perdí 12 kg. Pero lo más increíble es que me enamoré del ejercicio por primera vez en mi vida. No puedo faltar ni una semana." },
-  { initial: "A", name: "Andrea López", role: "Miembro Elite · 1 año", text: "Tenía una lesión de rodilla y mi médico me recomendó algo de bajo impacto. Ophelia fue la mejor decisión. Ahora salto fuerte y mis rodillas están perfectas." },
-  { initial: "V", name: "Valeria Ramos", role: "Miembro Pro · 6 meses", text: "Las instructoras son increíbles, siempre motivando y corrigiendo con mucho cariño. La comunidad de chicas es lo mejor. Me siento en mi segundo hogar." },
-  { initial: "M", name: "Mariana Torres", role: "Miembro Starter · 3 meses", text: "Nunca pensé que el ejercicio podría ser tan divertido. Las clases vuelan, la música es increíble y siempre salgo sudada pero con una sonrisa enorme." },
-  { initial: "C", name: "Carmen Vega", role: "Miembro Elite · 2 años", text: "Empecé a los 45 años pensando que era demasiado tarde. Ophelia me demostró que no hay edad para empezar. Mi salud y mi energía mejoraron 100%." },
-];
 
 export default Index;
