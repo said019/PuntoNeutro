@@ -43,7 +43,7 @@ const WeeklySchedule = () => {
     queryKey: ["schedules"],
     queryFn: async () => (await api.get("/schedules")).data,
   });
-  const schedules = data?.data ?? [];
+  const schedules = Array.isArray(data?.data) ? data.data : [];
 
   const { data: typesData } = useQuery<{ data: { id: string; name: string }[] }>({
     queryKey: ["class-types"],
@@ -135,7 +135,7 @@ const WeeklySchedule = () => {
                 <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
                   <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
                   <SelectContent>
-                    {(typesData?.data ?? []).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                    {(Array.isArray(typesData?.data) ? typesData.data : []).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -144,7 +144,7 @@ const WeeklySchedule = () => {
                 <Select onValueChange={(v) => form.setValue("instructorId", v)}>
                   <SelectTrigger><SelectValue placeholder="Instructor" /></SelectTrigger>
                   <SelectContent>
-                    {(instructorsData?.data ?? []).map((i) => <SelectItem key={i.id} value={i.id}>{i.displayName}</SelectItem>)}
+                    {(Array.isArray(instructorsData?.data) ? instructorsData.data : []).map((i) => <SelectItem key={i.id} value={i.id}>{i.displayName}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

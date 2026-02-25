@@ -29,7 +29,7 @@ const ReviewTagsManager = () => {
   const [editing, setEditing] = useState<ReviewTag | null>(null);
 
   const { data } = useQuery<{ data: ReviewTag[] }>({ queryKey: ["review-tags"], queryFn: async () => (await api.get("/review-tags")).data });
-  const tags = data?.data ?? [];
+  const tags = Array.isArray(data?.data) ? data.data : [];
 
   const form = useForm<TagFormData>({ resolver: zodResolver(tagSchema), defaultValues: { color: "#8B5CF6" } });
 
@@ -75,7 +75,7 @@ const AdminReviewsDashboard = () => {
   const { data: reviewsData } = useQuery({ queryKey: ["reviews"], queryFn: async () => (await api.get("/reviews?limit=50")).data });
 
   const stats = statsData?.data ?? statsData ?? {};
-  const reviews = reviewsData?.data ?? [];
+  const reviews = Array.isArray(reviewsData?.data) ? reviewsData.data : [];
 
   const renderStars = (n: number) => Array(5).fill(0).map((_, i) => (
     <Star key={i} size={12} fill={i < n ? "currentColor" : "none"} className={i < n ? "text-yellow-400" : "text-muted-foreground"} />

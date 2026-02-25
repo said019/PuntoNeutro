@@ -72,7 +72,7 @@ const Referrals = () => {
               <Table>
                 <TableHeader><TableRow><TableHead>Referidor</TableHead><TableHead>Referido</TableHead><TableHead>Estado</TableHead><TableHead>Puntos</TableHead><TableHead>Completado</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(referrals?.data ?? []).map((r) => (
+                  {(Array.isArray(referrals?.data) ? referrals.data : []).map((r) => (
                     <TableRow key={r.id}>
                       <TableCell>{r.referrer_name}</TableCell>
                       <TableCell>{r.referred_name}</TableCell>
@@ -88,7 +88,7 @@ const Referrals = () => {
               <Table>
                 <TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Usos</TableHead><TableHead>Máx. usos</TableHead><TableHead>Puntos</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(codes?.data ?? []).map((c) => (
+                  {(Array.isArray(codes?.data) ? codes.data : []).map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="font-mono font-bold">{c.code}</TableCell>
                       <TableCell>{c.uses_count}</TableCell>

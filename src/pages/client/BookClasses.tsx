@@ -35,8 +35,8 @@ const BookClasses = () => {
     queryFn: async () => (await api.get("/bookings/my-bookings")).data,
   });
 
-  const classes: any[] = classesData?.data ?? classesData ?? [];
-  const myBookings: BookingClient[] = bookingsData?.data ?? bookingsData ?? [];
+  const classes: any[] = Array.isArray(classesData?.data) ? classesData.data : Array.isArray(classesData) ? classesData : [];
+  const myBookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
   const myBookedClassIds = new Set(myBookings.map((b) => b.class_id));
 
   const days = Array.from({ length: 7 }, (_, i) => {

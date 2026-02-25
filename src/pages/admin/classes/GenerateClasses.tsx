@@ -75,7 +75,7 @@ const GenerateClasses = () => {
               <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
                 <SelectContent>
-                  {(typesData?.data ?? []).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  {(Array.isArray(typesData?.data) ? typesData.data : []).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -84,7 +84,7 @@ const GenerateClasses = () => {
               <Select onValueChange={(v) => form.setValue("instructorId", v)}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar instructor" /></SelectTrigger>
                 <SelectContent>
-                  {(instructorsData?.data ?? []).map((i) => <SelectItem key={i.id} value={i.id}>{i.displayName}</SelectItem>)}
+                  {(Array.isArray(instructorsData?.data) ? instructorsData.data : []).map((i) => <SelectItem key={i.id} value={i.id}>{i.displayName}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

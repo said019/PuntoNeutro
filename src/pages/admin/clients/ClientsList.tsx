@@ -50,7 +50,7 @@ const ClientsList = () => {
     queryKey: ["clients", debouncedSearch],
     queryFn: async () => (await api.get(`/users?role=client&search=${debouncedSearch}`)).data,
   });
-  const clients = data?.data ?? [];
+  const clients = Array.isArray(data?.data) ? data.data : [];
 
   const form = useForm<ClientFormData>({ resolver: zodResolver(clientSchema) });
 

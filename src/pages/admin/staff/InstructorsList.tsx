@@ -44,7 +44,7 @@ const InstructorsList = () => {
     queryKey: ["instructors"],
     queryFn: async () => (await api.get("/instructors")).data,
   });
-  const instructors = data?.data ?? [];
+  const instructors = Array.isArray(data?.data) ? data.data : [];
 
   const form = useForm<InstructorFormData>({ resolver: zodResolver(instructorSchema) });
 

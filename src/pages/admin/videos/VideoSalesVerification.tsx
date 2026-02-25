@@ -53,7 +53,7 @@ const PurchasesTable = ({ status }: { status?: string }) => {
     queryKey: ["video-purchases", status],
     queryFn: async () => (await api.get(url)).data,
   });
-  const purchases = (data?.data ?? []).filter((p) => !status || p.status === status);
+  const purchases = (Array.isArray(data?.data) ? data.data : []).filter((p) => !status || p.status === status);
 
   const approveMutation = useMutation({
     mutationFn: ({ id, notes }: { id: string; notes: string }) => api.post(`/videos/purchases/${id}/approve`, { admin_notes: notes }),

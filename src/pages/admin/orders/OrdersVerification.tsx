@@ -42,7 +42,7 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
     queryKey,
     queryFn: async () => (await api.get(url)).data,
   });
-  const orders = data?.data ?? [];
+  const orders = Array.isArray(data?.data) ? data.data : [];
 
   const approveMutation = useMutation({
     mutationFn: ({ id, notes }: { id: string; notes: string }) => api.put(`/orders/${id}/verify`, { notes }),

@@ -62,7 +62,7 @@ const ClassesCalendar = () => {
     queryKey: ["classes", start, end],
     queryFn: async () => (await api.get(`/classes?start=${start}&end=${end}`)).data,
   });
-  const classes = data?.data ?? [];
+  const classes = Array.isArray(data?.data) ? data.data : [];
 
   const { data: typesData } = useQuery<{ data: { id: string; name: string; color: string }[] }>({
     queryKey: ["class-types"],
@@ -163,7 +163,7 @@ const ClassesCalendar = () => {
                 <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
                   <SelectContent>
-                    {(typesData?.data ?? []).map((t) => (
+                    {(Array.isArray(typesData?.data) ? typesData.data : []).map((t) => (
                       <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -174,7 +174,7 @@ const ClassesCalendar = () => {
                 <Select onValueChange={(v) => form.setValue("instructorId", v)}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar instructor" /></SelectTrigger>
                   <SelectContent>
-                    {(instructorsData?.data ?? []).map((i) => (
+                    {(Array.isArray(instructorsData?.data) ? instructorsData.data : []).map((i) => (
                       <SelectItem key={i.id} value={i.id}>{i.displayName}</SelectItem>
                     ))}
                   </SelectContent>

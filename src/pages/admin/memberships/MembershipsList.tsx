@@ -69,7 +69,7 @@ const MembershipTable = ({ status, title }: { status?: string; title: string }) 
     queryKey: ["memberships", status],
     queryFn: async () => (await api.get(url)).data,
   });
-  const memberships = data?.data ?? [];
+  const memberships = Array.isArray(data?.data) ? data.data : [];
 
   const activateMutation = useMutation({
     mutationFn: (id: string) => api.put(`/memberships/${id}/activate`),
@@ -187,7 +187,7 @@ const MembershipsList = () => {
                 <Select onValueChange={(v) => form.setValue("planId", v)}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar plan" /></SelectTrigger>
                   <SelectContent>
-                    {(plansData?.data ?? []).map((p) => (
+                    {(Array.isArray(plansData?.data) ? plansData.data : []).map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}
                   </SelectContent>

@@ -35,6 +35,8 @@ const ReportsPage = () => {
 
   const o = overview?.data ?? overview ?? {};
 
+  const safeArray = (v: any) => (Array.isArray(v) ? v : []);
+
   const metric = (label: string, value: string | number | undefined, suffix = "") => (
     <Card>
       <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle></CardHeader>
@@ -72,7 +74,7 @@ const ReportsPage = () => {
                 <CardHeader><CardTitle>Ingresos mensuales</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={revenue?.data ?? []}>
+                    <BarChart data={safeArray(revenue?.data ?? revenue)}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
@@ -89,7 +91,7 @@ const ReportsPage = () => {
                 <CardHeader><CardTitle>Clases por semana</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={classes?.data ?? []}>
+                    <BarChart data={safeArray(classes?.data ?? classes)}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="week" />
                       <YAxis />
@@ -106,7 +108,7 @@ const ReportsPage = () => {
                 <CardHeader><CardTitle>Retención de miembros</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={retention?.data ?? []}>
+                    <LineChart data={safeArray(retention?.data ?? retention)}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
@@ -123,7 +125,7 @@ const ReportsPage = () => {
                 <CardHeader><CardTitle>Clases por instructor</CardTitle></CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {(instructors?.data ?? []).map((ins: any) => (
+                    {safeArray(instructors?.data ?? instructors).map((ins: any) => (
                       <div key={ins.id} className="flex items-center justify-between text-sm">
                         <span>{ins.name}</span>
                         <div className="flex items-center gap-3">

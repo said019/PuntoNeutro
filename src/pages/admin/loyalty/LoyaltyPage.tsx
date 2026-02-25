@@ -75,7 +75,7 @@ const LoyaltyRewards = () => {
   const [editing, setEditing] = useState<Reward | null>(null);
 
   const { data } = useQuery<{ data: Reward[] }>({ queryKey: ["loyalty-rewards"], queryFn: async () => (await api.get("/loyalty/rewards")).data });
-  const rewards = data?.data ?? [];
+  const rewards = Array.isArray(data?.data) ? data.data : [];
 
   const form = useForm<RewardFormData>({ resolver: zodResolver(rewardSchema), defaultValues: { reward_type: "discount", is_active: true, stock: null } });
 

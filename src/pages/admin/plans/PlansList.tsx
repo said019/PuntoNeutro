@@ -58,7 +58,7 @@ const PlansList = () => {
     queryKey: ["plans"],
     queryFn: async () => (await api.get("/plans")).data,
   });
-  const plans = data?.data ?? [];
+  const plans = Array.isArray(data?.data) ? data.data : [];
 
   const form = useForm<PlanFormData>({ resolver: zodResolver(planSchema), defaultValues: EMPTY });
 

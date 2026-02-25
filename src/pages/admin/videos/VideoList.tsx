@@ -34,7 +34,7 @@ const VideoList = () => {
     queryKey: ["videos", debouncedSearch],
     queryFn: async () => (await api.get(`/videos?search=${debouncedSearch}&limit=20`)).data,
   });
-  const videos = data?.data ?? [];
+  const videos = Array.isArray(data?.data) ? data.data : [];
 
   const { toast } = useToast();
   const qc = useQueryClient();

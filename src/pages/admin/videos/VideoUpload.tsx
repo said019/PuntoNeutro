@@ -115,7 +115,7 @@ const VideoUpload = () => {
                   <Select onValueChange={(v) => form.setValue("category_id", v)}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                     <SelectContent>
-                      {(categoriesData?.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      {(Array.isArray(categoriesData?.data) ? categoriesData.data : []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

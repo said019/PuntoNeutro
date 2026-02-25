@@ -40,9 +40,9 @@ const Dashboard = () => {
   });
 
   const membership: ClientMembership | null = membershipData?.data ?? membershipData ?? null;
-  const bookings: BookingClient[] = bookingsData?.data ?? bookingsData ?? [];
+  const bookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
   const wallet = walletData?.data ?? walletData ?? null;
-  const videos = videosData?.data ?? videosData ?? [];
+  const videos = Array.isArray(videosData?.data) ? videosData.data : Array.isArray(videosData) ? videosData : [];
 
   const upcomingBookings = bookings
     .filter((b) => b.status === "confirmed" || b.status === "waitlist")

@@ -41,7 +41,7 @@ const DiscountCodes = () => {
     queryKey: ["discount-codes"],
     queryFn: async () => (await api.get("/discount-codes")).data,
   });
-  const codes = data?.data ?? [];
+  const codes = Array.isArray(data?.data) ? data.data : [];
 
   const form = useForm<CodeFormData>({ resolver: zodResolver(codeSchema), defaultValues: { discountType: "percentage", isActive: true, maxUses: null } });
 

@@ -69,7 +69,7 @@ const CashAssignment = () => {
           </div>
           {usersLoading && <Loader2 className="animate-spin" />}
           <div className="space-y-2">
-            {(usersData?.data ?? []).map((u) => (
+            {(Array.isArray(usersData?.data) ? usersData.data : []).map((u) => (
               <div
                 key={u.id}
                 className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted cursor-pointer"
@@ -91,7 +91,7 @@ const CashAssignment = () => {
           <p className="text-sm text-muted-foreground">Cliente: <strong>{selectedUser?.displayName}</strong></p>
           <Label>Elegir plan</Label>
           <div className="space-y-2">
-            {(plansData?.data ?? []).map((p) => (
+            {(Array.isArray(plansData?.data) ? plansData.data : []).map((p) => (
               <div
                 key={p.id}
                 className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${selectedPlan?.id === p.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted"}`}
@@ -146,7 +146,7 @@ const PaymentsRegister = () => {
     queryKey: ["payments"],
     queryFn: async () => (await api.get("/payments")).data,
   });
-  const payments = data?.data ?? [];
+  const payments = Array.isArray(data?.data) ? data.data : [];
 
   return (
     <div>

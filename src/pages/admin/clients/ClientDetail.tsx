@@ -79,7 +79,7 @@ const ClientDetail = () => {
               <Table>
                 <TableHeader><TableRow><TableHead>Plan</TableHead><TableHead>Estado</TableHead><TableHead>Vence</TableHead><TableHead>Clases</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(memberships?.data ?? []).map((m: any) => (
+                  {(Array.isArray(memberships?.data) ? memberships.data : []).map((m: any) => (
                     <TableRow key={m.id}>
                       <TableCell>{m.planName ?? m.planId}</TableCell>
                       <TableCell><Badge>{m.status}</Badge></TableCell>
@@ -95,7 +95,7 @@ const ClientDetail = () => {
               <Table>
                 <TableHeader><TableRow><TableHead>Clase</TableHead><TableHead>Fecha</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(bookings?.data ?? []).map((b: any) => (
+                  {(Array.isArray(bookings?.data) ? bookings.data : []).map((b: any) => (
                     <TableRow key={b.id}>
                       <TableCell>{b.className ?? b.classId}</TableCell>
                       <TableCell>{b.startTime ? new Date(b.startTime).toLocaleString("es-MX") : "—"}</TableCell>
@@ -110,7 +110,7 @@ const ClientDetail = () => {
               <Table>
                 <TableHeader><TableRow><TableHead>Monto</TableHead><TableHead>Método</TableHead><TableHead>Fecha</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(payments?.data ?? []).map((p: any) => (
+                  {(Array.isArray(payments?.data) ? payments.data : []).map((p: any) => (
                     <TableRow key={p.id}>
                       <TableCell>${p.amount}</TableCell>
                       <TableCell>{p.method}</TableCell>

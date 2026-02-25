@@ -46,7 +46,7 @@ const ProductsPage = () => {
     queryKey: ["products", debouncedSearch],
     queryFn: async () => (await api.get(`/products?search=${debouncedSearch}`)).data,
   });
-  const products = data?.data ?? [];
+  const products = Array.isArray(data?.data) ? data.data : [];
 
   const form = useForm<ProductFormData>({ resolver: zodResolver(productSchema), defaultValues: { isActive: true, category: "suplementos" } });
 
@@ -135,7 +135,7 @@ const POSTerminal = () => {
     queryKey: ["products", debouncedSearch],
     queryFn: async () => (await api.get(`/products?search=${debouncedSearch}&active=true`)).data,
   });
-  const products = data?.data ?? [];
+  const products = Array.isArray(data?.data) ? data.data : [];
 
   const addToCart = (p: Product) => {
     setCart((prev) => {

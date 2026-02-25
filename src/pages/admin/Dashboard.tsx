@@ -73,7 +73,7 @@ const Dashboard = () => {
               <CardContent className="space-y-3">
                 {isLoading
                   ? Array(5).fill(0).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
-                  : (memberships?.data ?? []).map((m) => (
+                  : (Array.isArray(memberships?.data) ? memberships.data : []).map((m) => (
                       <div key={m.id} className="flex items-center justify-between text-sm">
                         <div>
                           <p className="font-medium">{m.userName}</p>
@@ -101,7 +101,7 @@ const Dashboard = () => {
               <CardContent className="space-y-3">
                 {isLoading
                   ? Array(5).fill(0).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
-                  : (pendingOrders?.data ?? []).map((o) => (
+                  : (Array.isArray(pendingOrders?.data) ? pendingOrders.data : []).map((o) => (
                       <div key={o.id} className="flex items-center justify-between text-sm">
                         <div>
                           <p className="font-medium">{o.userName}</p>

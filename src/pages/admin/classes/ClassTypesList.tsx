@@ -38,7 +38,7 @@ const ClassTypesList = () => {
     queryKey: ["class-types"],
     queryFn: async () => (await api.get("/class-types")).data,
   });
-  const types = data?.data ?? [];
+  const types = Array.isArray(data?.data) ? data.data : [];
 
   const form = useForm<TypeFormData>({ resolver: zodResolver(typeSchema), defaultValues: { color: "#8B5CF6", defaultDuration: 60, maxCapacity: 20, isActive: true } });
 

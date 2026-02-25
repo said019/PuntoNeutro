@@ -38,7 +38,7 @@ const BookingsList = ({ title = "Reservas", initialStatus, statusLocked = false 
     queryKey: ["bookings", status],
     queryFn: async () => (await api.get(url)).data,
   });
-  const bookings = data?.data ?? [];
+  const bookings = Array.isArray(data?.data) ? data.data : [];
 
   const checkinMutation = useMutation({
     mutationFn: (id: string) => api.put(`/bookings/${id}/check-in`),

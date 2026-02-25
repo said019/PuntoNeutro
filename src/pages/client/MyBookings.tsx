@@ -89,7 +89,7 @@ const MyBookings = () => {
     queryFn: async () => (await api.get("/bookings/my-bookings")).data,
   });
 
-  const bookings: BookingClient[] = bookingsData?.data ?? bookingsData ?? [];
+  const bookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
   const now = new Date();
 
   const upcoming = bookings.filter((b) =>
