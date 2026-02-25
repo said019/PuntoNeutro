@@ -14,7 +14,170 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      classes: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          subtitle: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          subtitle?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          subtitle?: string | null
+        }
+        Relationships: []
+      }
+      packages: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          num_classes: string
+          price: number
+          sort_order: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          num_classes: string
+          price: number
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          num_classes?: string
+          price?: number
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      schedule: {
+        Row: {
+          class_type: string
+          created_at: string
+          day_of_week: number
+          id: string
+          is_active: boolean
+          shift: string
+          time_slot: string
+        }
+        Insert: {
+          class_type?: string
+          created_at?: string
+          day_of_week: number
+          id?: string
+          is_active?: boolean
+          shift?: string
+          time_slot: string
+        }
+        Update: {
+          class_type?: string
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          is_active?: boolean
+          shift?: string
+          time_slot?: string
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          classes_remaining: number | null
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          membership_end: string | null
+          membership_start: string | null
+          notes: string | null
+          package_id: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          classes_remaining?: number | null
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          membership_end?: string | null
+          membership_start?: string | null
+          notes?: string | null
+          package_id?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          classes_remaining?: number | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          membership_end?: string | null
+          membership_start?: string | null
+          notes?: string | null
+          package_id?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
