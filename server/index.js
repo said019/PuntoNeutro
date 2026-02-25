@@ -56,6 +56,132 @@ async function ensureSchema() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    // ── class_types (tipos de clase editables desde admin) ──────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS class_types (
+        id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name         VARCHAR(100) NOT NULL,
+        subtitle     VARCHAR(150),
+        description  TEXT,
+        category     VARCHAR(20)  NOT NULL DEFAULT 'jumping' CHECK (category IN ('jumping','pilates','mixto')),
+        intensity    VARCHAR(20)  DEFAULT 'media' CHECK (intensity IN ('ligera','media','pesada','todas')),
+        level        VARCHAR(50)  DEFAULT 'Todos los niveles',
+        duration_min INTEGER      DEFAULT 50,
+        capacity     INTEGER      DEFAULT 15,
+        color        VARCHAR(50)  DEFAULT '#c026d3',
+        emoji        VARCHAR(10)  DEFAULT '🏃',
+        is_active    BOOLEAN      DEFAULT true,
+        sort_order   INTEGER      DEFAULT 0,
+        created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS subtitle VARCHAR(150);
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'jumping';
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS intensity VARCHAR(20) DEFAULT 'media';
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `);
+    // ── schedule_slots (horario semanal editable desde admin) ───────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS schedule_slots (
+        id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        time_slot       VARCHAR(20) NOT NULL,
+        day_of_week     INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
+        class_type_id   UUID REFERENCES class_types(id) ON DELETE SET NULL,
+        class_type_name VARCHAR(100),
+        instructor_name VARCHAR(100),
+        is_active       BOOLEAN DEFAULT true,
+        created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_schedule_slots_day ON schedule_slots(day_of_week);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_slots_slot ON schedule_slots(time_slot, day_of_week)
+        WHERE is_active = true;
+    `);
+    // ── schedule_templates (plantilla simple con class_label) ───────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS schedule_templates (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        time_slot   VARCHAR(10)  NOT NULL,
+        day_of_week SMALLINT     NOT NULL CHECK (day_of_week BETWEEN 1 AND 6),
+        class_label VARCHAR(50)  NOT NULL,
+        shift       VARCHAR(10)  NOT NULL DEFAULT 'morning' CHECK (shift IN ('morning','evening')),
+        is_active   BOOLEAN      DEFAULT true,
+        created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (time_slot, day_of_week)
+      );
+    `);
+    // ── packages (paquetes de precios jumping/pilates/mixtos) ────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS packages (
+        id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name          VARCHAR(100) NOT NULL,
+        num_classes   VARCHAR(20)  NOT NULL,
+        price         DECIMAL(10,2) NOT NULL,
+        category      VARCHAR(20)  NOT NULL DEFAULT 'jumping' CHECK (category IN ('jumping','pilates','mixtos')),
+        validity_days INTEGER      DEFAULT 30,
+        is_active     BOOLEAN      DEFAULT true,
+        sort_order    INTEGER      DEFAULT 0,
+        created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_packages_category ON packages(category);
+    `);
+    // ── Seed class_types si la tabla está vacía ────────────────────────────
+    const ctCount = await pool.query("SELECT COUNT(*) FROM class_types");
+    if (parseInt(ctCount.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO class_types (name, description, level, duration_min, capacity, color, emoji, sort_order) VALUES
+          ('Jumping Basics',  'La clase perfecta para comenzar. Aprende los fundamentos del jumping fitness con música motivadora y movimientos accesibles.', 'Principiante',       50, 15, 'primary',    '🚀', 1),
+          ('Power Jump',      'Lleva tu entrenamiento al siguiente nivel con coreografías dinámicas, intervalos HIIT y música que no para.',                  'Intermedio',         55, 12, 'purple',     '⚡', 2),
+          ('Jump & Stretch',  'Combina el jumping con yoga y stretching profundo. Ideal para relajar, ganar flexibilidad y recuperarte activamente.',         'Todos los niveles',  60, 10, 'yellow',     '🌸', 3)
+        ON CONFLICT DO NOTHING;
+      `);
+    }
+    // ── Seed schedule_slots si la tabla está vacía ─────────────────────────
+    const ssCount = await pool.query("SELECT COUNT(*) FROM schedule_slots");
+    if (parseInt(ssCount.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO schedule_slots (time_slot, day_of_week, class_type_name) VALUES
+          ('7:00 am', 1, 'Jumping Basics'), ('7:00 am', 2, 'Power Jump'),
+          ('7:00 am', 3, 'Jumping Basics'), ('7:00 am', 4, 'Power Jump'),
+          ('7:00 am', 5, 'Jump & Stretch'),('7:00 am', 6, 'Jumping Basics'),
+          ('9:00 am', 1, 'Power Jump'),     ('9:00 am', 2, 'Jumping Basics'),
+          ('9:00 am', 3, 'Power Jump'),     ('9:00 am', 4, 'Jumping Basics'),
+          ('9:00 am', 5, 'Power Jump'),     ('9:00 am', 6, 'Power Jump'),
+          ('11:00 am',1, 'Jump & Stretch'), ('11:00 am',3, 'Jump & Stretch'),
+          ('11:00 am',5, 'Jumping Basics'), ('11:00 am',6, 'Jump & Stretch'),
+          ('6:00 pm', 1, 'Jumping Basics'), ('6:00 pm', 2, 'Power Jump'),
+          ('6:00 pm', 3, 'Jumping Basics'), ('6:00 pm', 4, 'Power Jump'),
+          ('6:00 pm', 5, 'Power Jump'),
+          ('7:30 pm', 1, 'Power Jump'),     ('7:30 pm', 2, 'Jump & Stretch'),
+          ('7:30 pm', 3, 'Power Jump'),     ('7:30 pm', 4, 'Jump & Stretch')
+        ON CONFLICT DO NOTHING;
+      `);
+    }
+    // ── Seed plans si la tabla está vacía ──────────────────────────────────
+    const plCount = await pool.query("SELECT COUNT(*) FROM plans");
+    if (parseInt(plCount.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO plans (name, price, currency, duration_days, class_limit, is_active, sort_order) VALUES
+          ('4 Clases',   380,  'MXN', 30,   4,    true, 1),
+          ('8 Clases',   700,  'MXN', 30,   8,    true, 2),
+          ('12 Clases',  980,  'MXN', 30,   12,   true, 3),
+          ('Ilimitado',  1350, 'MXN', 30,   NULL, true, 4)
+        ON CONFLICT DO NOTHING;
+      `);
+    }
+    // ── Seed admin user si no existe ───────────────────────────────────────
+    const adminExists = await pool.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+    if (adminExists.rows.length === 0) {
+      const adminHash = await bcrypt.hash("Ophelia2026!", 12);
+      await pool.query(
+        `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
+         VALUES ('Admin Ophelia', 'admin@opheliajumping.mx', '0000000000', $1, 'admin', true, false)
+         ON CONFLICT (email) DO UPDATE SET role = 'admin', password_hash = $1`,
+        [adminHash]
+      );
+      console.log("✅ Admin user seeded: admin@opheliajumping.mx / Ophelia2026!");
+    }
     console.log("✅ Schema ensured");
   } catch (err) {
     console.error("Schema migration warning:", err.message);
@@ -868,6 +994,379 @@ app.get("/api/referrals/code", authMiddleware, async (req, res) => {
     return res.json({ data: r.rows[0] });
   } catch (err) {
     console.error("Referrals/code error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Routes: /api/admin/class-types ─────────────────────────────────────────
+
+// GET /api/admin/class-types
+app.get("/api/admin/class-types", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM class_types ORDER BY sort_order, name");
+    return res.json({ data: r.rows });
+  } catch (err) {
+    console.error("GET admin/class-types error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/class-types
+app.post("/api/admin/class-types", async (req, res) => {
+  const { name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order } = req.body;
+  if (!name?.trim()) return res.status(400).json({ message: "name requerido" });
+  try {
+    const r = await pool.query(
+      `INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [name.trim(), subtitle || null, description || null,
+       category || "jumping", intensity || "media",
+       level || "Todos los niveles", duration_min || 50, capacity || 15,
+       color || "#c026d3", emoji || "🏃", sort_order ?? 0]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("POST admin/class-types error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/class-types/:id
+app.put("/api/admin/class-types/:id", async (req, res) => {
+  const { name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, is_active, sort_order } = req.body;
+  try {
+    const r = await pool.query(
+      `UPDATE class_types SET
+         name         = COALESCE($1, name),
+         subtitle     = COALESCE($2, subtitle),
+         description  = COALESCE($3, description),
+         category     = COALESCE($4, category),
+         intensity    = COALESCE($5, intensity),
+         level        = COALESCE($6, level),
+         duration_min = COALESCE($7, duration_min),
+         capacity     = COALESCE($8, capacity),
+         color        = COALESCE($9, color),
+         emoji        = COALESCE($10, emoji),
+         is_active    = COALESCE($11, is_active),
+         sort_order   = COALESCE($12, sort_order),
+         updated_at   = NOW()
+       WHERE id = $13 RETURNING *`,
+      [name || null, subtitle || null, description || null,
+       category || null, intensity || null, level || null,
+       duration_min || null, capacity || null, color || null,
+       emoji || null, is_active ?? null, sort_order ?? null,
+       req.params.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("PUT admin/class-types error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/admin/class-types/:id
+app.delete("/api/admin/class-types/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM class_types WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Eliminado" });
+  } catch (err) {
+    console.error("DELETE admin/class-types error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Routes: /api/admin/schedule-slots ──────────────────────────────────────
+
+// GET /api/admin/schedule-slots
+app.get("/api/admin/schedule-slots", async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT ss.*, ct.color as class_color, ct.emoji as class_emoji
+       FROM schedule_slots ss
+       LEFT JOIN class_types ct ON ss.class_type_id = ct.id
+       WHERE ss.is_active = true
+       ORDER BY ss.time_slot, ss.day_of_week`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) {
+    console.error("GET admin/schedule-slots error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/schedule-slots
+app.post("/api/admin/schedule-slots", async (req, res) => {
+  const { time_slot, day_of_week, class_type_id, class_type_name, instructor_name } = req.body;
+  if (!time_slot?.trim() || !day_of_week) return res.status(400).json({ message: "time_slot y day_of_week requeridos" });
+  try {
+    // Resolve name from class_type_id if provided
+    let ctName = class_type_name || null;
+    if (class_type_id && !ctName) {
+      const ct = await pool.query("SELECT name FROM class_types WHERE id = $1", [class_type_id]);
+      ctName = ct.rows[0]?.name || null;
+    }
+    const r = await pool.query(
+      `INSERT INTO schedule_slots (time_slot, day_of_week, class_type_id, class_type_name, instructor_name)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT ON CONSTRAINT idx_schedule_slots_slot DO UPDATE
+         SET class_type_id = EXCLUDED.class_type_id,
+             class_type_name = EXCLUDED.class_type_name,
+             instructor_name = EXCLUDED.instructor_name
+       RETURNING *`,
+      [time_slot.trim(), parseInt(day_of_week), class_type_id || null, ctName, instructor_name || null]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("POST admin/schedule-slots error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/schedule-slots/:id
+app.put("/api/admin/schedule-slots/:id", async (req, res) => {
+  const { time_slot, day_of_week, class_type_id, class_type_name, instructor_name, is_active } = req.body;
+  try {
+    let ctName = class_type_name || null;
+    if (class_type_id && !ctName) {
+      const ct = await pool.query("SELECT name FROM class_types WHERE id = $1", [class_type_id]);
+      ctName = ct.rows[0]?.name || null;
+    }
+    const r = await pool.query(
+      `UPDATE schedule_slots SET
+         time_slot       = COALESCE($1, time_slot),
+         day_of_week     = COALESCE($2, day_of_week),
+         class_type_id   = COALESCE($3, class_type_id),
+         class_type_name = COALESCE($4, class_type_name),
+         instructor_name = COALESCE($5, instructor_name),
+         is_active       = COALESCE($6, is_active)
+       WHERE id = $7 RETURNING *`,
+      [time_slot || null, day_of_week ? parseInt(day_of_week) : null,
+       class_type_id || null, ctName, instructor_name || null, is_active ?? null, req.params.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("PUT admin/schedule-slots error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/admin/schedule-slots/:id
+app.delete("/api/admin/schedule-slots/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM schedule_slots WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Eliminado" });
+  } catch (err) {
+    console.error("DELETE admin/schedule-slots error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Routes: /api/admin/plans (CRUD) ────────────────────────────────────────
+
+// POST /api/admin/plans
+app.post("/api/admin/plans", async (req, res) => {
+  const { name, description, price, currency, duration_days, class_limit, features, is_active, sort_order } = req.body;
+  if (!name?.trim() || price === undefined) return res.status(400).json({ message: "name y price requeridos" });
+  try {
+    const r = await pool.query(
+      `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, features, is_active, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [name.trim(), description || null, price, currency || "MXN",
+       duration_days || 30, class_limit || null,
+       JSON.stringify(features || []), is_active ?? true, sort_order ?? 0]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("POST admin/plans error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/plans/:id
+app.put("/api/admin/plans/:id", async (req, res) => {
+  const { name, description, price, currency, duration_days, class_limit, features, is_active, sort_order } = req.body;
+  try {
+    const r = await pool.query(
+      `UPDATE plans SET
+         name          = COALESCE($1, name),
+         description   = COALESCE($2, description),
+         price         = COALESCE($3, price),
+         currency      = COALESCE($4, currency),
+         duration_days = COALESCE($5, duration_days),
+         class_limit   = $6,
+         features      = COALESCE($7, features),
+         is_active     = COALESCE($8, is_active),
+         sort_order    = COALESCE($9, sort_order),
+         updated_at    = NOW()
+       WHERE id = $10 RETURNING *`,
+      [name || null, description || null, price ?? null, currency || null,
+       duration_days || null, class_limit ?? null,
+       features ? JSON.stringify(features) : null,
+       is_active ?? null, sort_order ?? null, req.params.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("PUT admin/plans error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/admin/plans/:id
+app.delete("/api/admin/plans/:id", async (req, res) => {
+  try {
+    await pool.query("UPDATE plans SET is_active = false WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Plan desactivado" });
+  } catch (err) {
+    console.error("DELETE admin/plans error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Routes: /api/admin/schedule (schedule_templates) ───────────────────────
+
+// GET /api/admin/schedule
+app.get("/api/admin/schedule", async (_req, res) => {
+  try {
+    const r = await pool.query(
+      "SELECT * FROM schedule_templates ORDER BY time_slot ASC, day_of_week ASC"
+    );
+    return res.json({ data: r.rows });
+  } catch (err) {
+    console.error("GET admin/schedule error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/schedule
+app.post("/api/admin/schedule", async (req, res) => {
+  const { time_slot, day_of_week, class_label, shift } = req.body;
+  if (!time_slot || !day_of_week || !class_label) {
+    return res.status(400).json({ message: "time_slot, day_of_week y class_label requeridos" });
+  }
+  try {
+    const r = await pool.query(
+      `INSERT INTO schedule_templates (time_slot, day_of_week, class_label, shift)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (time_slot, day_of_week) DO UPDATE
+         SET class_label = EXCLUDED.class_label, shift = EXCLUDED.shift, updated_at = NOW()
+       RETURNING *`,
+      [time_slot, Number(day_of_week), class_label.toUpperCase(), shift || "morning"]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("POST admin/schedule error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/schedule/:id
+app.put("/api/admin/schedule/:id", async (req, res) => {
+  const { time_slot, day_of_week, class_label, shift, is_active } = req.body;
+  try {
+    const r = await pool.query(
+      `UPDATE schedule_templates SET
+         time_slot   = COALESCE($1, time_slot),
+         day_of_week = COALESCE($2, day_of_week),
+         class_label = COALESCE($3, class_label),
+         shift       = COALESCE($4, shift),
+         is_active   = COALESCE($5, is_active),
+         updated_at  = NOW()
+       WHERE id = $6 RETURNING *`,
+      [time_slot || null, day_of_week ? Number(day_of_week) : null,
+       class_label ? class_label.toUpperCase() : null,
+       shift || null, is_active ?? null, req.params.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("PUT admin/schedule error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/admin/schedule/:id
+app.delete("/api/admin/schedule/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM schedule_templates WHERE id = $1", [req.params.id]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE admin/schedule error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Routes: /api/packages ──────────────────────────────────────────────────
+
+// GET /api/packages  (público — landing + checkout)
+app.get("/api/packages", async (_req, res) => {
+  try {
+    const r = await pool.query(
+      "SELECT * FROM packages WHERE is_active = true ORDER BY category ASC, sort_order ASC"
+    );
+    return res.json({ data: r.rows });
+  } catch (err) {
+    console.error("GET packages error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/packages
+app.post("/api/admin/packages", async (req, res) => {
+  const { name, num_classes, price, category, validity_days, sort_order } = req.body;
+  if (!name?.trim() || !num_classes || price === undefined || !category) {
+    return res.status(400).json({ message: "name, num_classes, price y category requeridos" });
+  }
+  try {
+    const r = await pool.query(
+      `INSERT INTO packages (name, num_classes, price, category, validity_days, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [name.trim(), num_classes, Number(price), category, validity_days || 30, sort_order || 0]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("POST admin/packages error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/packages/:id
+app.put("/api/admin/packages/:id", async (req, res) => {
+  const { name, num_classes, price, category, validity_days, is_active, sort_order } = req.body;
+  try {
+    const r = await pool.query(
+      `UPDATE packages SET
+         name          = COALESCE($1, name),
+         num_classes   = COALESCE($2, num_classes),
+         price         = COALESCE($3, price),
+         category      = COALESCE($4, category),
+         validity_days = COALESCE($5, validity_days),
+         is_active     = COALESCE($6, is_active),
+         sort_order    = COALESCE($7, sort_order),
+         updated_at    = NOW()
+       WHERE id = $8 RETURNING *`,
+      [name || null, num_classes || null,
+       price !== undefined ? Number(price) : null,
+       category || null, validity_days ?? null,
+       is_active ?? null, sort_order ?? null, req.params.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("PUT admin/packages error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/admin/packages/:id
+app.delete("/api/admin/packages/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM packages WHERE id = $1", [req.params.id]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE admin/packages error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
 });
