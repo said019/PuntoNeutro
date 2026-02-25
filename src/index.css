@@ -34,53 +34,53 @@
 }
 
 /* ──────────────────────────────────────────────────────────────
-   PALETA OFICIAL OPHELIA STUDIO
-   Principal  : #1F0047  (morado oscuro profundo)
+   PALETA OFICIAL OPHELIA STUDIO — sobre fondo negro
+   Background : #080808  (negro puro)
    Primario   : #E15CB8  (rosa magenta vibrante)
    Acento 1   : #CA71E1  (lila/violeta)
    Acento 2   : #E7EB6E  (amarillo neón)
-   Crema      : #F9F7E8  (foreground cálido)
+   Foreground : #F9F7E8  (crema cálido)
    Sec 1      : #ECD6FB  (lila pastel)
    Sec 2      : #FEA5DC  (rosa claro)
    ────────────────────────────────────────────────────────────── */
 
 @layer base {
   :root {
-    /* Fondo oscuro morado profundo */
-    --background: 265 100% 14%;          /* #1F0047 */
-    --foreground: 53 74% 94%;            /* #F9F7E8 */
+    /* Fondo negro puro — estética original */
+    --background: 0 0% 3.1%;             /* #080808 */
+    --foreground: 53 74% 94%;            /* #F9F7E8 crema */
 
-    --card: 265 100% 10%;
+    --card: 0 0% 5.9%;
     --card-foreground: 53 74% 94%;
 
-    --popover: 265 100% 10%;
+    --popover: 0 0% 5.9%;
     --popover-foreground: 53 74% 94%;
 
-    /* Primario: rosa magenta #E15CB8 */
+    /* Primario: rosa magenta Ophelia #E15CB8 */
     --primary: 316 70% 61%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secundario: morado más claro */
-    --secondary: 265 60% 20%;
+    /* Secundario: gris muy oscuro */
+    --secondary: 0 0% 8.6%;
     --secondary-foreground: 53 74% 94%;
 
-    --muted: 265 40% 22%;
-    --muted-foreground: 265 20% 65%;
+    --muted: 0 0% 16.5%;
+    --muted-foreground: 0 0% 55%;
 
-    /* Acento: lila #CA71E1 */
+    /* Acento: lila Ophelia #CA71E1 */
     --accent: 291 65% 66%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 265 40% 26%;
-    --input: 265 40% 22%;
+    --border: 0 0% 16.5%;
+    --input: 0 0% 16.5%;
     --ring: 316 70% 61%;
 
     --radius: 0.75rem;
 
-    /* Tokens de color Ophelia */
+    /* Tokens Ophelia (disponibles como var() en cualquier componente) */
     --ophelia-purple:    265 100% 14%;   /* #1F0047 */
     --ophelia-magenta:   316 70% 61%;    /* #E15CB8 */
     --ophelia-violet:    291 65% 66%;    /* #CA71E1 */
