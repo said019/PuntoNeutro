@@ -31,9 +31,9 @@ interface Booking {
 const BookingsList = ({ title = "Reservas", initialStatus, statusLocked = false }: BookingsListProps) => {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [status, setStatus] = useState(initialStatus ?? "");
+  const [status, setStatus] = useState(initialStatus ?? "all");
 
-  const url = status ? `/bookings?status=${status}` : "/bookings";
+  const url = status && status !== "all" ? `/bookings?status=${status}` : "/bookings";
   const { data, isLoading } = useQuery<{ data: Booking[] }>({
     queryKey: ["bookings", status],
     queryFn: async () => (await api.get(url)).data,
@@ -60,7 +60,7 @@ const BookingsList = ({ title = "Reservas", initialStatus, statusLocked = false 
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger className="w-48"><SelectValue placeholder="Filtrar estado" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
