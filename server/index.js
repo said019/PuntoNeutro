@@ -344,6 +344,18 @@ async function authMiddleware(req, res, next) {
   }
 }
 
+async function adminMiddleware(req, res, next) {
+  authMiddleware(req, res, async () => {
+    try {
+      const r = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
+      if (!r.rows.length || !["admin", "super_admin", "instructor", "reception"].includes(r.rows[0].role)) {
+        return res.status(403).json({ message: "Acceso restringido" });
+      }
+      next();
+    } catch { return res.status(500).json({ message: "Error interno" }); }
+  });
+}
+
 function mapUser(u) {
   return {
     id: u.id,
@@ -2049,20 +2061,6 @@ app.delete("/api/videos/:id", adminMiddleware, async (req, res) => {
     return res.json({ message: "Video eliminado" });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
-
-
-
-const adminMiddleware = (req, res, next) => {
-  authMiddleware(req, res, async () => {
-    try {
-      const r = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
-      if (!r.rows.length || !["admin", "super_admin", "instructor", "reception"].includes(r.rows[0].role)) {
-        return res.status(403).json({ message: "Acceso restringido" });
-      }
-      next();
-    } catch { return res.status(500).json({ message: "Error interno" }); }
-  });
-};
 
 // GET /api/admin/stats
 app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
