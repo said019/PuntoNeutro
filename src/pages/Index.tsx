@@ -59,18 +59,25 @@ const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
 ];
 
 const FALLBACK_PACKAGES: PackageRow[] = [
-  { id: "p1", name: "4 Clases Jumping", num_classes: "4", price: 380, category: "jumping", validity_days: 30, is_active: true, sort_order: 1 },
-  { id: "p2", name: "8 Clases Jumping", num_classes: "8", price: 700, category: "jumping", validity_days: 30, is_active: true, sort_order: 2 },
-  { id: "p3", name: "12 Clases Jumping", num_classes: "12", price: 980, category: "jumping", validity_days: 30, is_active: true, sort_order: 3 },
-  { id: "p4", name: "Ilimitado Jumping", num_classes: "ILIMITADO", price: 1350, category: "jumping", validity_days: 30, is_active: true, sort_order: 4 },
-  { id: "p5", name: "4 Clases Pilates", num_classes: "4", price: 400, category: "pilates", validity_days: 30, is_active: true, sort_order: 1 },
-  { id: "p6", name: "8 Clases Pilates", num_classes: "8", price: 740, category: "pilates", validity_days: 30, is_active: true, sort_order: 2 },
-  { id: "p7", name: "12 Clases Pilates", num_classes: "12", price: 1050, category: "pilates", validity_days: 30, is_active: true, sort_order: 3 },
-  { id: "p8", name: "Ilimitado Pilates", num_classes: "ILIMITADO", price: 1400, category: "pilates", validity_days: 30, is_active: true, sort_order: 4 },
-  { id: "p9", name: "4 Clases Mixto", num_classes: "4", price: 420, category: "mixtos", validity_days: 30, is_active: true, sort_order: 1 },
-  { id: "p10", name: "8 Clases Mixto", num_classes: "8", price: 780, category: "mixtos", validity_days: 30, is_active: true, sort_order: 2 },
-  { id: "p11", name: "12 Clases Mixto", num_classes: "12", price: 1100, category: "mixtos", validity_days: 30, is_active: true, sort_order: 3 },
-  { id: "p12", name: "Ilimitado Mixto", num_classes: "ILIMITADO", price: 1500, category: "mixtos", validity_days: 30, is_active: true, sort_order: 4 },
+  // Jumping
+  { id: "p1",  name: "4 Clases Jumping",      num_classes: "4",         price: 300,  category: "jumping", validity_days: 30, is_active: true, sort_order: 1 },
+  { id: "p2",  name: "8 Clases Jumping",      num_classes: "8",         price: 560,  category: "jumping", validity_days: 30, is_active: true, sort_order: 2 },
+  { id: "p3",  name: "12 Clases Jumping",     num_classes: "12",        price: 780,  category: "jumping", validity_days: 30, is_active: true, sort_order: 3 },
+  { id: "p4",  name: "16 Clases Jumping",     num_classes: "16",        price: 960,  category: "jumping", validity_days: 30, is_active: true, sort_order: 4 },
+  { id: "p5",  name: "20 Clases Jumping",     num_classes: "20",        price: 1100, category: "jumping", validity_days: 30, is_active: true, sort_order: 5 },
+  { id: "p6",  name: "Ilimitado Jumping",     num_classes: "ILIMITADO", price: 1000, category: "jumping", validity_days: 30, is_active: true, sort_order: 6 },
+  // Pilates
+  { id: "p7",  name: "4 Clases Pilates",      num_classes: "4",         price: 300,  category: "pilates", validity_days: 30, is_active: true, sort_order: 1 },
+  { id: "p8",  name: "8 Clases Pilates",      num_classes: "8",         price: 600,  category: "pilates", validity_days: 30, is_active: true, sort_order: 2 },
+  { id: "p9",  name: "12 Clases Pilates",     num_classes: "12",        price: 840,  category: "pilates", validity_days: 30, is_active: true, sort_order: 3 },
+  { id: "p10", name: "16 Clases Pilates",     num_classes: "16",        price: 1120, category: "pilates", validity_days: 30, is_active: true, sort_order: 4 },
+  { id: "p11", name: "Ilimitado Pilates",     num_classes: "ILIMITADO", price: 1000, category: "pilates", validity_days: 30, is_active: true, sort_order: 5 },
+  // Mixtos
+  { id: "p12", name: "8 Clases Mixto",        num_classes: "8",         price: 600,  category: "mixtos",  validity_days: 30, is_active: true, sort_order: 1 },
+  { id: "p13", name: "12 Clases Mixto",       num_classes: "12",        price: 860,  category: "mixtos",  validity_days: 30, is_active: true, sort_order: 2 },
+  { id: "p14", name: "16 Clases Mixto",       num_classes: "16",        price: 1120, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 3 },
+  { id: "p15", name: "20 Clases Mixto",       num_classes: "20",        price: 1300, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 4 },
+  { id: "p16", name: "Ilimitado Mixto",       num_classes: "ILIMITADO", price: 1000, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 5 },
 ];
 
 const FALLBACK_SCHEDULE: ScheduleSlot[] = [
@@ -202,15 +209,15 @@ const Index = () => {
         }`}
       >
         <a href="#" className="flex items-center">
-          <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-14 w-auto object-contain" />
+          <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-20 w-auto object-contain" />
         </a>
         <ul className="hidden lg:flex gap-8 list-none">
           {[
-          { label: "Clases",      id: "clases" },
+            { label: "Clases",      id: "clases" },
             { label: "Horario",     id: "horario" },
             { label: "Paquetes",    id: "membresias" },
             { label: "Instructoras",id: "instructoras" },
-            { label: "Políticas",   id: "politicas" },
+            { label: "Videos",      id: "videos" },
             { label: "Contacto",    id: "contacto" },
           ].map((item) => (
             <li key={item.id}>
@@ -432,16 +439,18 @@ const Index = () => {
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
             Disponibilidad
           </div>
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-10">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-12">
             <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
               HORARIO<br />SEMANAL
             </h2>
-            <div className="flex flex-col gap-2 lg:text-right">
-              <span className="inline-flex items-center gap-2 text-[0.78rem] font-semibold text-primary tracking-wide uppercase bg-primary/10 border border-primary/30 px-3 py-1.5 rounded-full w-fit lg:ml-auto">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                {getCDMXWeekLabel()}
-              </span>
-              <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
+            <div className="rounded-3xl border-2 border-primary/40 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 lg:p-8 lg:min-w-[380px]">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="w-3 h-3 rounded-full bg-primary animate-pulse flex-shrink-0" />
+                <span className="font-bebas text-[clamp(1.3rem,2vw,1.8rem)] text-primary tracking-wide leading-tight">
+                  {getCDMXWeekLabel()}
+                </span>
+              </div>
+              <p className="text-[0.9rem] text-muted-foreground leading-[1.7]">
                 Clases de lunes a sábado. Reserva tu lugar desde la app con anticipación.
               </p>
             </div>
@@ -481,24 +490,24 @@ const Index = () => {
               <>
                 {/* Desktop */}
                 <div className="hidden lg:block">
-                  <div className="grid grid-cols-[80px_repeat(6,1fr)] gap-2">
+                  <div className="grid grid-cols-[90px_repeat(6,1fr)] gap-2">
                     {/* Header */}
                     <div />
                     {DAYS.map((d) => (
-                      <div key={d} className="text-center py-2.5 px-2 bg-secondary rounded-xl text-[0.72rem] font-semibold tracking-widest uppercase text-muted-foreground">{d}</div>
+                      <div key={d} className="text-center py-3 px-2 bg-secondary rounded-xl text-[0.8rem] font-bold tracking-widest uppercase text-muted-foreground">{d}</div>
                     ))}
                     {/* Rows */}
                     {times.map((time) => (
                       <>
-                        <div key={`t-${time}`} className="flex items-center justify-end pr-2">
-                          <span className="text-[0.78rem] font-semibold text-foreground/70 whitespace-nowrap">{time}</span>
+                        <div key={`t-${time}`} className="flex items-center justify-end pr-3">
+                          <span className="text-[0.88rem] font-bold text-foreground/80 whitespace-nowrap">{time}</span>
                         </div>
                         {[1, 2, 3, 4, 5, 6].map((day) => {
                           const cell = schedule.find((s) => s.time_slot === time && s.day_of_week === day);
                           return (
-                            <div key={`${time}-${day}`} className="rounded-xl overflow-hidden h-12">
+                            <div key={`${time}-${day}`} className="rounded-xl overflow-hidden h-14">
                               {cell ? (
-                                <div className={`h-full flex items-center justify-center text-[0.65rem] font-bold tracking-wider ${CELL_STYLE[cell.class_label] ?? "bg-secondary text-foreground"}`}>
+                                <div className={`h-full flex items-center justify-center text-[0.75rem] font-bold tracking-wider ${CELL_STYLE[cell.class_label] ?? "bg-secondary text-foreground"}`}>
                                   {cell.class_label}
                                 </div>
                               ) : (
@@ -606,6 +615,56 @@ const Index = () => {
         </div>
       </section>
 
+      {/* ── VIDEOS ── */}
+      <section id="videos" className="py-16 lg:py-24 px-6 lg:px-[60px]">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
+          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
+            <span className="w-[30px] h-[1px] bg-primary inline-block" />
+            Conoce la experiencia
+          </div>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-10">
+            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
+              MIRA CÓMO<br />SE VIVE
+            </h2>
+            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
+              Descubre la energía de cada clase. Aquí puedes ver fragmentos de lo que te espera en Ophelia.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[
+              { title: "Jumping Fitness", desc: "Cardio de alta intensidad en trampolín con música que te hará volar.", placeholder: "🏋️" },
+              { title: "Jumping Dance", desc: "Coreografías sobre el trampolín que combinan ritmo y diversión.", placeholder: "💃" },
+              { title: "Pilates Flow", desc: "Secuencias fluidas para fortalecer tu core y mejorar postura.", placeholder: "🧘" },
+            ].map((v, i) => (
+              <div key={i} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all">
+                <div className="relative aspect-video bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center overflow-hidden">
+                  {/* decorative glow */}
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary)/0.15)_0%,transparent_65%)]" />
+                  <div className="relative flex flex-col items-center gap-3">
+                    <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_40px_hsl(var(--primary)/0.3)]">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-primary ml-1">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    </div>
+                    <span className="text-[0.65rem] tracking-[0.15em] uppercase text-primary/60 font-medium">Video próximamente</span>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">{v.placeholder}</span>
+                    <h3 className="font-syne font-bold text-[1rem] text-foreground">{v.title}</h3>
+                  </div>
+                  <p className="text-[0.82rem] text-muted-foreground leading-[1.6]">{v.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground text-center mt-6 tracking-wide">
+            LOS VIDEOS SE ACTUALIZARÁN SEMANALMENTE · SIGUE NUESTRAS REDES PARA MÁS CONTENIDO
+          </p>
+        </div>
+      </section>
+
       {/* ── PAQUETES ── */}
       <section id="membresias" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
@@ -638,7 +697,7 @@ const Index = () => {
             ))}
           </div>
           {/* Package grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {packages
               .filter((p) => p.category === activePkgTab && p.is_active)
               .sort((a, b) => a.sort_order - b.sort_order)
@@ -1024,7 +1083,7 @@ const Index = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 pb-10">
         <div>
             <div className="mb-3">
-              <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-16 w-auto object-contain" />
+              <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-20 w-auto object-contain" />
             </div>
             <p className="text-[0.82rem] text-muted-foreground leading-[1.7] max-w-[200px]">
               El jumping studio que eleva tu cuerpo y transforma tu vida, salto a salto.
@@ -1050,8 +1109,19 @@ const Index = () => {
           <div>
             <div className="text-[0.72rem] tracking-widest uppercase text-muted-foreground mb-5">Legal</div>
             <ul className="flex flex-col gap-[10px] list-none">
-              {["Aviso de privacidad", "Términos y condiciones", "Política de cancelación"].map((l) => (
-                <li key={l}><a href="#" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">{l}</a></li>
+              {[
+                { label: "Aviso de privacidad", path: "/legal/privacidad" },
+                { label: "Términos y condiciones", path: "/legal/terminos" },
+                { label: "Política de cancelación", path: "/legal/cancelacion" },
+              ].map((l) => (
+                <li key={l.path}>
+                  <button
+                    onClick={() => navigate(l.path)}
+                    className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none cursor-pointer p-0"
+                  >
+                    {l.label}
+                  </button>
+                </li>
               ))}
             </ul>
           </div>

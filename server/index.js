@@ -154,6 +154,31 @@ async function ensureSchema() {
       );
       CREATE INDEX IF NOT EXISTS idx_packages_category ON packages(category);
     `);
+    // ── Seed packages si la tabla está vacía ──────────────────────────────
+    const pkgCount = await pool.query("SELECT COUNT(*) FROM packages");
+    if (parseInt(pkgCount.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO packages (name, num_classes, price, category, validity_days, is_active, sort_order) VALUES
+          ('4 Clases Jumping',  '4',         300,  'jumping', 30, true, 1),
+          ('8 Clases Jumping',  '8',         560,  'jumping', 30, true, 2),
+          ('12 Clases Jumping', '12',        780,  'jumping', 30, true, 3),
+          ('16 Clases Jumping', '16',        960,  'jumping', 30, true, 4),
+          ('20 Clases Jumping', '20',        1100, 'jumping', 30, true, 5),
+          ('Ilimitado Jumping', 'ILIMITADO', 1000, 'jumping', 30, true, 6),
+          ('4 Clases Pilates',  '4',         300,  'pilates', 30, true, 1),
+          ('8 Clases Pilates',  '8',         600,  'pilates', 30, true, 2),
+          ('12 Clases Pilates', '12',        840,  'pilates', 30, true, 3),
+          ('16 Clases Pilates', '16',        1120, 'pilates', 30, true, 4),
+          ('Ilimitado Pilates', 'ILIMITADO', 1000, 'pilates', 30, true, 5),
+          ('8 Clases Mixto',    '8',         600,  'mixtos',  30, true, 1),
+          ('12 Clases Mixto',   '12',        860,  'mixtos',  30, true, 2),
+          ('16 Clases Mixto',   '16',        1120, 'mixtos',  30, true, 3),
+          ('20 Clases Mixto',   '20',        1300, 'mixtos',  30, true, 4),
+          ('Ilimitado Mixto',   'ILIMITADO', 1000, 'mixtos',  30, true, 5)
+        ON CONFLICT DO NOTHING;
+      `);
+      console.log("✅ Seeded 16 Ophelia packages");
+    }
     // ── Seed class_types – ensure 8 real Ophelia types exist ──────────────
     const hasOpheliaTypes = await pool.query("SELECT 1 FROM class_types WHERE name = 'Jumping Fitness' LIMIT 1");
     if (hasOpheliaTypes.rows.length === 0) {

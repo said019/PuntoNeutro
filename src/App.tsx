@@ -60,6 +60,11 @@ import ReportsPage from "./pages/admin/reports/ReportsPage";
 import AdminReviewsDashboard from "./pages/admin/reviews/AdminReviewsDashboard";
 import SettingsPage from "./pages/admin/settings/SettingsPage";
 
+// Legal pages
+import Privacidad from "./pages/legal/Privacidad";
+import Terminos from "./pages/legal/Terminos";
+import Cancelacion from "./pages/legal/Cancelacion";
+
 const queryClient = new QueryClient();
 
 // checkAuth on mount
@@ -79,6 +84,11 @@ const App = () => (
         <Routes>
           {/* Public landing */}
           <Route path="/" element={<Index />} />
+
+          {/* Legal pages */}
+          <Route path="/legal/privacidad" element={<Privacidad />} />
+          <Route path="/legal/terminos" element={<Terminos />} />
+          <Route path="/legal/cancelacion" element={<Cancelacion />} />
 
           {/* Auth */}
           <Route path="/auth/login" element={<Login />} />
