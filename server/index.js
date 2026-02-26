@@ -25,9 +25,21 @@ const pool = new Pool({
 // Ensure users table has password_hash column (idempotent migration)
 async function ensureSchema() {
   try {
+    // ── Ensure all users columns the app needs ────────────────────────────
     await pool.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS accepts_terms BOOLEAN DEFAULT false;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS accepts_communications BOOLEAN DEFAULT false;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_name VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_phone VARCHAR(20);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS health_notes TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_reminders BOOLEAN DEFAULT true;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_promotions BOOLEAN DEFAULT false;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_weekly_summary BOOLEAN DEFAULT false;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
     `);
     // Ensure referrals table exists
     await pool.query(`
@@ -78,6 +90,13 @@ async function ensureSchema() {
       ALTER TABLE class_types ADD COLUMN IF NOT EXISTS subtitle VARCHAR(150);
       ALTER TABLE class_types ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'jumping';
       ALTER TABLE class_types ADD COLUMN IF NOT EXISTS intensity VARCHAR(20) DEFAULT 'media';
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS level VARCHAR(50) DEFAULT 'Todos los niveles';
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS duration_min INTEGER DEFAULT 50;
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15;
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS color VARCHAR(50) DEFAULT '#c026d3';
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS emoji VARCHAR(10) DEFAULT '🏃';
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+      ALTER TABLE class_types ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
       ALTER TABLE class_types ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
     // ── schedule_slots (horario semanal editable desde admin) ───────────────
@@ -93,6 +112,14 @@ async function ensureSchema() {
         created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_schedule_slots_day ON schedule_slots(day_of_week);
+    `);
+    await pool.query(`
+      ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS class_type_id UUID;
+      ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS class_type_name VARCHAR(100);
+      ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS instructor_name VARCHAR(100);
+      ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+    `);
+    await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_slots_slot ON schedule_slots(time_slot, day_of_week)
         WHERE is_active = true;
     `);
@@ -158,6 +185,16 @@ async function ensureSchema() {
         ON CONFLICT DO NOTHING;
       `);
     }
+    // ── Ensure plans columns exist ───────────────────────────────────────
+    await pool.query(`
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS currency VARCHAR(3) DEFAULT 'MXN';
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_limit INTEGER;
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `);
     // ── Seed plans si la tabla está vacía ──────────────────────────────────
     const plCount = await pool.query("SELECT COUNT(*) FROM plans");
     if (parseInt(plCount.rows[0].count) === 0) {
@@ -298,17 +335,27 @@ async function ensureSchema() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    // ── Videos: add price column ───────────────────────────────────────────
-    await pool.query(`
-      ALTER TABLE videos ADD COLUMN IF NOT EXISTS price DECIMAL(10,2);
-      ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false;
-    `);
+    // ── Videos: add price column (may fail if videos table not yet created) ─
+    try {
+      await pool.query(`
+        ALTER TABLE videos ADD COLUMN IF NOT EXISTS price DECIMAL(10,2);
+        ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false;
+      `);
+    } catch { /* videos table may not exist yet, that's ok */ }
     // ── Video purchases: add admin_notes and verified_at ──────────────────
-    await pool.query(`
-      ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT;
-      ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
-    `);
-    // ── Seed/reset admin user (always upsert so deploy always resets pwd) ──
+    try {
+      await pool.query(`
+        ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT;
+        ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
+      `);
+    } catch { /* video_purchases table may not exist yet */ }
+    console.log("✅ Schema ensured");
+  } catch (err) {
+    console.error("Schema migration warning:", err.message);
+  }
+
+  // ── Admin user — always upsert (separate try/catch so it always runs) ──
+  try {
     const adminHash = await bcrypt.hash("Ophelia2026!", 12);
     await pool.query(
       `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
@@ -317,9 +364,8 @@ async function ensureSchema() {
       [adminHash]
     );
     console.log("✅ Admin user ready: admin@opheliajumping.mx / Ophelia2026!");
-    console.log("✅ Schema ensured");
   } catch (err) {
-    console.error("Schema migration warning:", err.message);
+    console.error("Admin seed warning:", err.message);
   }
 }
 
