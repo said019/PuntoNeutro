@@ -14,14 +14,14 @@ import type { Order } from "@/types/order";
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: "Pago pendiente",
   pending_verification: "En verificación",
-  verified: "Verificado",
+  approved: "Aprobado",
   rejected: "Rechazado",
   cancelled: "Cancelado",
 };
 const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending_payment: "secondary",
   pending_verification: "outline",
-  verified: "default",
+  approved: "default",
   rejected: "destructive",
   cancelled: "destructive",
 };
@@ -55,7 +55,7 @@ const Orders = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="font-semibold">${order.amount} {order.currency}</p>
+                        <p className="font-semibold">${order.total_amount ?? order.amount} {order.currency}</p>
                         <Badge variant={STATUS_VARIANTS[order.status] ?? "secondary"}>
                           {STATUS_LABELS[order.status] ?? order.status}
                         </Badge>

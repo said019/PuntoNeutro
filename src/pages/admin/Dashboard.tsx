@@ -13,7 +13,7 @@ interface Stats {
   monthlyRevenue: number;
   pendingAlerts: number;
   recentMemberships: { id: string; userName: string; planName: string; status: string; createdAt: string }[];
-  pendingOrders: { id: string; userName: string; amount: number; status: string }[];
+  pendingOrders: { id: string; userName: string; amount?: number; total_amount?: number; status: string }[];
 }
 
 const Dashboard = () => {
@@ -105,7 +105,7 @@ const Dashboard = () => {
                       <div key={o.id} className="flex items-center justify-between text-sm">
                         <div>
                           <p className="font-medium">{o.userName}</p>
-                          <p className="text-muted-foreground text-xs">${o.amount} MXN</p>
+                          <p className="text-muted-foreground text-xs">${o.total_amount ?? o.amount} MXN</p>
                         </div>
                         <Badge variant="outline" className="text-xs">
                           {o.status}

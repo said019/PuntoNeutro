@@ -20,7 +20,7 @@ import type { Order } from "@/types/order";
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: "Pago pendiente",
   pending_verification: "En verificación",
-  verified: "Verificado — membresía activa",
+  approved: "Aprobado — membresía activa",
   rejected: "Rechazado",
   cancelled: "Cancelado",
 };
@@ -79,7 +79,7 @@ const OrderDetail = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Monto</span>
-                    <span className="font-semibold">${order.amount} {order.currency}</span>
+                    <span className="font-semibold">${order.total_amount ?? order.amount} {order.currency}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Fecha</span>

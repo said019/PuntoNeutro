@@ -1,8 +1,9 @@
 export type OrderStatus =
   | "pending_payment"
   | "pending_verification"
-  | "verified"
+  | "approved"
   | "rejected"
+  | "expired"
   | "cancelled";
 
 export interface Order {
@@ -10,7 +11,9 @@ export interface Order {
   user_id: string;
   plan_id: string;
   plan_name: string;
-  amount: number;
+  amount?: number;
+  total_amount?: number;
+  subtotal?: number;
   currency: string;
   status: OrderStatus;
   payment_method: string;

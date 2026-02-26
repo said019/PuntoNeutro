@@ -304,6 +304,10 @@ async function ensureSchema() {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_by UUID;
     `);
+    // Make plan_id nullable (POS orders don't always have a plan)
+    await pool.query(`ALTER TABLE orders ALTER COLUMN plan_id DROP NOT NULL`).catch(() => {});
+    // Make user_id nullable (walk-in POS sales may not have a user)
+    await pool.query(`ALTER TABLE orders ALTER COLUMN user_id DROP NOT NULL`).catch(() => {});
     // ── memberships: add order_id column ─────────────────────────────────
     await pool.query(`
       ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID;
@@ -1802,7 +1806,7 @@ app.delete("/api/schedules/:id", adminMiddleware, async (req, res) => {
 app.put("/api/orders/:id/verify", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      "UPDATE orders SET status='verified', verified_at=NOW(), verified_by=$1 WHERE id=$2 RETURNING *",
+      "UPDATE orders SET status='approved', verified_at=NOW(), verified_by=$1 WHERE id=$2 RETURNING *",
       [req.userId, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
@@ -1856,8 +1860,8 @@ app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
     }
     const total = Math.max(0, subtotal - discountAmount);
     const orderRes = await pool.query(
-      "INSERT INTO orders (user_id, amount, payment_method, status, discount_amount, channel) VALUES ($1,$2,$3,'verified',$4,'pos') RETURNING *",
-      [userId || null, total, paymentMethod, discountAmount]
+      "INSERT INTO orders (user_id, subtotal, tax_amount, total_amount, payment_method, status, discount_amount, channel) VALUES ($1,$2,0,$3,$4,'approved',$5,'pos') RETURNING *",
+      [userId || null, subtotal, total, paymentMethod, discountAmount]
     );
     const order = orderRes.rows[0];
     for (const item of items) {
@@ -1941,9 +1945,9 @@ app.get("/api/reports/overview", adminMiddleware, async (req, res) => {
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
     const [members, revenue, bookings, classes] = await Promise.all([
       pool.query("SELECT COUNT(*) FROM memberships WHERE status='active'"),
-      pool.query("SELECT COALESCE(SUM(amount),0) AS total FROM orders WHERE status='verified' AND created_at>=$1", [monthStart]),
+      pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status='approved' AND created_at>=$1", [monthStart]),
       pool.query("SELECT COUNT(*) FROM bookings WHERE created_at>=$1", [monthStart]),
-      pool.query("SELECT COUNT(*) FROM classes WHERE status='scheduled' AND start_time>=$1", [monthStart]),
+      pool.query("SELECT COUNT(*) FROM classes WHERE status='scheduled' AND date>=$1", [monthStart]),
     ]);
     return res.json({ data: {
       activeMembers: parseInt(members.rows[0].count),
@@ -1957,8 +1961,8 @@ app.get("/api/reports/overview", adminMiddleware, async (req, res) => {
 app.get("/api/reports/revenue", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT DATE_TRUNC('month', created_at) AS month, SUM(amount) AS total, COUNT(*) AS count
-       FROM orders WHERE status='verified'
+      `SELECT DATE_TRUNC('month', created_at) AS month, SUM(total_amount) AS total, COUNT(*) AS count
+       FROM orders WHERE status='approved'
        GROUP BY month ORDER BY month DESC LIMIT 12`
     );
     return res.json({ data: r.rows });
@@ -2209,9 +2213,9 @@ app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
     const [classesToday, activeMembers, monthlyRevenue, pendingAlerts] = await Promise.all([
-      pool.query("SELECT COUNT(*) FROM classes WHERE DATE(start_time) = $1", [today]),
+      pool.query("SELECT COUNT(*) FROM classes WHERE date = $1", [today]),
       pool.query("SELECT COUNT(*) FROM memberships WHERE status = 'active'"),
-      pool.query("SELECT COALESCE(SUM(amount),0) AS total FROM orders WHERE status = 'verified' AND created_at >= $1", [monthStart]),
+      pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status = 'approved' AND created_at >= $1", [monthStart]),
       pool.query("SELECT COUNT(*) FROM orders WHERE status = 'pending_verification'"),
     ]);
 
@@ -2493,7 +2497,7 @@ app.get("/api/admin/orders", adminMiddleware, async (req, res) => {
 app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      "UPDATE orders SET status = 'verified', verified_at = NOW(), verified_by = $1 WHERE id = $2 RETURNING *",
+      "UPDATE orders SET status = 'approved', verified_at = NOW(), verified_by = $1 WHERE id = $2 RETURNING *",
       [req.userId, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
@@ -2544,13 +2548,13 @@ app.get("/api/payments", adminMiddleware, async (req, res) => {
              FROM orders o
              LEFT JOIN users u ON o.user_id = u.id
              LEFT JOIN plans p ON o.plan_id = p.id
-             WHERE o.status = 'verified'`;
+             WHERE o.status = 'approved'`;
     const params = [];
     if (startDate) { params.push(startDate); q += ` AND o.created_at >= $${params.length}`; }
     if (endDate) { params.push(endDate); q += ` AND o.created_at <= $${params.length}`; }
     params.push(parseInt(limit)); q += ` ORDER BY o.created_at DESC LIMIT $${params.length}`;
     const r = await pool.query(q, params);
-    const total = r.rows.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
+    const total = r.rows.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
     return res.json({ data: r.rows.map(o => ({ ...o, userName: o.user_name, planName: o.plan_name })), total });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
@@ -2697,8 +2701,8 @@ app.post("/api/pos/sale", adminMiddleware, async (req, res) => {
     const total = Math.max(0, subtotal - discountAmount);
     // Create order
     const orderRes = await pool.query(
-      "INSERT INTO orders (user_id, amount, payment_method, status, discount_amount, channel) VALUES ($1,$2,$3,'verified',$4,'pos') RETURNING *",
-      [userId || null, total, paymentMethod, discountAmount]
+      "INSERT INTO orders (user_id, subtotal, tax_amount, total_amount, payment_method, status, discount_amount, channel) VALUES ($1,$2,0,$3,$4,'approved',$5,'pos') RETURNING *",
+      [userId || null, subtotal, total, paymentMethod, discountAmount]
     );
     const order = orderRes.rows[0];
     // Create order items & update stock
@@ -2815,7 +2819,7 @@ app.get("/api/admin/reports", adminMiddleware, async (req, res) => {
 
     const [revenue, newClients, bookings, topPlans] = await Promise.all([
       pool.query(
-        "SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS count FROM orders WHERE status='verified' AND created_at BETWEEN $1 AND $2",
+        "SELECT COALESCE(SUM(total_amount),0) AS total, COUNT(*) AS count FROM orders WHERE status='approved' AND created_at BETWEEN $1 AND $2",
         [start, end]
       ),
       pool.query(
@@ -2827,10 +2831,10 @@ app.get("/api/admin/reports", adminMiddleware, async (req, res) => {
         [start, end]
       ),
       pool.query(
-        `SELECT p.name, COUNT(m.id) AS sales, SUM(o.amount) AS revenue
+        `SELECT p.name, COUNT(m.id) AS sales, SUM(o.total_amount) AS revenue
          FROM memberships m
          JOIN plans p ON m.plan_id = p.id
-         LEFT JOIN orders o ON o.plan_id = p.id AND o.status = 'verified'
+         LEFT JOIN orders o ON o.plan_id = p.id AND o.status = 'approved'
          WHERE m.created_at BETWEEN $1 AND $2
          GROUP BY p.name ORDER BY sales DESC LIMIT 5`,
         [start, end]

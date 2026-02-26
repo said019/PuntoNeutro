@@ -157,7 +157,7 @@ const PaymentsRegister = () => {
           {payments.map((p: any) => (
             <TableRow key={p.id}>
               <TableCell>{p.userName ?? p.userId}</TableCell>
-              <TableCell>${p.amount} MXN</TableCell>
+              <TableCell>${p.total_amount ?? p.amount} MXN</TableCell>
               <TableCell><Badge variant="outline">{p.method}</Badge></TableCell>
               <TableCell className="text-sm">{p.createdAt ? new Date(p.createdAt).toLocaleDateString("es-MX") : "—"}</TableCell>
             </TableRow>

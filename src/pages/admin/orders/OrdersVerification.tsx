@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 const STATUS_BADGE: Record<string, "default" | "outline" | "destructive" | "secondary"> = {
   pending_payment: "outline",
   pending_verification: "outline",
-  verified: "default",
+  approved: "default",
   rejected: "destructive",
   cancelled: "secondary",
 };
@@ -25,7 +25,8 @@ interface Order {
   id: string;
   userName?: string;
   userId: string;
-  amount: number;
+  amount?: number;
+  total_amount?: number;
   status: string;
   createdAt: string;
   proofUrl?: string;
@@ -75,7 +76,7 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
               : orders.map((o) => (
                 <TableRow key={o.id}>
                   <TableCell>{o.userName ?? o.userId}</TableCell>
-                  <TableCell>${o.amount} MXN</TableCell>
+                  <TableCell>${o.total_amount ?? o.amount} MXN</TableCell>
                   <TableCell><Badge variant={STATUS_BADGE[o.status] ?? "outline"}>{o.status}</Badge></TableCell>
                   <TableCell className="text-sm">{new Date(o.createdAt).toLocaleDateString("es-MX")}</TableCell>
                   <TableCell>
@@ -97,7 +98,7 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
             <div className="space-y-4">
               <div className="text-sm space-y-1">
                 <div><span className="font-medium">Cliente:</span> {selected.userName}</div>
-                <div><span className="font-medium">Monto:</span> ${selected.amount} MXN</div>
+                <div><span className="font-medium">Monto:</span> ${selected.total_amount ?? selected.amount} MXN</div>
                 <div><span className="font-medium">Estado:</span> <Badge variant={STATUS_BADGE[selected.status] ?? "outline"}>{selected.status}</Badge></div>
               </div>
               {selected.proofUrl && (

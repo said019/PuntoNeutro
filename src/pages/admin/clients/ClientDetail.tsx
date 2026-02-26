@@ -112,7 +112,7 @@ const ClientDetail = () => {
                 <TableBody>
                   {(Array.isArray(payments?.data) ? payments.data : []).map((p: any) => (
                     <TableRow key={p.id}>
-                      <TableCell>${p.amount}</TableCell>
+                      <TableCell>${p.total_amount ?? p.amount}</TableCell>
                       <TableCell>{p.method}</TableCell>
                       <TableCell>{p.createdAt ? new Date(p.createdAt).toLocaleDateString("es-MX") : "—"}</TableCell>
                     </TableRow>
