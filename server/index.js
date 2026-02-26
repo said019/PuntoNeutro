@@ -170,6 +170,144 @@ async function ensureSchema() {
         ON CONFLICT DO NOTHING;
       `);
     }
+    // ── Products table ─────────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name       VARCHAR(150) NOT NULL,
+        price      DECIMAL(10,2) DEFAULT 0,
+        category   VARCHAR(50) DEFAULT 'accesorios',
+        stock      INTEGER DEFAULT 0,
+        sku        VARCHAR(100),
+        is_active  BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    // ── Order items table ───────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        order_id   UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+        quantity   INTEGER NOT NULL DEFAULT 1,
+        unit_price DECIMAL(10,2) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+    `);
+    // ── Instructors table ──────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS instructors (
+        id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        display_name VARCHAR(150) NOT NULL,
+        email        VARCHAR(255),
+        phone        VARCHAR(30),
+        bio          TEXT,
+        specialties  TEXT,
+        photo_url    TEXT,
+        is_active    BOOLEAN DEFAULT true,
+        created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    // ── Reviews table ──────────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS reviews (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+        rating      SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+        comment     TEXT,
+        class_id    UUID,
+        is_approved BOOLEAN DEFAULT false,
+        created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id);
+    `);
+    // ── Loyalty transactions table ─────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS loyalty_transactions (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type        VARCHAR(10) NOT NULL CHECK (type IN ('earn','redeem','adjust')),
+        points      INTEGER NOT NULL,
+        description TEXT,
+        created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+        created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_loyalty_tx_user ON loyalty_transactions(user_id);
+    `);
+    // ── referrals table (tracks which users were referred) ─────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS referrals (
+        id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        referral_code_id UUID REFERENCES referral_codes(id) ON DELETE CASCADE,
+        referred_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        rewarded         BOOLEAN DEFAULT false,
+        created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(referral_code_id);
+    `);
+    // ── orders: add missing columns if needed ─────────────────────────────
+    await pool.query(`
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS channel VARCHAR(30) DEFAULT 'web';
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS plan_id UUID;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_by UUID;
+    `);
+    // ── memberships: add order_id column ─────────────────────────────────
+    await pool.query(`
+      ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_order ON memberships(order_id) WHERE order_id IS NOT NULL;
+    `);
+    // ── discount_codes: normalise discount_type values ────────────────────
+    await pool.query(`
+      ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0;
+      ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `);
+    // ── bookings: add checked_in_at column ────────────────────────────────
+    await pool.query(`
+      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE;
+    `);
+    // ── Settings table ─────────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key        VARCHAR(100) PRIMARY KEY,
+        value      JSONB NOT NULL DEFAULT '{}',
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    // ── Loyalty rewards table ──────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS loyalty_rewards (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name        VARCHAR(150) NOT NULL,
+        description TEXT,
+        points_cost INTEGER NOT NULL,
+        is_active   BOOLEAN DEFAULT true,
+        created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    // ── Review tags table ──────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS review_tags (
+        id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name       VARCHAR(100) NOT NULL,
+        color      VARCHAR(20) DEFAULT '#c026d3',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    // ── Videos: add price column ───────────────────────────────────────────
+    await pool.query(`
+      ALTER TABLE videos ADD COLUMN IF NOT EXISTS price DECIMAL(10,2);
+      ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false;
+    `);
+    // ── Video purchases: add admin_notes and verified_at ──────────────────
+    await pool.query(`
+      ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT;
+      ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
+    `);
     // ── Seed admin user si no existe ───────────────────────────────────────
     const adminExists = await pool.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
     if (adminExists.rows.length === 0) {
@@ -937,14 +1075,24 @@ app.post("/api/videos/purchases/:id/proof", authMiddleware, upload.single("proof
 
 // PUT /api/users/:id
 app.put("/api/users/:id", authMiddleware, async (req, res) => {
-  if (req.params.id !== req.userId) return res.status(403).json({ message: "Acceso denegado" });
-  const {
-    displayName, phone, dateOfBirth,
-    emergencyContactName, emergencyContactPhone, healthNotes,
-    receiveReminders, receivePromotions, receiveWeeklySummary,
-    acceptsCommunications,
-  } = req.body;
+  // Allow own profile edit OR admin editing any user
   try {
+    const selfRes = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
+    const callerRole = selfRes.rows[0]?.role || "client";
+    const isAdminCaller = ["admin", "super_admin"].includes(callerRole);
+    if (req.params.id !== req.userId && !isAdminCaller) {
+      return res.status(403).json({ message: "Acceso denegado" });
+    }
+    const {
+      displayName, phone, dateOfBirth,
+      emergencyContactName, emergencyContactPhone, healthNotes,
+      receiveReminders, receivePromotions, receiveWeeklySummary,
+      acceptsCommunications,
+      role,
+    } = req.body;
+    // Non-admins cannot change role
+    const newRole = isAdminCaller && role ? role : null;
+    const targetId = req.params.id;
     const r = await pool.query(
       `UPDATE users SET
          display_name              = COALESCE($1, display_name),
@@ -957,15 +1105,17 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
          receive_promotions        = COALESCE($8, receive_promotions),
          receive_weekly_summary    = COALESCE($9, receive_weekly_summary),
          accepts_communications    = COALESCE($10, accepts_communications),
+         role                      = COALESCE($11, role),
          updated_at                = NOW()
-       WHERE id = $11
+       WHERE id = $12
        RETURNING *`,
       [
         displayName || null, phone || null, dateOfBirth || null,
         emergencyContactName || null, emergencyContactPhone || null, healthNotes || null,
         receiveReminders ?? null, receivePromotions ?? null, receiveWeeklySummary ?? null,
         acceptsCommunications ?? null,
-        req.userId,
+        newRole,
+        targetId,
       ]
     );
     return res.json({ user: mapUser(r.rows[0]) });
@@ -1369,6 +1519,1421 @@ app.delete("/api/admin/packages/:id", async (req, res) => {
     console.error("DELETE admin/packages error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
+});
+
+// ─── Routes: /api/admin (protected admin routes) ────────────────────────────
+
+// GET /api/users/:id — get single user (admin)
+app.get("/api/users/:id", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM users WHERE id = $1", [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
+    return res.json({ data: mapUser(r.rows[0]) });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// GET /api/class-types — public alias for admin/class-types
+app.get("/api/class-types", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM class_types WHERE is_active = true ORDER BY sort_order ASC");
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// POST /api/classes — admin creates a class (alias)
+app.post("/api/classes", adminMiddleware, async (req, res) => {
+  try {
+    const { classTypeId, instructorId, startTime, endTime, capacity = 10, location, notes } = req.body;
+    if (!classTypeId) return res.status(400).json({ message: "classTypeId requerido" });
+    const r = await pool.query(
+      `INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, location, notes, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'scheduled') RETURNING *`,
+      [classTypeId, instructorId || null, startTime, endTime || null, capacity, location || null, notes || null]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// PUT /api/classes/:id/cancel
+app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("UPDATE classes SET status='cancelled', updated_at=NOW() WHERE id=$1 RETURNING *", [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ message: "Clase no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// POST /api/classes/generate — bulk generate
+app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
+  try {
+    const { startDate, endDate, instructorId } = req.body;
+    if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
+    const slotsRes = await pool.query("SELECT * FROM schedule_templates WHERE is_active = true");
+    const classTypeRes = await pool.query("SELECT id, name, category FROM class_types WHERE is_active = true");
+    const classTypes = classTypeRes.rows;
+    const created = [];
+    const start = new Date(startDate); const end = new Date(endDate);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay();
+      const daySlots = slotsRes.rows.filter(s => s.day_of_week === dayOfWeek);
+      for (const slot of daySlots) {
+        const timeStr = slot.time_slot.toLowerCase();
+        const isPM = timeStr.includes("pm");
+        const cleanTime = timeStr.replace(/[apm\s]/g, "");
+        const [h, m = 0] = cleanTime.split(":").map(Number);
+        const hour = isPM && h !== 12 ? h + 12 : (!isPM && h === 12 ? 0 : h);
+        const classDate = new Date(d); classDate.setHours(hour, m, 0, 0);
+        const endDate2 = new Date(classDate); endDate2.setMinutes(endDate2.getMinutes() + 55);
+        const label = slot.class_label?.toLowerCase();
+        let ct = classTypes.find(c => c.category?.toLowerCase() === label || c.name?.toLowerCase().includes(label));
+        if (!ct) ct = classTypes[0];
+        if (!ct) continue;
+        const exists = await pool.query("SELECT id FROM classes WHERE start_time = $1 AND class_type_id = $2", [classDate.toISOString(), ct.id]);
+        if (exists.rows.length) continue;
+        const r = await pool.query(
+          "INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, status) VALUES ($1,$2,$3,$4,10,'scheduled') RETURNING *",
+          [ct.id, instructorId || null, classDate.toISOString(), endDate2.toISOString()]
+        );
+        created.push(r.rows[0]);
+      }
+    }
+    return res.json({ created: created.length, data: created });
+  } catch (err) { console.error("generate classes error:", err); return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Schedules (schedule_slots) CRUD ────────────────────────────────────────
+
+// GET /api/schedules
+app.get("/api/schedules", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM schedule_slots ORDER BY day_of_week, time_slot");
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// POST /api/schedules
+app.post("/api/schedules", adminMiddleware, async (req, res) => {
+  try {
+    const { timeSlot, dayOfWeek, classTypeName, classTypeId, instructorName, isActive = true } = req.body;
+    if (!timeSlot || !dayOfWeek) return res.status(400).json({ message: "timeSlot y dayOfWeek requeridos" });
+    const r = await pool.query(
+      `INSERT INTO schedule_slots (time_slot, day_of_week, class_type_id, class_type_name, instructor_name, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [timeSlot, dayOfWeek, classTypeId || null, classTypeName || null, instructorName || null, isActive]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// PUT /api/schedules/:id
+app.put("/api/schedules/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { timeSlot, dayOfWeek, classTypeName, classTypeId, instructorName, isActive } = req.body;
+    const r = await pool.query(
+      `UPDATE schedule_slots SET time_slot=$1, day_of_week=$2, class_type_id=$3, class_type_name=$4, instructor_name=$5, is_active=$6
+       WHERE id=$7 RETURNING *`,
+      [timeSlot, dayOfWeek, classTypeId || null, classTypeName || null, instructorName || null, isActive !== false, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Slot no encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// DELETE /api/schedules/:id
+app.delete("/api/schedules/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM schedule_slots WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Slot eliminado" });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Orders verify/reject ────────────────────────────────────────────────────
+
+// PUT /api/orders/:id/verify
+app.put("/api/orders/:id/verify", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "UPDATE orders SET status='verified', verified_at=NOW(), verified_by=$1 WHERE id=$2 RETURNING *",
+      [req.userId, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
+    const order = r.rows[0];
+    if (order.plan_id) {
+      const planRes = await pool.query("SELECT * FROM plans WHERE id = $1", [order.plan_id]);
+      if (planRes.rows.length) {
+        const plan = planRes.rows[0];
+        const end = new Date(); end.setDate(end.getDate() + (plan.duration_days || 30));
+        await pool.query(
+          `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
+           VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)
+           ON CONFLICT (order_id) DO UPDATE SET status='active'`,
+          [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
+        ).catch(() => {}); // ignore if order_id unique constraint not in place
+      }
+    }
+    return res.json({ data: order });
+  } catch (err) { console.error("orders/:id/verify error:", err); return res.status(500).json({ message: "Error interno" }); }
+});
+
+// PUT /api/orders/:id/reject
+app.put("/api/orders/:id/reject", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("UPDATE orders SET status='rejected', verified_at=NOW() WHERE id=$1 RETURNING *", [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// POST /api/pos/checkout — alias for /pos/sale
+app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
+  req.url = "/api/pos/sale";
+  const { userId, items, paymentMethod = "efectivo", discountCode } = req.body;
+  try {
+    if (!items?.length) return res.status(400).json({ message: "Se requieren artículos" });
+    let subtotal = 0; let discountAmount = 0;
+    for (const item of items) {
+      const pRes = await pool.query("SELECT * FROM products WHERE id = $1", [item.productId]);
+      if (!pRes.rows.length) return res.status(404).json({ message: `Producto ${item.productId} no encontrado` });
+      subtotal += parseFloat(pRes.rows[0].price) * item.qty;
+    }
+    if (discountCode) {
+      const dcRes = await pool.query("SELECT * FROM discount_codes WHERE code=$1 AND is_active=true", [discountCode.toUpperCase()]);
+      if (dcRes.rows.length) {
+        const dc = dcRes.rows[0];
+        discountAmount = dc.discount_type === "percentage" || dc.discount_type === "percent"
+          ? subtotal * (parseFloat(dc.discount_value) / 100)
+          : parseFloat(dc.discount_value);
+      }
+    }
+    const total = Math.max(0, subtotal - discountAmount);
+    const orderRes = await pool.query(
+      "INSERT INTO orders (user_id, amount, payment_method, status, discount_amount, channel) VALUES ($1,$2,$3,'verified',$4,'pos') RETURNING *",
+      [userId || null, total, paymentMethod, discountAmount]
+    );
+    const order = orderRes.rows[0];
+    for (const item of items) {
+      const pRes = await pool.query("SELECT price FROM products WHERE id=$1", [item.productId]);
+      await pool.query("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,$2,$3,$4)", [order.id, item.productId, item.qty, pRes.rows[0].price]);
+      await pool.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [item.qty, item.productId]);
+    }
+    return res.status(201).json({ data: order });
+  } catch (err) { console.error("pos/checkout error:", err); return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Loyalty config & rewards admin ─────────────────────────────────────────
+
+// GET/PUT /api/loyalty/config
+app.get("/api/loyalty/config", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+    const defaults = { pointsPerClass: 10, pointsPerReferral: 200, pointsPerReview: 50, expirationDays: 365 };
+    return res.json({ data: r.rows.length ? r.rows[0].value : defaults });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.put("/api/loyalty/config", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query(
+      `INSERT INTO settings (key, value) VALUES ('loyalty_config', $1)
+       ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
+      [JSON.stringify(req.body)]
+    );
+    return res.json({ data: req.body });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// POST /api/loyalty/rewards — admin CRUD for loyalty rewards
+app.post("/api/loyalty/rewards", adminMiddleware, async (req, res) => {
+  try {
+    const { name, description, pointsCost, isActive = true } = req.body;
+    if (!name || !pointsCost) return res.status(400).json({ message: "name y pointsCost requeridos" });
+    const r = await pool.query(
+      "INSERT INTO loyalty_rewards (name, description, points_cost, is_active) VALUES ($1,$2,$3,$4) RETURNING *",
+      [name, description || null, pointsCost, isActive]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.put("/api/loyalty/rewards/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { name, description, pointsCost, isActive } = req.body;
+    const r = await pool.query(
+      "UPDATE loyalty_rewards SET name=$1, description=$2, points_cost=$3, is_active=$4 WHERE id=$5 RETURNING *",
+      [name, description || null, pointsCost, isActive !== false, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Recompensa no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.delete("/api/loyalty/rewards/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM loyalty_rewards WHERE id=$1", [req.params.id]);
+    return res.json({ message: "Recompensa eliminada" });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// GET /api/loyalty/points/:userId
+app.get("/api/loyalty/points/:userId", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "SELECT COALESCE(SUM(CASE WHEN type='earn' OR type='adjust' THEN points ELSE -points END),0) AS balance FROM loyalty_transactions WHERE user_id=$1",
+      [req.params.userId]
+    );
+    return res.json({ data: { balance: parseInt(r.rows[0].balance) } });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Reports sub-routes ──────────────────────────────────────────────────────
+
+app.get("/api/reports/overview", adminMiddleware, async (req, res) => {
+  try {
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    const [members, revenue, bookings, classes] = await Promise.all([
+      pool.query("SELECT COUNT(*) FROM memberships WHERE status='active'"),
+      pool.query("SELECT COALESCE(SUM(amount),0) AS total FROM orders WHERE status='verified' AND created_at>=$1", [monthStart]),
+      pool.query("SELECT COUNT(*) FROM bookings WHERE created_at>=$1", [monthStart]),
+      pool.query("SELECT COUNT(*) FROM classes WHERE status='scheduled' AND start_time>=$1", [monthStart]),
+    ]);
+    return res.json({ data: {
+      activeMembers: parseInt(members.rows[0].count),
+      monthlyRevenue: parseFloat(revenue.rows[0].total),
+      monthlyBookings: parseInt(bookings.rows[0].count),
+      upcomingClasses: parseInt(classes.rows[0].count),
+    }});
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.get("/api/reports/revenue", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT DATE_TRUNC('month', created_at) AS month, SUM(amount) AS total, COUNT(*) AS count
+       FROM orders WHERE status='verified'
+       GROUP BY month ORDER BY month DESC LIMIT 12`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.get("/api/reports/classes", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT ct.name, COUNT(b.id) AS bookings, COUNT(CASE WHEN b.status='checked_in' THEN 1 END) AS attended
+       FROM classes c
+       JOIN class_types ct ON c.class_type_id=ct.id
+       LEFT JOIN bookings b ON b.class_id=c.id
+       GROUP BY ct.name ORDER BY bookings DESC LIMIT 10`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.get("/api/reports/retention", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT COUNT(*) AS total,
+              COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) AS new_this_month
+       FROM users WHERE role='client'`
+    );
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.get("/api/reports/instructors", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT i.display_name, COUNT(c.id) AS classes_taught, COUNT(b.id) AS total_students
+       FROM instructors i
+       LEFT JOIN classes c ON c.instructor_id=i.id
+       LEFT JOIN bookings b ON b.class_id=c.id
+       GROUP BY i.id, i.display_name ORDER BY classes_taught DESC`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Reviews public endpoints & admin ───────────────────────────────────────
+
+// GET /api/reviews (public, approved only; admin sees all via /api/admin/reviews)
+app.get("/api/reviews", async (req, res) => {
+  try {
+    const { limit = 50, approved } = req.query;
+    let q = `SELECT rv.*, u.display_name AS user_name FROM reviews rv LEFT JOIN users u ON rv.user_id=u.id WHERE 1=1`;
+    const params = [];
+    if (approved !== "false") { q += ` AND rv.is_approved=true`; }
+    params.push(parseInt(limit)); q += ` ORDER BY rv.created_at DESC LIMIT $${params.length}`;
+    const r = await pool.query(q, params);
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// GET /api/reviews/stats
+app.get("/api/reviews/stats", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT AVG(rating) AS average, COUNT(*) AS total FROM reviews WHERE is_approved=true");
+    const dist = await pool.query("SELECT rating, COUNT(*) FROM reviews WHERE is_approved=true GROUP BY rating ORDER BY rating DESC");
+    return res.json({ data: { average: parseFloat(r.rows[0].average || 0).toFixed(1), total: parseInt(r.rows[0].total), distribution: dist.rows } });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// Review tags (admin)
+app.get("/api/review-tags", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM review_tags ORDER BY name").catch(() => ({ rows: [] }));
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.post("/api/review-tags", adminMiddleware, async (req, res) => {
+  try {
+    const { name, color } = req.body;
+    const r = await pool.query(
+      "INSERT INTO review_tags (name, color) VALUES ($1,$2) RETURNING *",
+      [name, color || "#c026d3"]
+    ).catch(() => ({ rows: [{ id: "1", name, color }] }));
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.put("/api/review-tags/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { name, color } = req.body;
+    const r = await pool.query(
+      "UPDATE review_tags SET name=$1, color=$2 WHERE id=$3 RETURNING *",
+      [name, color || "#c026d3", req.params.id]
+    ).catch(() => ({ rows: [{ id: req.params.id, name, color }] }));
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.delete("/api/review-tags/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM review_tags WHERE id=$1", [req.params.id]).catch(() => {});
+    return res.json({ message: "Tag eliminado" });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Referrals admin ─────────────────────────────────────────────────────────
+
+// GET /api/referrals/codes — all codes (admin)
+app.get("/api/referrals/codes", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT rc.*, u.display_name AS user_name, u.email, rc.uses_count
+       FROM referral_codes rc LEFT JOIN users u ON rc.user_id=u.id
+       ORDER BY rc.uses_count DESC`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// GET /api/referrals — referral history
+app.get("/api/referrals", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT r.*, rc.code, u.display_name AS referred_name
+       FROM referrals r
+       JOIN referral_codes rc ON r.referral_code_id=rc.id
+       LEFT JOIN users u ON r.referred_user_id=u.id
+       ORDER BY r.created_at DESC LIMIT 100`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// GET /api/referrals/stats
+app.get("/api/referrals/stats", adminMiddleware, async (req, res) => {
+  try {
+    const [total, rewarded] = await Promise.all([
+      pool.query("SELECT COUNT(*) FROM referrals"),
+      pool.query("SELECT COUNT(*) FROM referrals WHERE rewarded=true"),
+    ]);
+    return res.json({ data: { total: parseInt(total.rows[0].count), rewarded: parseInt(rewarded.rows[0].count) } });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Settings ────────────────────────────────────────────────────────────────
+
+app.get("/api/settings/:key", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT value FROM settings WHERE key=$1", [req.params.key]);
+    return res.json({ data: r.rows.length ? r.rows[0].value : null });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
+  try {
+    const { value } = req.body;
+    await pool.query(
+      "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()",
+      [req.params.key, JSON.stringify(value)]
+    );
+    return res.json({ data: { key: req.params.key, value } });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Evolution (WhatsApp) stubs ───────────────────────────────────────────────
+
+app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
+  return res.json({ data: { connected: false, status: "not_configured" } });
+});
+
+app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
+  return res.json({ data: { message: "Integración WhatsApp no configurada" } });
+});
+
+app.post("/api/evolution/disconnect", adminMiddleware, async (req, res) => {
+  return res.json({ data: { message: "Desconectado" } });
+});
+
+app.post("/api/evolution/send-test", adminMiddleware, async (req, res) => {
+  return res.json({ data: { message: "Función no disponible aún" } });
+});
+
+// ─── Videos purchases approve/reject ────────────────────────────────────────
+
+app.post("/api/videos/purchases/:id/approve", adminMiddleware, async (req, res) => {
+  try {
+    const { admin_notes } = req.body;
+    const r = await pool.query(
+      "UPDATE video_purchases SET status='active', admin_notes=$1, verified_at=NOW() WHERE id=$2 RETURNING *",
+      [admin_notes || null, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Compra no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.post("/api/videos/purchases/:id/reject", adminMiddleware, async (req, res) => {
+  try {
+    const { admin_notes } = req.body;
+    const r = await pool.query(
+      "UPDATE video_purchases SET status='rejected', admin_notes=$1, verified_at=NOW() WHERE id=$2 RETURNING *",
+      [admin_notes || null, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Compra no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// Admin Videos — also available at /api/videos (CRUD) for admin use
+app.post("/api/videos", adminMiddleware, async (req, res) => {
+  try {
+    const { title, description, videoUrl, thumbnailUrl, classTypeId, instructorId, durationMinutes, accessType = "membership", isPublished = false, isFeatured = false, sortOrder = 0, price } = req.body;
+    if (!title || !videoUrl) return res.status(400).json({ message: "title y videoUrl requeridos" });
+    const r = await pool.query(
+      `INSERT INTO videos (title, description, video_url, thumbnail_url, class_type_id, instructor_id, duration_minutes, access_type, is_published, is_featured, sort_order, price)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [title, description || null, videoUrl, thumbnailUrl || null, classTypeId || null, instructorId || null, durationMinutes || null, accessType, isPublished, isFeatured, sortOrder, price || null]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.put("/api/videos/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { title, description, videoUrl, thumbnailUrl, classTypeId, instructorId, durationMinutes, accessType, isPublished, isFeatured, sortOrder, price } = req.body;
+    const r = await pool.query(
+      `UPDATE videos SET title=$1, description=$2, video_url=$3, thumbnail_url=$4, class_type_id=$5,
+       instructor_id=$6, duration_minutes=$7, access_type=$8, is_published=$9, is_featured=$10,
+       sort_order=$11, price=$12, updated_at=NOW()
+       WHERE id=$13 RETURNING *`,
+      [title, description || null, videoUrl, thumbnailUrl || null, classTypeId || null, instructorId || null, durationMinutes || null, accessType || "membership", isPublished !== false, isFeatured === true, sortOrder || 0, price || null, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Video no encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.delete("/api/videos/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM videos WHERE id=$1", [req.params.id]);
+    return res.json({ message: "Video eliminado" });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+
+
+const adminMiddleware = (req, res, next) => {
+  authMiddleware(req, res, async () => {
+    try {
+      const r = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
+      if (!r.rows.length || !["admin", "super_admin", "instructor", "reception"].includes(r.rows[0].role)) {
+        return res.status(403).json({ message: "Acceso restringido" });
+      }
+      next();
+    } catch { return res.status(500).json({ message: "Error interno" }); }
+  });
+};
+
+// GET /api/admin/stats
+app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+
+    const [classesToday, activeMembers, monthlyRevenue, pendingAlerts] = await Promise.all([
+      pool.query("SELECT COUNT(*) FROM classes WHERE DATE(start_time) = $1", [today]),
+      pool.query("SELECT COUNT(*) FROM memberships WHERE status = 'active'"),
+      pool.query("SELECT COALESCE(SUM(amount),0) AS total FROM orders WHERE status = 'verified' AND created_at >= $1", [monthStart]),
+      pool.query("SELECT COUNT(*) FROM orders WHERE status = 'pending_verification'"),
+    ]);
+
+    return res.json({
+      classesToday: parseInt(classesToday.rows[0].count),
+      activeMembers: parseInt(activeMembers.rows[0].count),
+      monthlyRevenue: parseFloat(monthlyRevenue.rows[0].total),
+      pendingAlerts: parseInt(pendingAlerts.rows[0].count),
+    });
+  } catch (err) {
+    console.error("admin/stats error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/users?role=&search=
+app.get("/api/users", adminMiddleware, async (req, res) => {
+  try {
+    const { role, search = "" } = req.query;
+    let q = `SELECT id, display_name, email, phone, role, created_at FROM users WHERE 1=1`;
+    const params = [];
+    if (role) { params.push(role); q += ` AND role = $${params.length}`; }
+    if (search) { params.push(`%${search}%`); q += ` AND (display_name ILIKE $${params.length} OR email ILIKE $${params.length})`; }
+    q += " ORDER BY created_at DESC LIMIT 100";
+    const r = await pool.query(q, params);
+    return res.json({ data: r.rows });
+  } catch (err) {
+    console.error("GET /api/users error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/users — admin creates a client
+app.post("/api/users", adminMiddleware, async (req, res) => {
+  try {
+    const { email, displayName, phone, role = "client", dateOfBirth, emergencyContactName, emergencyContactPhone, healthNotes } = req.body;
+    if (!email || !displayName) return res.status(400).json({ message: "Email y nombre requeridos" });
+    const exists = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+    if (exists.rows.length) return res.status(409).json({ message: "Email ya registrado" });
+    const tempPassword = Math.random().toString(36).slice(2, 10);
+    const bcrypt = await import("bcryptjs");
+    const hash = await bcrypt.default.hash(tempPassword, 10);
+    const r = await pool.query(
+      `INSERT INTO users (display_name, email, phone, role, password_hash, date_of_birth, emergency_contact_name, emergency_contact_phone, health_notes, accepts_terms)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true) RETURNING *`,
+      [displayName, email, phone || null, role, hash, dateOfBirth || null, emergencyContactName || null, emergencyContactPhone || null, healthNotes || null]
+    );
+    return res.status(201).json({ user: mapUser(r.rows[0]), tempPassword });
+  } catch (err) {
+    console.error("POST /api/users error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/users/:id
+app.delete("/api/users/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Usuario eliminado" });
+  } catch (err) {
+    console.error("DELETE /api/users/:id error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Memberships admin CRUD ──────────────────────────────────────────────────
+
+// GET /api/memberships — admin list all
+app.get("/api/memberships", adminMiddleware, async (req, res) => {
+  try {
+    const { status, limit = 50 } = req.query;
+    let q = `SELECT m.*, u.display_name AS user_name, p.name AS plan_name
+             FROM memberships m
+             LEFT JOIN users u ON m.user_id = u.id
+             LEFT JOIN plans p ON m.plan_id = p.id
+             WHERE 1=1`;
+    const params = [];
+    if (status) { params.push(status); q += ` AND m.status = $${params.length}`; }
+    params.push(parseInt(limit)); q += ` ORDER BY m.created_at DESC LIMIT $${params.length}`;
+    const r = await pool.query(q, params);
+    return res.json({ data: r.rows.map(m => ({ ...m, userName: m.user_name, planName: m.plan_name })) });
+  } catch (err) {
+    console.error("GET /memberships error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/memberships — admin assigns membership to a user
+app.post("/api/memberships", adminMiddleware, async (req, res) => {
+  try {
+    const { userId, planId, paymentMethod = "efectivo", startDate } = req.body;
+    if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
+    const planRes = await pool.query("SELECT * FROM plans WHERE id = $1", [planId]);
+    if (!planRes.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
+    const plan = planRes.rows[0];
+    const start = startDate ? new Date(startDate) : new Date();
+    const end = new Date(start);
+    end.setDate(end.getDate() + (plan.duration_days || 30));
+    const r = await pool.query(
+      `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining)
+       VALUES ($1,$2,'active',$3,$4,$5,$6) RETURNING *`,
+      [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? 9999]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("POST /memberships error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/memberships/:id/activate
+app.put("/api/memberships/:id/activate", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "UPDATE memberships SET status = 'active', updated_at = NOW() WHERE id = $1 RETURNING *",
+      [req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/memberships/:id/cancel
+app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "UPDATE memberships SET status = 'cancelled', updated_at = NOW() WHERE id = $1 RETURNING *",
+      [req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/memberships/:id — update any field
+app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { status, classesRemaining, endDate, paymentMethod } = req.body;
+    const r = await pool.query(
+      `UPDATE memberships SET
+         status = COALESCE($1, status),
+         classes_remaining = COALESCE($2, classes_remaining),
+         end_date = COALESCE($3, end_date),
+         payment_method = COALESCE($4, payment_method),
+         updated_at = NOW()
+       WHERE id = $5 RETURNING *`,
+      [status || null, classesRemaining ?? null, endDate || null, paymentMethod || null, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Plans admin CRUD ────────────────────────────────────────────────────────
+
+// GET /api/plans — public
+// (Already exists above as GET /api/plans)
+
+// POST /api/plans — admin (mirror of /api/admin/plans)
+// PUT /api/plans/:id
+app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { name, description, price, currency, durationDays, classLimit, features, isActive, sortOrder } = req.body;
+    const r = await pool.query(
+      `UPDATE plans SET name=$1, description=$2, price=$3, currency=$4, duration_days=$5,
+       class_limit=$6, features=$7, is_active=$8, sort_order=$9, updated_at=NOW()
+       WHERE id=$10 RETURNING *`,
+      [name, description || null, price, currency || "MXN", durationDays || 30, classLimit ?? null, features || null, isActive !== false, sortOrder || 0, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/plans/:id
+app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM plans WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Plan eliminado" });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/plans
+app.post("/api/plans", adminMiddleware, async (req, res) => {
+  try {
+    const { name, description, price, currency = "MXN", durationDays = 30, classLimit, features, isActive = true, sortOrder = 0 } = req.body;
+    if (!name) return res.status(400).json({ message: "Nombre requerido" });
+    const r = await pool.query(
+      `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, features, is_active, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [name, description || null, price || 0, currency, durationDays, classLimit ?? null, features || null, isActive, sortOrder]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Bookings admin ──────────────────────────────────────────────────────────
+
+// GET /api/bookings — admin sees all
+app.get("/api/bookings", adminMiddleware, async (req, res) => {
+  try {
+    const { status, classId, limit = 100 } = req.query;
+    let q = `SELECT b.*, u.display_name AS user_name, c.start_time, ct.name AS class_name
+             FROM bookings b
+             LEFT JOIN users u ON b.user_id = u.id
+             LEFT JOIN classes c ON b.class_id = c.id
+             LEFT JOIN class_types ct ON c.class_type_id = ct.id
+             WHERE 1=1`;
+    const params = [];
+    if (status) { params.push(status); q += ` AND b.status = $${params.length}`; }
+    if (classId) { params.push(classId); q += ` AND b.class_id = $${params.length}`; }
+    params.push(parseInt(limit)); q += ` ORDER BY b.created_at DESC LIMIT $${params.length}`;
+    const r = await pool.query(q, params);
+    return res.json({ data: r.rows.map(b => ({ ...b, userName: b.user_name, className: b.class_name, startTime: b.start_time })) });
+  } catch (err) {
+    console.error("GET /bookings error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/bookings/:id/check-in
+app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "UPDATE bookings SET status = 'checked_in', checked_in_at = NOW() WHERE id = $1 RETURNING *",
+      [req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Reserva no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/orders/pending
+app.get("/api/orders/pending", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT o.*, u.display_name AS user_name
+       FROM orders o LEFT JOIN users u ON o.user_id = u.id
+       WHERE o.status = 'pending_verification'
+       ORDER BY o.created_at DESC LIMIT 20`
+    );
+    return res.json({ data: r.rows.map(o => ({ ...o, userName: o.user_name })) });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/admin/orders — all orders
+app.get("/api/admin/orders", adminMiddleware, async (req, res) => {
+  try {
+    const { status, limit = 100 } = req.query;
+    let q = `SELECT o.*, u.display_name AS user_name
+             FROM orders o LEFT JOIN users u ON o.user_id = u.id WHERE 1=1`;
+    const params = [];
+    if (status) { params.push(status); q += ` AND o.status = $${params.length}`; }
+    params.push(parseInt(limit)); q += ` ORDER BY o.created_at DESC LIMIT $${params.length}`;
+    const r = await pool.query(q, params);
+    return res.json({ data: r.rows.map(o => ({ ...o, userName: o.user_name })) });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/orders/:id/verify
+app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "UPDATE orders SET status = 'verified', verified_at = NOW(), verified_by = $1 WHERE id = $2 RETURNING *",
+      [req.userId, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
+    // Activate membership if this order is for a plan
+    const order = r.rows[0];
+    if (order.plan_id) {
+      const planRes = await pool.query("SELECT * FROM plans WHERE id = $1", [order.plan_id]);
+      if (planRes.rows.length) {
+        const plan = planRes.rows[0];
+        const end = new Date();
+        end.setDate(end.getDate() + (plan.duration_days || 30));
+        await pool.query(
+          `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
+           VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)
+           ON CONFLICT (order_id) DO UPDATE SET status='active'`,
+          [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
+        );
+      }
+    }
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("PUT /admin/orders/:id/verify error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/orders/:id/reject
+app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "UPDATE orders SET status = 'rejected', verified_at = NOW() WHERE id = $1 RETURNING *",
+      [req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Payments admin ──────────────────────────────────────────────────────────
+
+// GET /api/payments
+app.get("/api/payments", adminMiddleware, async (req, res) => {
+  try {
+    const { startDate, endDate, limit = 100 } = req.query;
+    let q = `SELECT o.*, u.display_name AS user_name, p.name AS plan_name
+             FROM orders o
+             LEFT JOIN users u ON o.user_id = u.id
+             LEFT JOIN plans p ON o.plan_id = p.id
+             WHERE o.status = 'verified'`;
+    const params = [];
+    if (startDate) { params.push(startDate); q += ` AND o.created_at >= $${params.length}`; }
+    if (endDate) { params.push(endDate); q += ` AND o.created_at <= $${params.length}`; }
+    params.push(parseInt(limit)); q += ` ORDER BY o.created_at DESC LIMIT $${params.length}`;
+    const r = await pool.query(q, params);
+    const total = r.rows.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
+    return res.json({ data: r.rows.map(o => ({ ...o, userName: o.user_name, planName: o.plan_name })), total });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Discount codes admin CRUD ───────────────────────────────────────────────
+
+// GET /api/discount-codes
+app.get("/api/discount-codes", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM discount_codes ORDER BY created_at DESC");
+    return res.json({ data: r.rows });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/discount-codes
+app.post("/api/discount-codes", adminMiddleware, async (req, res) => {
+  try {
+    const { code, discountType = "percentage", discountValue, maxUses, expiresAt, minOrderAmount = 0, isActive = true } = req.body;
+    if (!code || !discountValue) return res.status(400).json({ message: "Código y valor requeridos" });
+    const r = await pool.query(
+      `INSERT INTO discount_codes (code, discount_type, discount_value, max_uses, expires_at, min_order_amount, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [code.toUpperCase(), discountType, discountValue, maxUses || null, expiresAt || null, minOrderAmount, isActive]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    if (err.code === "23505") return res.status(409).json({ message: "Código ya existe" });
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/discount-codes/:id
+app.put("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { code, discountType, discountValue, maxUses, expiresAt, minOrderAmount, isActive } = req.body;
+    const r = await pool.query(
+      `UPDATE discount_codes SET code=$1, discount_type=$2, discount_value=$3, max_uses=$4,
+       expires_at=$5, min_order_amount=$6, is_active=$7, updated_at=NOW()
+       WHERE id=$8 RETURNING *`,
+      [code?.toUpperCase(), discountType, discountValue, maxUses || null, expiresAt || null, minOrderAmount || 0, isActive !== false, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Código no encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/discount-codes/:id
+app.delete("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM discount_codes WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Código eliminado" });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Products CRUD (POS) ─────────────────────────────────────────────────────
+
+// GET /api/products
+app.get("/api/products", adminMiddleware, async (req, res) => {
+  try {
+    const { search = "" } = req.query;
+    let q = "SELECT * FROM products WHERE 1=1";
+    const params = [];
+    if (search) { params.push(`%${search}%`); q += ` AND name ILIKE $${params.length}`; }
+    q += " ORDER BY created_at DESC";
+    const r = await pool.query(q, params);
+    return res.json({ data: r.rows });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/products
+app.post("/api/products", adminMiddleware, async (req, res) => {
+  try {
+    const { name, price, category, stock = 0, sku, isActive = true } = req.body;
+    if (!name) return res.status(400).json({ message: "Nombre requerido" });
+    const r = await pool.query(
+      "INSERT INTO products (name, price, category, stock, sku, is_active) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
+      [name, price || 0, category || "accesorios", stock, sku || null, isActive]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/products/:id
+app.put("/api/products/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { name, price, category, stock, sku, isActive } = req.body;
+    const r = await pool.query(
+      "UPDATE products SET name=$1, price=$2, category=$3, stock=$4, sku=$5, is_active=$6, updated_at=NOW() WHERE id=$7 RETURNING *",
+      [name, price, category, stock, sku || null, isActive !== false, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Producto no encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/products/:id
+app.delete("/api/products/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM products WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Producto eliminado" });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/pos/sale — POS transaction
+app.post("/api/pos/sale", adminMiddleware, async (req, res) => {
+  try {
+    const { userId, items, paymentMethod = "efectivo", discountCode } = req.body;
+    if (!items?.length) return res.status(400).json({ message: "Se requieren artículos" });
+    let subtotal = 0;
+    let discountAmount = 0;
+    // Validate items & compute subtotal
+    for (const item of items) {
+      const pRes = await pool.query("SELECT * FROM products WHERE id = $1", [item.productId]);
+      if (!pRes.rows.length) return res.status(404).json({ message: `Producto ${item.productId} no encontrado` });
+      const product = pRes.rows[0];
+      if (product.stock < item.qty) return res.status(400).json({ message: `Stock insuficiente para ${product.name}` });
+      subtotal += parseFloat(product.price) * item.qty;
+    }
+    // Apply discount code
+    if (discountCode) {
+      const dcRes = await pool.query("SELECT * FROM discount_codes WHERE code = $1 AND is_active = true", [discountCode.toUpperCase()]);
+      if (dcRes.rows.length) {
+        const dc = dcRes.rows[0];
+        if (dc.discount_type === "percentage") discountAmount = subtotal * (parseFloat(dc.discount_value) / 100);
+        else discountAmount = parseFloat(dc.discount_value);
+      }
+    }
+    const total = Math.max(0, subtotal - discountAmount);
+    // Create order
+    const orderRes = await pool.query(
+      "INSERT INTO orders (user_id, amount, payment_method, status, discount_amount, channel) VALUES ($1,$2,$3,'verified',$4,'pos') RETURNING *",
+      [userId || null, total, paymentMethod, discountAmount]
+    );
+    const order = orderRes.rows[0];
+    // Create order items & update stock
+    for (const item of items) {
+      const pRes = await pool.query("SELECT * FROM products WHERE id = $1", [item.productId]);
+      const product = pRes.rows[0];
+      await pool.query(
+        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,$2,$3,$4)",
+        [order.id, item.productId, item.qty, product.price]
+      );
+      await pool.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [item.qty, item.productId]);
+    }
+    return res.status(201).json({ data: order });
+  } catch (err) {
+    console.error("POST /pos/sale error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Loyalty admin ───────────────────────────────────────────────────────────
+
+// GET /api/admin/loyalty/users — list users with points
+app.get("/api/admin/loyalty/users", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT u.id, u.display_name, u.email,
+              COALESCE(SUM(CASE WHEN lt.type='earn' THEN lt.points ELSE -lt.points END), 0) AS balance
+       FROM users u
+       LEFT JOIN loyalty_transactions lt ON lt.user_id = u.id
+       WHERE u.role = 'client'
+       GROUP BY u.id ORDER BY balance DESC LIMIT 50`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/loyalty/adjust — manual points adjustment
+app.post("/api/admin/loyalty/adjust", adminMiddleware, async (req, res) => {
+  try {
+    const { userId, points, reason, type = "earn" } = req.body;
+    if (!userId || !points) return res.status(400).json({ message: "userId y points requeridos" });
+    const r = await pool.query(
+      "INSERT INTO loyalty_transactions (user_id, type, points, description, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING *",
+      [userId, type, Math.abs(points), reason || "Ajuste manual", req.userId]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Instructors / Staff ─────────────────────────────────────────────────────
+
+// GET /api/instructors
+app.get("/api/instructors", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM instructors ORDER BY created_at DESC");
+    return res.json({ data: r.rows });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/instructors
+app.post("/api/instructors", adminMiddleware, async (req, res) => {
+  try {
+    const { displayName, email, phone, bio, specialties, isActive = true } = req.body;
+    if (!displayName) return res.status(400).json({ message: "Nombre requerido" });
+    const r = await pool.query(
+      "INSERT INTO instructors (display_name, email, phone, bio, specialties, is_active) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
+      [displayName, email || null, phone || null, bio || null, specialties || null, isActive]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/instructors/:id
+app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { displayName, email, phone, bio, specialties, isActive } = req.body;
+    const r = await pool.query(
+      "UPDATE instructors SET display_name=$1, email=$2, phone=$3, bio=$4, specialties=$5, is_active=$6, updated_at=NOW() WHERE id=$7 RETURNING *",
+      [displayName, email || null, phone || null, bio || null, specialties || null, isActive !== false, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Instructor no encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/instructors/:id
+app.delete("/api/instructors/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM instructors WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Instructor eliminado" });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+
+// GET /api/admin/reports?startDate=&endDate=
+app.get("/api/admin/reports", adminMiddleware, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const start = startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    const end = endDate || new Date().toISOString().slice(0, 10);
+
+    const [revenue, newClients, bookings, topPlans] = await Promise.all([
+      pool.query(
+        "SELECT COALESCE(SUM(amount),0) AS total, COUNT(*) AS count FROM orders WHERE status='verified' AND created_at BETWEEN $1 AND $2",
+        [start, end]
+      ),
+      pool.query(
+        "SELECT COUNT(*) FROM users WHERE role='client' AND created_at BETWEEN $1 AND $2",
+        [start, end]
+      ),
+      pool.query(
+        "SELECT COUNT(*) AS total, COUNT(CASE WHEN status='checked_in' THEN 1 END) AS attended FROM bookings WHERE created_at BETWEEN $1 AND $2",
+        [start, end]
+      ),
+      pool.query(
+        `SELECT p.name, COUNT(m.id) AS sales, SUM(o.amount) AS revenue
+         FROM memberships m
+         JOIN plans p ON m.plan_id = p.id
+         LEFT JOIN orders o ON o.plan_id = p.id AND o.status = 'verified'
+         WHERE m.created_at BETWEEN $1 AND $2
+         GROUP BY p.name ORDER BY sales DESC LIMIT 5`,
+        [start, end]
+      ),
+    ]);
+
+    return res.json({
+      period: { start, end },
+      revenue: { total: parseFloat(revenue.rows[0].total), count: parseInt(revenue.rows[0].count) },
+      newClients: parseInt(newClients.rows[0].count),
+      bookings: { total: parseInt(bookings.rows[0].total), attended: parseInt(bookings.rows[0].attended) },
+      topPlans: topPlans.rows,
+    });
+  } catch (err) {
+    console.error("GET /admin/reports error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Classes admin ──────────────────────────────────────────────────────────
+
+// GET /api/admin/classes — all scheduled classes
+app.get("/api/admin/classes", adminMiddleware, async (req, res) => {
+  try {
+    const { startDate, endDate, instructorId } = req.query;
+    let q = `SELECT c.*, ct.name AS class_type_name, i.display_name AS instructor_name
+             FROM classes c
+             LEFT JOIN class_types ct ON c.class_type_id = ct.id
+             LEFT JOIN instructors i ON c.instructor_id = i.id
+             WHERE 1=1`;
+    const params = [];
+    if (startDate) { params.push(startDate); q += ` AND c.start_time >= $${params.length}`; }
+    if (endDate) { params.push(endDate); q += ` AND c.start_time <= $${params.length}`; }
+    if (instructorId) { params.push(instructorId); q += ` AND c.instructor_id = $${params.length}`; }
+    q += " ORDER BY c.start_time ASC LIMIT 200";
+    const r = await pool.query(q, params);
+    return res.json({ data: r.rows });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/classes — create a class
+app.post("/api/admin/classes", adminMiddleware, async (req, res) => {
+  try {
+    const { classTypeId, instructorId, startTime, endTime, capacity = 10, location, notes } = req.body;
+    if (!classTypeId || !startTime) return res.status(400).json({ message: "classTypeId y startTime requeridos" });
+    const r = await pool.query(
+      `INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, location, notes, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'scheduled') RETURNING *`,
+      [classTypeId, instructorId || null, startTime, endTime || null, capacity, location || null, notes || null]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/classes/:id
+app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { classTypeId, instructorId, startTime, endTime, capacity, status, notes } = req.body;
+    const r = await pool.query(
+      `UPDATE classes SET class_type_id=COALESCE($1,class_type_id), instructor_id=COALESCE($2,instructor_id),
+       start_time=COALESCE($3,start_time), end_time=COALESCE($4,end_time),
+       capacity=COALESCE($5,capacity), status=COALESCE($6,status), notes=COALESCE($7,notes), updated_at=NOW()
+       WHERE id=$8 RETURNING *`,
+      [classTypeId || null, instructorId || null, startTime || null, endTime || null, capacity || null, status || null, notes || null, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Clase no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/admin/classes/:id
+app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM classes WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Clase eliminada" });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/classes/generate — bulk generate from schedule templates
+app.post("/api/admin/classes/generate", adminMiddleware, async (req, res) => {
+  try {
+    const { startDate, endDate, instructorId } = req.body;
+    if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
+    // Get schedule slots
+    const slotsRes = await pool.query("SELECT * FROM schedule_templates WHERE is_active = true");
+    const slots = slotsRes.rows;
+    if (!slots.length) return res.status(400).json({ message: "No hay horarios configurados" });
+    // Get a default class type for each label
+    const classTypeRes = await pool.query("SELECT id, name, category FROM class_types WHERE is_active = true");
+    const classTypes = classTypeRes.rows;
+    const created = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay(); // Mon=1..Sun=7
+      const daySlots = slots.filter(s => s.day_of_week === dayOfWeek);
+      for (const slot of daySlots) {
+        const [hour, min] = slot.time_slot.replace(/[ap]m/i, "").split(":").map(Number);
+        const isPM = slot.time_slot.toLowerCase().includes("pm") && hour !== 12;
+        const classDate = new Date(d);
+        classDate.setHours(isPM ? hour + 12 : hour, min || 0, 0, 0);
+        const endDate2 = new Date(classDate);
+        endDate2.setMinutes(endDate2.getMinutes() + 55);
+        // Pick class type by label
+        const label = slot.class_label?.toUpperCase();
+        let ct = classTypes.find(ct => ct.category?.toLowerCase() === label?.toLowerCase());
+        if (!ct) ct = classTypes[0];
+        if (!ct) continue;
+        // Check no duplicate
+        const exists = await pool.query("SELECT id FROM classes WHERE start_time = $1 AND class_type_id = $2", [classDate.toISOString(), ct.id]);
+        if (exists.rows.length) continue;
+        const r = await pool.query(
+          "INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, status) VALUES ($1,$2,$3,$4,10,'scheduled') RETURNING *",
+          [ct.id, instructorId || null, classDate.toISOString(), endDate2.toISOString()]
+        );
+        created.push(r.rows[0]);
+      }
+    }
+    return res.json({ created: created.length, data: created });
+  } catch (err) {
+    console.error("POST /admin/classes/generate error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/admin/referrals
+app.get("/api/admin/referrals", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT rc.*, u.display_name AS user_name, u.email,
+              COUNT(r2.id) AS referral_count
+       FROM referral_codes rc
+       LEFT JOIN users u ON rc.user_id = u.id
+       LEFT JOIN referrals r2 ON r2.referral_code_id = rc.id
+       GROUP BY rc.id, u.display_name, u.email
+       ORDER BY referral_count DESC`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/admin/videos — video list for admin
+app.get("/api/admin/videos", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT v.*, ct.name AS class_type_name, i.display_name AS instructor_name
+       FROM videos v
+       LEFT JOIN class_types ct ON v.class_type_id = ct.id
+       LEFT JOIN instructors i ON v.instructor_id = i.id
+       ORDER BY v.created_at DESC`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/videos
+app.post("/api/admin/videos", adminMiddleware, async (req, res) => {
+  try {
+    const { title, description, videoUrl, thumbnailUrl, classTypeId, instructorId, durationMinutes, accessType = "membership", isPublished = false, isFeatured = false, sortOrder = 0 } = req.body;
+    if (!title || !videoUrl) return res.status(400).json({ message: "title y videoUrl requeridos" });
+    const r = await pool.query(
+      `INSERT INTO videos (title, description, video_url, thumbnail_url, class_type_id, instructor_id, duration_minutes, access_type, is_published, is_featured, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [title, description || null, videoUrl, thumbnailUrl || null, classTypeId || null, instructorId || null, durationMinutes || null, accessType, isPublished, isFeatured, sortOrder]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/videos/:id
+app.put("/api/admin/videos/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { title, description, videoUrl, thumbnailUrl, classTypeId, instructorId, durationMinutes, accessType, isPublished, isFeatured, sortOrder } = req.body;
+    const r = await pool.query(
+      `UPDATE videos SET title=$1, description=$2, video_url=$3, thumbnail_url=$4, class_type_id=$5,
+       instructor_id=$6, duration_minutes=$7, access_type=$8, is_published=$9, is_featured=$10, sort_order=$11, updated_at=NOW()
+       WHERE id=$12 RETURNING *`,
+      [title, description || null, videoUrl, thumbnailUrl || null, classTypeId || null, instructorId || null, durationMinutes || null, accessType || "membership", isPublished !== false, isFeatured === true, sortOrder || 0, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Video no encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/admin/videos/:id
+app.delete("/api/admin/videos/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM videos WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Video eliminado" });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/admin/reviews
+app.get("/api/admin/reviews", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT rv.*, u.display_name AS user_name, u.email
+       FROM reviews rv LEFT JOIN users u ON rv.user_id = u.id
+       ORDER BY rv.created_at DESC LIMIT 100`
+    );
+    return res.json({ data: r.rows });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/reviews/:id/approve
+app.put("/api/admin/reviews/:id/approve", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("UPDATE reviews SET is_approved=true WHERE id=$1 RETURNING *", [req.params.id]);
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// DELETE /api/admin/reviews/:id
+app.delete("/api/admin/reviews/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM reviews WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Reseña eliminada" });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 // ─── Serve React SPA (static) ────────────────────────────────────────────────

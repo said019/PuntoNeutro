@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { cn } from "@/lib/utils";
+import opheliaLogo from "@/assets/ophelia-logo-full.png";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
   Calendar, BookOpen, UserCheck, DollarSign, ShoppingBag,
@@ -57,9 +58,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         {/* Logo */}
         <div className="flex items-center justify-between px-4 py-5 border-b border-border">
           {!collapsed && (
-            <span className="font-syne font-extrabold text-base">
-              Ophelia<span className="text-primary">.</span>
-            </span>
+            <img src={opheliaLogo} alt="Ophelia" className="h-7 w-auto" />
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
