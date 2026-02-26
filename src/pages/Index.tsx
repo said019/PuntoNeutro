@@ -97,6 +97,26 @@ const FALLBACK_SCHEDULE: ScheduleSlot[] = [
 
 const DAYS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
 
+/** Returns e.g. "Semana del 23 al 28 de febrero · 2026" in CDMX time */
+function getCDMXWeekLabel(): string {
+  // Get today in CDMX timezone (UTC-6 / UTC-5 DST — use Intl for accuracy)
+  const nowCDMX = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City" })
+  );
+  const day = nowCDMX.getDay(); // 0=Sun
+  // Monday = start of week
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const diffToSat = day === 0 ? 0 : 6 - day;
+  const mon = new Date(nowCDMX); mon.setDate(nowCDMX.getDate() + diffToMon);
+  const sat = new Date(nowCDMX); sat.setDate(nowCDMX.getDate() + diffToSat);
+  const MONTHS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  const monStr = `${mon.getDate()} de ${MONTHS[mon.getMonth()]}`;
+  const satStr = mon.getMonth() === sat.getMonth()
+    ? `${sat.getDate()} de ${MONTHS[sat.getMonth()]}`
+    : `${sat.getDate()} de ${MONTHS[sat.getMonth()]}`;
+  return `Semana del ${monStr} al ${satStr} · ${sat.getFullYear()}`;
+}
+
 const TESTIMONIOS = [
   { name: "Karla M.", stars: 5, text: "Llevo 6 meses y no puedo parar! Baje 8 kg y me siento increible. El ambiente del studio es unico, las instructoras te motivan a dar lo mejor.", avatar: "KM" },
   { name: "Sofia R.", stars: 5, text: "Empece sin forma fisica y ahora hago Power Jump sin problema. La comunidad de Ophelia es lo mejor, todas nos apoyamos.", avatar: "SR" },
@@ -180,7 +200,7 @@ const Index = () => {
         }`}
       >
         <a href="#" className="flex items-center">
-          <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-10 w-auto" />
+          <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-14 w-auto object-contain" />
         </a>
         <ul className="hidden lg:flex gap-8 list-none">
           {[
@@ -394,9 +414,15 @@ const Index = () => {
             <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
               HORARIO<br />SEMANAL
             </h2>
-            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Clases de lunes a sábado. Reserva tu lugar desde la app con anticipación.
-            </p>
+            <div className="flex flex-col gap-2 lg:text-right">
+              <span className="inline-flex items-center gap-2 text-[0.78rem] font-semibold text-primary tracking-wide uppercase bg-primary/10 border border-primary/30 px-3 py-1.5 rounded-full w-fit lg:ml-auto">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                {getCDMXWeekLabel()}
+              </span>
+              <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
+                Clases de lunes a sábado. Reserva tu lugar desde la app con anticipación.
+              </p>
+            </div>
           </div>
 
           {/* Legend */}
@@ -674,24 +700,29 @@ const Index = () => {
               Certificadas, apasionadas y dedicadas a que cada clase sea tu mejor versión.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {[
               { label: "Instructora 1", sub: "Jumping & Pilates" },
               { label: "Instructora 2", sub: "Jumping & Pilates" },
             ].map((inst, i) => (
               <div key={i} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 hover:-translate-y-2 transition-all">
-                {/* Photo placeholder */}
-                <div className="h-[260px] bg-gradient-to-br from-[#1F0047] to-[#2d0a40] flex items-center justify-center">
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#E15CB8]/30 to-[#CA71E1]/20 border-2 border-[#E15CB8]/30">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#E15CB8]/60">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
+                {/* Photo placeholder — full width, tall */}
+                <div className="h-[380px] lg:h-[460px] bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center relative overflow-hidden">
+                  {/* decorative glow */}
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_60%,hsl(var(--primary)/0.18)_0%,transparent_65%)]" />
+                  <div className="relative flex flex-col items-center gap-4">
+                    <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-[#E15CB8]/25 to-[#CA71E1]/15 border-2 border-[#E15CB8]/30 shadow-[0_0_60px_hsl(var(--primary)/0.2)]">
+                      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-[#E15CB8]/50">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+                    <span className="text-[0.65rem] tracking-[0.2em] uppercase text-[#E15CB8]/50 font-medium">Foto próximamente</span>
                   </div>
                 </div>
-                <div className="p-6">
-                  <h3 className="font-syne font-bold text-[1.05rem] text-foreground mb-1">{inst.label}</h3>
-                  <p className="text-primary text-[0.78rem] tracking-wide font-medium">{inst.sub}</p>
+                <div className="p-7">
+                  <h3 className="font-syne font-bold text-[1.2rem] text-foreground mb-1">{inst.label}</h3>
+                  <p className="text-primary text-[0.85rem] tracking-wide font-medium">{inst.sub}</p>
                 </div>
               </div>
             ))}
@@ -823,63 +854,145 @@ const Index = () => {
       </section>
 
       {/* ── CTA ── */}
-      <section id="contacto" className="py-16 lg:py-24 px-6 lg:px-[60px] text-center relative overflow-hidden">
+      <section id="contacto" className="py-16 lg:py-24 px-6 lg:px-[60px] relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.12)_0%,transparent_60%)] pointer-events-none" />
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700 relative z-10">
-          <div className="text-primary text-[0.8rem] tracking-[0.15em] uppercase mb-6">¿Lista para transformarte?</div>
-          <h2 className="font-bebas text-[clamp(4rem,8vw,8rem)] leading-[0.9] text-foreground mb-8">
-            TU PRIMER<br />
-            <span className="[-webkit-text-stroke:2px_hsl(var(--foreground)/0.4)] text-transparent">SALTO</span><br />
-            TE ESPERA
-          </h2>
-          <p className="text-[1.1rem] text-muted-foreground max-w-[500px] mx-auto mb-12 leading-[1.7]">
-            Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Tu primera clase es gratis.
-          </p>
-          <div className="flex gap-4 justify-center items-center flex-wrap mb-16">
-            <button
-              onClick={() => navigate("/auth/register")}
-              className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all"
-            >
-              Crear cuenta gratis
-              <span className="w-[22px] h-[22px] bg-primary-foreground/20 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
-            </button>
-            <a
-              href="https://wa.me/524421234567?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Ophelia%20Studio"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="border border-border text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-3 px-8 py-[18px] rounded-full opacity-70 hover:opacity-100 hover:border-primary transition-all no-underline"
-            >
-              WhatsApp
-            </a>
+          {/* CTA heading */}
+          <div className="text-center mb-16">
+            <div className="text-primary text-[0.8rem] tracking-[0.15em] uppercase mb-6">¿Lista para transformarte?</div>
+            <h2 className="font-bebas text-[clamp(4rem,8vw,8rem)] leading-[0.9] text-foreground mb-8">
+              TU PRIMER<br />
+              <span className="[-webkit-text-stroke:2px_hsl(var(--foreground)/0.4)] text-transparent">SALTO</span><br />
+              TE ESPERA
+            </h2>
+            <p className="text-[1.1rem] text-muted-foreground max-w-[500px] mx-auto mb-10 leading-[1.7]">
+              Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Tu primera clase es gratis.
+            </p>
+            <div className="flex gap-4 justify-center items-center flex-wrap">
+              <button
+                onClick={() => navigate("/auth/register")}
+                className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all"
+              >
+                Crear cuenta gratis
+                <span className="w-[22px] h-[22px] bg-primary-foreground/20 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
+              </button>
+              <a
+                href="https://wa.me/524421234567?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Ophelia%20Studio"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border border-border text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-3 px-8 py-[18px] rounded-full opacity-70 hover:opacity-100 hover:border-primary transition-all no-underline"
+              >
+                WhatsApp
+              </a>
+            </div>
           </div>
 
-          {/* Datos de contacto */}
-          <div className="flex flex-wrap justify-center gap-10 border-t border-border pt-12 mb-12">
-            {[
-              { label: "Ubicación", value: "San Juan del Río, Querétaro" },
-              { label: "Teléfono", value: "+52 442 123 4567" },
-              { label: "Email", value: "info@opheliajumping.mx" },
-              { label: "Horarios", value: "Lun–Vie 6am–9pm · Sáb 7am–2pm" },
-            ].map((c) => (
-              <div key={c.label} className="text-center">
-                <div className="text-[0.65rem] tracking-widest uppercase text-muted-foreground mb-1">{c.label}</div>
-                <div className="text-[0.85rem] text-foreground">{c.value}</div>
+          {/* Info + Map — 2 columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+            {/* Left — contact info with palette colors */}
+            <div className="rounded-3xl p-10 flex flex-col justify-between gap-8 bg-gradient-to-br from-[#1F0047] via-[#2a0050] to-[#1a003a] border border-[#CA71E1]/20 relative overflow-hidden">
+              {/* decorative glow */}
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,#E15CB8_0%,transparent_65%)] opacity-[0.08] pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-[200px] h-[200px] rounded-full bg-[radial-gradient(circle,#CA71E1_0%,transparent_65%)] opacity-[0.08] pointer-events-none" />
+
+              <div className="relative z-10">
+                <div className="text-[0.7rem] tracking-[0.18em] uppercase text-[#E15CB8] font-semibold mb-3">Encuéntranos</div>
+                <h3 className="font-bebas text-[clamp(2.5rem,3.5vw,3.5rem)] leading-[0.95] text-[#F9F7E8] mb-8">
+                  VISÍTANOS<br />EN ESTUDIO
+                </h3>
+
+                <div className="flex flex-col gap-6">
+                  {[
+                    {
+                      icon: (
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
+                        </svg>
+                      ),
+                      label: "Ubicación",
+                      value: "San Juan del Río, Querétaro",
+                      accent: "#E15CB8",
+                    },
+                    {
+                      icon: (
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 11 19.79 19.79 0 0 1 1.77 2.38 2 2 0 0 1 3.74.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6.08 6.08l1.28-1.28a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                      ),
+                      label: "Teléfono",
+                      value: "+52 442 123 4567",
+                      accent: "#CA71E1",
+                    },
+                    {
+                      icon: (
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                        </svg>
+                      ),
+                      label: "Email",
+                      value: "info@opheliajumping.mx",
+                      accent: "#E15CB8",
+                    },
+                    {
+                      icon: (
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                        </svg>
+                      ),
+                      label: "Horarios",
+                      value: "Lun–Vie 6am–9pm  ·  Sáb 7am–2pm",
+                      accent: "#E7EB6E",
+                    },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-start gap-4">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: item.accent + "20", color: item.accent, border: `1px solid ${item.accent}30` }}
+                      >
+                        {item.icon}
+                      </div>
+                      <div>
+                        <div className="text-[0.65rem] tracking-widest uppercase mb-0.5" style={{ color: item.accent }}>{item.label}</div>
+                        <div className="text-[1rem] text-[#F9F7E8] font-medium leading-snug">{item.value}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* Google Maps */}
-          <div className="rounded-2xl overflow-hidden border border-border max-w-3xl mx-auto">
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3739.577714731379!2d-99.99482528857814!3d20.40029408101758!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d30d002e88643b%3A0xb7eed5074cefa672!2sOphelia%20Jumping%20Studio!5e0!3m2!1ses-419!2smx!4v1772066339529!5m2!1ses-419!2smx"
-              width="100%"
-              height="340"
-              style={{ border: 0, display: "block" }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              title="Ophelia Jumping Studio ubicación"
-            />
+              {/* Social row */}
+              <div className="relative z-10 flex gap-3 pt-6 border-t border-[#CA71E1]/15">
+                {[
+                  { label: "Instagram", href: "https://instagram.com/opheliajumping", short: "ig" },
+                  { label: "Facebook",  href: "https://facebook.com/opheliajumping",  short: "fb" },
+                  { label: "TikTok",    href: "https://tiktok.com/@opheliajumping",   short: "tt" },
+                ].map((s) => (
+                  <a
+                    key={s.short}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 rounded-full border border-[#E15CB8]/30 flex items-center justify-center text-[0.8rem] text-[#E15CB8]/70 hover:bg-[#E15CB8]/15 hover:text-[#E15CB8] transition-all no-underline"
+                  >
+                    {s.short}
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* Right — Google Map */}
+            <div className="rounded-3xl overflow-hidden border border-border min-h-[480px] lg:min-h-0">
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3739.577714731379!2d-99.99482528857814!3d20.40029408101758!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d30d002e88643b%3A0xb7eed5074cefa672!2sOphelia%20Jumping%20Studio!5e0!3m2!1ses-419!2smx!4v1772066339529!5m2!1ses-419!2smx"
+                width="100%"
+                height="100%"
+                style={{ border: 0, display: "block", minHeight: "480px" }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Ophelia Jumping Studio ubicación"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -889,7 +1002,7 @@ const Index = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 pb-10">
         <div>
             <div className="mb-3">
-              <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-12 w-auto" />
+              <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-16 w-auto object-contain" />
             </div>
             <p className="text-[0.82rem] text-muted-foreground leading-[1.7] max-w-[200px]">
               El jumping studio que eleva tu cuerpo y transforma tu vida, salto a salto.
