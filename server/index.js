@@ -162,14 +162,14 @@ async function ensureSchema() {
       await pool.query("DELETE FROM class_types WHERE name != ALL($1::text[])", [opheliaNames]);
       await pool.query(`
         INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order, is_active) VALUES
-          ('Jumping Fitness',  'Full Body',                 'Clase de jumping fitness de cuerpo completo con música motivadora.',                        'jumping',  'Alta',   'Todos los niveles', 50, 10, '#E15CB8', '🏋️', 1, true),
-          ('Jumping Dance',    'Coreografías',              'Coreografías dinámicas sobre el trampolín con ritmos contagiosos.',                         'jumping',  'Media',  'Todos los niveles', 50, 10, '#CA71E1', '💃', 2, true),
-          ('Jump & Tone',      'Tonificación y resistencia','Combina jumping con ejercicios de tonificación y resistencia muscular.',                    'jumping',  'Alta',   'Intermedio',        55, 10, '#E7EB6E', '💪', 3, true),
-          ('Strong Jump',      'Fuerza y glúteo',           'Enfocada en fuerza de tren inferior y glúteo con intervalos de alta intensidad.',           'jumping',  'Alta',   'Intermedio',        55, 10, '#E15CB8', '🔥', 4, true),
-          ('Mindful Jump',     'Pilates en trampolín',      'Pilates sobre trampolín para mejorar equilibrio, flexibilidad y conciencia corporal.',      'jumping',  'Baja',   'Todos los niveles', 60, 10, '#CA71E1', '🧘', 5, true),
-          ('Hot Pilates',      'Pesada',                    'Clase de pilates de alta intensidad enfocada en fuerza y control.',                         'pilates',  'Alta',   'Intermedio',        55, 10, '#E7EB6E', '🔥', 6, true),
-          ('Flow Pilates',     'Media',                     'Pilates fluido de intensidad media para fortalecer y elongar.',                             'pilates',  'Media',  'Todos los niveles', 55, 10, '#E15CB8', '🌊', 7, true),
-          ('Pilates Mat',      'Ligera',                    'Pilates en mat de baja intensidad enfocado en técnica y control corporal.',                 'pilates',  'Baja',   'Principiante',      50, 10, '#CA71E1', '🌸', 8, true)
+          ('Jumping Fitness',  'Full Body',                  'Clase de jumping fitness de cuerpo completo con música motivadora.',                   'jumping',  'Alta',  'all',          50, 10, '#E15CB8', '🏋️', 1, true),
+          ('Jumping Dance',    'Coreografías',               'Coreografías dinámicas sobre el trampolín con ritmos contagiosos.',                    'jumping',  'Media', 'all',          50, 10, '#CA71E1', '💃',  2, true),
+          ('Jump & Tone',      'Tonificación y resistencia', 'Combina jumping con ejercicios de tonificación y resistencia muscular.',              'jumping',  'Alta',  'intermediate', 55, 10, '#E7EB6E', '💪',  3, true),
+          ('Strong Jump',      'Fuerza y glúteo',            'Enfocada en fuerza de tren inferior y glúteo con intervalos de alta intensidad.',      'jumping',  'Alta',  'intermediate', 55, 10, '#8B5CF6', '🔥',  4, true),
+          ('Mindful Jump',     'Pilates en trampolín',       'Pilates sobre trampolín para mejorar equilibrio, flexibilidad y conciencia corporal.', 'jumping',  'Baja',  'all',          60, 10, '#c026d3', '🧘',  5, true),
+          ('Hot Pilates',      'Pesada',                     'Clase de pilates de alta intensidad enfocada en fuerza y control.',                    'pilates',  'Alta',  'intermediate', 55, 10, '#E15CB8', '🔥',  6, true),
+          ('Flow Pilates',     'Media',                      'Pilates fluido de intensidad media para fortalecer y elongar.',                       'pilates',  'Media', 'all',          55, 10, '#CA71E1', '🌊',  7, true),
+          ('Pilates Mat',      'Ligera',                     'Pilates en mat de baja intensidad enfocado en técnica y control corporal.',            'pilates',  'Baja',  'beginner',     50, 10, '#E7EB6E', '🌸',  8, true)
         ON CONFLICT DO NOTHING;
       `);
       console.log("✅ Seeded 8 Ophelia class types");
