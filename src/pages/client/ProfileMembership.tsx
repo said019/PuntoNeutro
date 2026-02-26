@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { format, parseISO, differenceInCalendarDays } from "date-fns";
+import { format, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
+import { safeParse } from "@/lib/utils";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +31,7 @@ const ProfileMembership = () => {
   const membership: ClientMembership | null = data?.data ?? data ?? null;
 
   const daysRemaining = membership?.end_date
-    ? Math.max(differenceInCalendarDays(parseISO(membership.end_date), new Date()), 0)
+    ? Math.max(differenceInCalendarDays(safeParse(membership.end_date), new Date()), 0)
     : null;
 
   const classesProgress =
@@ -62,11 +63,11 @@ const ProfileMembership = () => {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">Inicio</p>
-                    <p className="font-medium">{format(parseISO(membership.start_date), "d MMM yyyy", { locale: es })}</p>
+                    <p className="font-medium">{membership.start_date ? format(safeParse(membership.start_date), "d MMM yyyy", { locale: es }) : "—"}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Vencimiento</p>
-                    <p className="font-medium">{format(parseISO(membership.end_date), "d MMM yyyy", { locale: es })}</p>
+                    <p className="font-medium">{membership.end_date ? format(safeParse(membership.end_date), "d MMM yyyy", { locale: es }) : "—"}</p>
                   </div>
                 </div>
                 {daysRemaining !== null && (

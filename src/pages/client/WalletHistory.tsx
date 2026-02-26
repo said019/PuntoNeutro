@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
+import { safeParse } from "@/lib/utils";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +38,7 @@ const WalletHistory = () => {
                   <div>
                     <p className="text-sm font-medium">{item.reason}</p>
                     <p className="text-xs text-muted-foreground">
-                      {format(parseISO(item.created_at), "d MMM yyyy", { locale: es })}
+                      {item.created_at ? format(safeParse(item.created_at), "d MMM yyyy", { locale: es }) : "—"}
                     </p>
                   </div>
                   <Badge variant={item.type === "earned" ? "default" : "secondary"}>

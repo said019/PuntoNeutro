@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
+import { safeParse } from "@/lib/utils";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Button } from "@/components/ui/button";
@@ -65,11 +66,11 @@ const BookClassConfirm = () => {
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar size={14} className="text-muted-foreground" />
-                  {format(parseISO(cls.start_time), "EEEE d 'de' MMMM yyyy", { locale: es })}
+                  {cls.start_time ? format(safeParse(cls.start_time), "EEEE d 'de' MMMM yyyy", { locale: es }) : "—"}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Clock size={14} className="text-muted-foreground" />
-                  {format(parseISO(cls.start_time), "HH:mm")} – {format(parseISO(cls.end_time), "HH:mm")}
+                  {cls.start_time ? format(safeParse(cls.start_time), "HH:mm") : "—"} – {cls.end_time ? format(safeParse(cls.end_time), "HH:mm") : "—"}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <User size={14} className="text-muted-foreground" />

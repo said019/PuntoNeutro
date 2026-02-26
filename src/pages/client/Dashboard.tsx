@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { differenceInCalendarDays, parseISO } from "date-fns";
+import { differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { format } from "date-fns";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
+import { safeParse } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +50,7 @@ const Dashboard = () => {
     .slice(0, 2);
 
   const daysRemaining = membership?.end_date
-    ? Math.max(differenceInCalendarDays(parseISO(membership.end_date), new Date()), 0)
+    ? Math.max(differenceInCalendarDays(safeParse(membership.end_date), new Date()), 0)
     : null;
 
   const classesProgress =
@@ -148,7 +149,7 @@ const Dashboard = () => {
                       <div>
                         <p className="font-medium text-sm">{b.class_type_name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {format(parseISO(b.start_time), "EEEE d MMM · HH:mm", { locale: es })} · {b.instructor_name}
+                          {b.start_time ? format(safeParse(b.start_time), "EEEE d MMM · HH:mm", { locale: es }) : "—"} · {b.instructor_name ?? b.class_type_name}
                         </p>
                       </div>
                       <Badge variant={b.status === "waitlist" ? "secondary" : "default"}>

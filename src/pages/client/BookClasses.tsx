@@ -2,11 +2,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
-  startOfWeek, endOfWeek, addWeeks, subWeeks, format, parseISO,
+  startOfWeek, endOfWeek, addWeeks, subWeeks, format,
   isBefore, isAfter,
 } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
+import { safeParse } from "@/lib/utils";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Button } from "@/components/ui/button";
@@ -48,10 +49,11 @@ const BookClasses = () => {
   const classesForDay = (day: Date) =>
     classes
       .filter((c) => {
-        const dt = parseISO(c.start_time);
+        if (!c.start_time) return false;
+        const dt = safeParse(c.start_time);
         return format(dt, "yyyy-MM-dd") === format(day, "yyyy-MM-dd");
       })
-      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+      .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
 
   const now = new Date();
 
@@ -87,7 +89,7 @@ const BookClasses = () => {
                   ) : (
                     <div className="space-y-1">
                       {classesForDay(day).map((cls) => {
-                        const isPast = isBefore(parseISO(cls.start_time), now);
+                        const isPast = cls.start_time ? isBefore(safeParse(cls.start_time), now) : true;
                         const isBooked = myBookedClassIds.has(cls.id);
                         return (
                           <button
@@ -101,7 +103,7 @@ const BookClasses = () => {
                             }`}
                           >
                             <p className="font-medium truncate">{cls.class_type_name}</p>
-                            <p className="text-muted-foreground">{format(parseISO(cls.start_time), "HH:mm")}</p>
+                            <p className="text-muted-foreground">{cls.start_time ? format(safeParse(cls.start_time), "HH:mm") : "—"}</p>
                             {isBooked && (
                               <Badge variant="default" className="text-[10px] px-1 py-0 mt-0.5">✓</Badge>
                             )}

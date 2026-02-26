@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
+import { safeParse } from "@/lib/utils";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Button } from "@/components/ui/button";
@@ -53,7 +54,7 @@ const BookingCard = ({
       <div className="space-y-1">
         <p className="font-medium">{booking.class_type_name}</p>
         <p className="text-sm text-muted-foreground">
-          {format(parseISO(booking.start_time), "EEEE d MMM · HH:mm", { locale: es })}
+          {booking.start_time ? format(safeParse(booking.start_time), "EEEE d MMM · HH:mm", { locale: es }) : "—"}
         </p>
         <p className="text-xs text-muted-foreground">{booking.instructor_name}</p>
       </div>

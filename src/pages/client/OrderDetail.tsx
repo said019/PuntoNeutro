@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
+import { safeParse } from "@/lib/utils";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Button } from "@/components/ui/button";
@@ -82,7 +83,7 @@ const OrderDetail = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Fecha</span>
-                    <span>{format(parseISO(order.created_at), "d MMM yyyy", { locale: es })}</span>
+                    <span>{order.created_at ? format(safeParse(order.created_at), "d MMM yyyy", { locale: es }) : "—"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Método</span>

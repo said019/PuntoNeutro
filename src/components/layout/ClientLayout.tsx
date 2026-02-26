@@ -88,7 +88,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
   };
 
   const initials = (user?.displayName ?? user?.display_name)
-    ? (user.displayName ?? user.display_name)!.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
+    ? (user?.displayName ?? user?.display_name ?? "").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
     : user?.email
       ? user.email[0].toUpperCase()
       : "U";

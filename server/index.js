@@ -560,6 +560,8 @@ app.get("/api/classes", async (req, res) => {
     const { start, end, limit } = req.query;
     let query = `
       SELECT c.*,
+             (c.date || 'T' || c.start_time) AS start_time,
+             (c.date || 'T' || c.end_time)   AS end_time,
              ct.name  AS class_type_name,
              ct.color AS class_type_color,
              ct.icon  AS class_type_icon,
@@ -591,6 +593,8 @@ app.get("/api/classes/:id", async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT c.*,
+              (c.date || 'T' || c.start_time) AS start_time,
+              (c.date || 'T' || c.end_time)   AS end_time,
               ct.name  AS class_type_name,
               ct.color AS class_type_color,
               ct.icon  AS class_type_icon,
@@ -621,8 +625,11 @@ app.get("/api/bookings/my-bookings", authMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT b.*,
-              c.date, c.start_time, c.end_time, c.status AS class_status,
-              ct.name  AS class_name,
+              c.date,
+              (c.date || 'T' || c.start_time) AS start_time,
+              (c.date || 'T' || c.end_time)   AS end_time,
+              c.status AS class_status,
+              ct.name  AS class_type_name,
               ct.color AS class_color,
               i.display_name AS instructor_name,
               i.photo_url    AS instructor_photo,
@@ -2419,7 +2426,7 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
 app.get("/api/bookings", adminMiddleware, async (req, res) => {
   try {
     const { status, classId, limit = 100 } = req.query;
-    let q = `SELECT b.*, u.display_name AS user_name, c.start_time, ct.name AS class_name
+    let q = `SELECT b.*, u.display_name AS user_name, (c.date || 'T' || c.start_time) AS start_time, ct.name AS class_name
              FROM bookings b
              LEFT JOIN users u ON b.user_id = u.id
              LEFT JOIN classes c ON b.class_id = c.id

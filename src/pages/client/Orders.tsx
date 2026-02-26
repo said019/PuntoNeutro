@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
+import { safeParse } from "@/lib/utils";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +50,7 @@ const Orders = () => {
                     <div className="space-y-1">
                       <p className="font-medium">{order.plan_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(parseISO(order.created_at), "d MMM yyyy", { locale: es })}
+                        {order.created_at ? format(safeParse(order.created_at), "d MMM yyyy", { locale: es }) : "—"}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
