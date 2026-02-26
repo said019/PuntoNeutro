@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import {
   LayoutDashboard, Calendar, ClipboardList, CreditCard, Package,
   Wallet, Play, User, Bell, LogOut, Menu, X, Settings,
-  Gift, ChevronRight, Sparkles,
+  ChevronRight, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,6 @@ const NAV_GROUPS = [
     label: "Contenido",
     items: [
       { to: "/app/videos",    label: "Videos",          icon: Play },
-      { to: "/app/profile/refer", label: "Referir amigos", icon: Gift },
     ],
   },
 ];
@@ -88,13 +87,13 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
     navigate("/auth/login");
   };
 
-  const initials = user?.display_name
-    ? user.display_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
+  const initials = (user?.displayName ?? user?.display_name)
+    ? (user.displayName ?? user.display_name)!.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
     : user?.email
       ? user.email[0].toUpperCase()
       : "U";
 
-  const firstName = user?.display_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Tú";
+  const firstName = (user?.displayName ?? user?.display_name)?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Tú";
 
   /* ── mobile bottom nav items ── */
   const BOTTOM_NAV = [
@@ -162,8 +161,8 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
               "flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white",
               "bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] shadow-md shadow-[#E15CB8]/30"
             )}>
-              {user?.photo_url
-                ? <img src={user.photo_url} className="h-10 w-10 rounded-full object-cover" alt="" />
+              {(user?.photoUrl ?? user?.photo_url)
+                ? <img src={(user?.photoUrl ?? user?.photo_url)!} className="h-10 w-10 rounded-full object-cover" alt="" />
                 : initials}
             </div>
             {/* Online dot */}

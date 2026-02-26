@@ -19,9 +19,9 @@ const ProfilePreferences = () => {
   const qc = useQueryClient();
 
   const [prefs, setPrefs] = useState({
-    receiveReminders: user?.receive_reminders ?? true,
-    receivePromotions: user?.receive_promotions ?? false,
-    receiveWeeklySummary: user?.receive_weekly_summary ?? false,
+    receiveReminders: user?.receiveReminders ?? user?.receive_reminders ?? true,
+    receivePromotions: user?.receivePromotions ?? user?.receive_promotions ?? false,
+    receiveWeeklySummary: user?.receiveWeeklySummary ?? user?.receive_weekly_summary ?? false,
   });
 
   const mutation = useMutation({
@@ -45,13 +45,13 @@ const ProfilePreferences = () => {
     <ClientAuthGuard requiredRoles={["client"]}>
       <ClientLayout>
         <div className="max-w-md space-y-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/app/profile")}>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/app/profile")} className="text-muted-foreground hover:text-[#CA71E1]">
             <ArrowLeft size={16} className="mr-2" />Perfil
           </Button>
           <h1 className="text-xl font-bold">Preferencias de notificación</h1>
           <div className="space-y-4">
             {items.map(({ key, label, desc }) => (
-              <div key={key} className="flex items-center justify-between rounded-xl border p-4">
+              <div key={key} className="flex items-center justify-between rounded-xl border border-white/[0.08] p-4 hover:border-[#CA71E1]/30 transition-colors">
                 <div className="space-y-0.5">
                   <Label className="text-sm font-medium">{label}</Label>
                   <p className="text-xs text-muted-foreground">{desc}</p>
@@ -63,7 +63,11 @@ const ProfilePreferences = () => {
               </div>
             ))}
           </div>
-          <Button className="w-full" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          <Button
+            className="w-full bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:from-[#E15CB8]/90 hover:to-[#CA71E1]/90 text-white font-medium"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+          >
             {mutation.isPending ? "Guardando..." : "Guardar preferencias"}
           </Button>
         </div>

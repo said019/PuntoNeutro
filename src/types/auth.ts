@@ -5,6 +5,7 @@ export interface User {
   displayName: string;
   display_name?: string;
   full_name?: string;
+  gender?: "female" | "male" | "other" | null;
   photoUrl: string | null;
   photo_url?: string | null;
   avatar_url?: string | null;
@@ -50,6 +51,7 @@ export interface RegisterData {
   password: string;
   displayName: string;
   phone: string;
+  gender?: "female" | "male" | "other";
   acceptsTerms: boolean;
   acceptsCommunications: boolean;
 }

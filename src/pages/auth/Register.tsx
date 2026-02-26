@@ -15,6 +15,7 @@ const schema = z.object({
     .string()
     .transform((v) => v.replace(/\D/g, ""))           // quitar no-dígitos
     .refine((v) => v.length === 10, "Debe tener 10 dígitos"),
+  gender: z.enum(["female", "male", "other"]),
   password: z
     .string()
     .min(8, "Mínimo 8 caracteres")
@@ -32,6 +33,7 @@ type FormValues = {
   displayName: string;
   email: string;
   phone: string;
+  gender: "female" | "male" | "other";
   password: string;
   confirmPassword: string;
   acceptsTerms: boolean;
@@ -66,6 +68,7 @@ const Register = () => {
         password: data.password,
         displayName: data.displayName,
         phone,
+        gender: data.gender,
         acceptsTerms: data.acceptsTerms,
         acceptsCommunications: data.acceptsCommunications,
         ...(refCode ? { referralCode: refCode } : {}),
@@ -191,6 +194,22 @@ const Register = () => {
                 />
                 {errors.phone && <span className="text-xs text-destructive">{errors.phone.message}</span>}
               </div>
+            </div>
+
+            {/* gender */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-muted-foreground uppercase tracking-widest font-medium">Sexo</label>
+              <select
+                {...register("gender")}
+                className="bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm focus:outline-none focus:border-primary transition-all"
+                defaultValue=""
+              >
+                <option value="" disabled>Selecciona…</option>
+                <option value="female">Femenino</option>
+                <option value="male">Masculino</option>
+                <option value="other">Otro</option>
+              </select>
+              {errors.gender && <span className="text-xs text-destructive">{errors.gender.message}</span>}
             </div>
 
             {/* email */}

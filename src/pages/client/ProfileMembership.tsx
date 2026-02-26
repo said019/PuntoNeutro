@@ -42,7 +42,7 @@ const ProfileMembership = () => {
     <ClientAuthGuard requiredRoles={["client"]}>
       <ClientLayout>
         <div className="max-w-md space-y-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/app/profile")}>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/app/profile")} className="text-muted-foreground hover:text-[#CA71E1]">
             <ArrowLeft size={16} className="mr-2" />Perfil
           </Button>
           <h1 className="text-xl font-bold">Mi membresía</h1>

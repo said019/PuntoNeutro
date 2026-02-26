@@ -2,14 +2,14 @@ import { Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
-import { ChevronRight, User, CreditCard, Bell, Users, LogOut, Settings } from "lucide-react";
+import { ChevronRight, User, CreditCard, Bell, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const ProfileLink = ({
-  to, icon: Icon, label, description, danger,
+  to, icon: Icon, label, description, danger, accent,
 }: {
-  to: string; icon: any; label: string; description?: string; danger?: boolean;
+  to: string; icon: any; label: string; description?: string; danger?: boolean; accent?: string;
 }) => (
   <Link
     to={to}
@@ -21,12 +21,14 @@ const ProfileLink = ({
     )}
   >
     <div className="flex items-center gap-3.5">
-      <div className={cn(
-        "flex h-9 w-9 items-center justify-center rounded-xl",
-        danger
-          ? "bg-red-500/10 text-red-400"
-          : "bg-gradient-to-br from-[#E15CB8]/15 to-[#CA71E1]/10 text-[#E15CB8]"
-      )}>
+      <div
+        className="flex h-9 w-9 items-center justify-center rounded-xl"
+        style={
+          danger
+            ? { background: "rgba(239,68,68,0.1)", color: "#f87171" }
+            : { background: `${accent ?? "#E15CB8"}15`, color: accent ?? "#E15CB8" }
+        }
+      >
         <Icon size={17} />
       </div>
       <div>
@@ -46,7 +48,7 @@ const Profile = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
-  const name = user?.display_name ?? user?.email?.split("@")[0] ?? "Usuario";
+  const name = user?.displayName ?? user?.display_name ?? user?.email?.split("@")[0] ?? "Usuario";
   const initials = name
     .split(" ")
     .filter(Boolean)
@@ -75,8 +77,8 @@ const Profile = () => {
               {/* Avatar */}
               <div className="relative flex-shrink-0">
                 <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] text-2xl font-bold text-white shadow-xl shadow-[#E15CB8]/25">
-                  {user?.photo_url
-                    ? <img src={user.photo_url} className="h-20 w-20 rounded-2xl object-cover" alt={name} />
+                  {(user?.photoUrl ?? user?.photo_url)
+                    ? <img src={(user?.photoUrl ?? user?.photo_url)!} className="h-20 w-20 rounded-2xl object-cover" alt={name} />
                     : initials}
                 </div>
                 <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-emerald-400 border-2 border-[#0d0d14]" />
@@ -93,7 +95,9 @@ const Profile = () => {
                 <div className="inline-flex items-center gap-1.5 mt-2.5 px-2.5 py-1 rounded-full bg-[#E15CB8]/15 border border-[#E15CB8]/20">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#E15CB8]" />
                   <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-[#E15CB8]">
-                    {user?.role === "client" ? "Alumna" : user?.role ?? "Cliente"}
+                    {user?.role === "client"
+                      ? (user?.gender === "male" ? "Alumno" : user?.gender === "other" ? "Alumno/a" : "Alumna")
+                      : user?.role ?? "Cliente"}
                   </span>
                 </div>
               </div>
@@ -110,24 +114,21 @@ const Profile = () => {
               icon={User}
               label="Editar perfil"
               description="Nombre, teléfono, foto y más"
+              accent="#CA71E1"
             />
             <ProfileLink
               to="/app/profile/membership"
               icon={CreditCard}
               label="Mi membresía"
               description="Clases disponibles y vigencia"
+              accent="#E15CB8"
             />
             <ProfileLink
               to="/app/profile/preferences"
               icon={Bell}
               label="Preferencias"
               description="Notificaciones y comunicaciones"
-            />
-            <ProfileLink
-              to="/app/profile/refer"
-              icon={Users}
-              label="Referir amigas"
-              description="Gana clases gratis al invitar"
+              accent="#E7EB6E"
             />
           </div>
 

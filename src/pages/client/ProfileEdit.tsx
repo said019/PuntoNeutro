@@ -19,6 +19,7 @@ import type { UpdateProfileData } from "@/types/auth";
 const schema = z.object({
   displayName: z.string().min(2, "Mínimo 2 caracteres"),
   phone: z.string().regex(/^\+52[0-9]{10}$/, "Formato: +521234567890").or(z.literal("")),
+  gender: z.enum(["female", "male", "other", ""]).optional(),
   dateOfBirth: z.string().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
@@ -38,12 +39,13 @@ const ProfileEdit = () => {
   useEffect(() => {
     if (user) {
       reset({
-        displayName: user.display_name ?? "",
+        displayName: user.displayName ?? user.display_name ?? "",
         phone: user.phone ?? "",
-        dateOfBirth: user.date_of_birth ?? "",
-        emergencyContactName: user.emergency_contact_name ?? "",
-        emergencyContactPhone: user.emergency_contact_phone ?? "",
-        healthNotes: user.health_notes ?? "",
+        gender: (user as any).gender ?? "",
+        dateOfBirth: user.dateOfBirth ?? user.date_of_birth ?? "",
+        emergencyContactName: user.emergencyContactName ?? user.emergency_contact_name ?? "",
+        emergencyContactPhone: user.emergencyContactPhone ?? user.emergency_contact_phone ?? "",
+        healthNotes: user.healthNotes ?? user.health_notes ?? "",
       });
     }
   }, [user]);
@@ -63,40 +65,69 @@ const ProfileEdit = () => {
     mutation.mutate({
       displayName: data.displayName,
       phone: data.phone || undefined,
+      gender: data.gender || undefined,
       dateOfBirth: data.dateOfBirth || undefined,
       emergencyContactName: data.emergencyContactName || undefined,
       emergencyContactPhone: data.emergencyContactPhone || undefined,
       healthNotes: data.healthNotes || undefined,
-    });
+    } as any);
   };
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
       <ClientLayout>
-        <div className="max-w-md space-y-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/app/profile")}>
+        <div className="max-w-md space-y-5">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/app/profile")} className="text-muted-foreground hover:text-[#CA71E1]">
             <ArrowLeft size={16} className="mr-2" />Perfil
           </Button>
           <h1 className="text-xl font-bold">Editar perfil</h1>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {[
-              { name: "displayName" as const, label: "Nombre" },
+              { name: "displayName" as const, label: "Nombre completo" },
               { name: "phone" as const, label: "Teléfono", placeholder: "+521234567890" },
               { name: "dateOfBirth" as const, label: "Fecha de nacimiento", type: "date" },
               { name: "emergencyContactName" as const, label: "Contacto de emergencia" },
               { name: "emergencyContactPhone" as const, label: "Teléfono de emergencia" },
             ].map(({ name, label, type, placeholder }) => (
-              <div key={name} className="space-y-1">
-                <Label>{label}</Label>
-                <Input type={type ?? "text"} placeholder={placeholder} {...register(name)} />
+              <div key={name} className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">{label}</Label>
+                <Input
+                  type={type ?? "text"}
+                  placeholder={placeholder}
+                  {...register(name)}
+                  className="bg-secondary border-border focus:border-[#CA71E1] transition-colors"
+                />
                 {errors[name] && <p className="text-xs text-destructive">{errors[name]?.message}</p>}
               </div>
             ))}
-            <div className="space-y-1">
-              <Label>Notas de salud</Label>
-              <Textarea placeholder="Alergias, condiciones médicas relevantes..." {...register("healthNotes")} />
+
+            {/* Gender select */}
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Sexo</Label>
+              <select
+                {...register("gender")}
+                className="w-full rounded-md bg-secondary border border-border px-3 py-2.5 text-sm text-foreground focus:border-[#CA71E1] focus:outline-none transition-colors"
+              >
+                <option value="">Selecciona…</option>
+                <option value="female">Femenino</option>
+                <option value="male">Masculino</option>
+                <option value="other">Otro</option>
+              </select>
             </div>
-            <Button type="submit" className="w-full" disabled={mutation.isPending}>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Notas de salud</Label>
+              <Textarea
+                placeholder="Alergias, condiciones médicas relevantes..."
+                {...register("healthNotes")}
+                className="bg-secondary border-border focus:border-[#CA71E1] transition-colors"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:from-[#E15CB8]/90 hover:to-[#CA71E1]/90 text-white font-medium"
+              disabled={mutation.isPending}
+            >
               {mutation.isPending ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
               Guardar cambios
             </Button>

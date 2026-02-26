@@ -40,6 +40,7 @@ async function ensureSchema() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_promotions BOOLEAN DEFAULT false;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_weekly_summary BOOLEAN DEFAULT false;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10);
     `);
     // Ensure referrals table exists
     await pool.query(`
@@ -421,6 +422,7 @@ function mapUser(u) {
     email: u.email,
     phone: u.phone,
     role: u.role,
+    gender: u.gender ?? null,
     photoUrl: u.photo_url ?? null,
     dateOfBirth: u.date_of_birth ?? null,
     emergencyContactName: u.emergency_contact_name ?? null,
@@ -437,7 +439,7 @@ function mapUser(u) {
 
 // POST /api/auth/register
 app.post("/api/auth/register", async (req, res) => {
-  const { email, password, displayName, phone, acceptsTerms, acceptsCommunications } = req.body;
+  const { email, password, displayName, phone, gender, acceptsTerms, acceptsCommunications } = req.body;
   if (!email || !password || !displayName) {
     return res.status(400).json({ message: "Nombre, email y contraseña son requeridos" });
   }
@@ -448,10 +450,10 @@ app.post("/api/auth/register", async (req, res) => {
     }
     const passwordHash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      `INSERT INTO users (display_name, email, phone, password_hash, accepts_terms, accepts_communications, role)
-       VALUES ($1, $2, $3, $4, $5, $6, 'client')
+      `INSERT INTO users (display_name, email, phone, gender, password_hash, accepts_terms, accepts_communications, role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'client')
        RETURNING *`,
-      [displayName.trim(), email.toLowerCase().trim(), phone || null, passwordHash, acceptsTerms ?? false, acceptsCommunications ?? false]
+      [displayName.trim(), email.toLowerCase().trim(), phone || null, gender || null, passwordHash, acceptsTerms ?? false, acceptsCommunications ?? false]
     );
     const user = result.rows[0];
     // Auto-create referral code
@@ -1151,7 +1153,7 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ message: "Acceso denegado" });
     }
     const {
-      displayName, phone, dateOfBirth,
+      displayName, phone, dateOfBirth, gender,
       emergencyContactName, emergencyContactPhone, healthNotes,
       receiveReminders, receivePromotions, receiveWeeklySummary,
       acceptsCommunications,
@@ -1173,8 +1175,9 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
          receive_weekly_summary    = COALESCE($9, receive_weekly_summary),
          accepts_communications    = COALESCE($10, accepts_communications),
          role                      = COALESCE($11, role),
+         gender                    = COALESCE($12, gender),
          updated_at                = NOW()
-       WHERE id = $12
+       WHERE id = $13
        RETURNING *`,
       [
         displayName || null, phone || null, dateOfBirth || null,
@@ -1182,6 +1185,7 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
         receiveReminders ?? null, receivePromotions ?? null, receiveWeeklySummary ?? null,
         acceptsCommunications ?? null,
         newRole,
+        gender || null,
         targetId,
       ]
     );
