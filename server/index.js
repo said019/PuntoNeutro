@@ -154,14 +154,24 @@ async function ensureSchema() {
       );
       CREATE INDEX IF NOT EXISTS idx_packages_category ON packages(category);
     `);
-    // ── Seed class_types si la tabla está vacía ────────────────────────────
+    // ── Seed class_types – replace old placeholders with real Ophelia types ──
     const ctCount = await pool.query("SELECT COUNT(*) FROM class_types");
-    if (parseInt(ctCount.rows[0].count) === 0) {
+    const hasOldSeed = await pool.query("SELECT 1 FROM class_types WHERE name = 'Jumping Basics' LIMIT 1");
+    if (parseInt(ctCount.rows[0].count) === 0 || hasOldSeed.rows.length > 0) {
+      // Delete old placeholder classes if present
+      if (hasOldSeed.rows.length > 0) {
+        await pool.query("DELETE FROM class_types WHERE name IN ('Jumping Basics','Power Jump','Jump & Stretch')");
+      }
       await pool.query(`
-        INSERT INTO class_types (name, description, level, duration_min, capacity, color, emoji, sort_order) VALUES
-          ('Jumping Basics',  'La clase perfecta para comenzar. Aprende los fundamentos del jumping fitness con música motivadora y movimientos accesibles.', 'Principiante',       50, 15, 'primary',    '🚀', 1),
-          ('Power Jump',      'Lleva tu entrenamiento al siguiente nivel con coreografías dinámicas, intervalos HIIT y música que no para.',                  'Intermedio',         55, 12, 'purple',     '⚡', 2),
-          ('Jump & Stretch',  'Combina el jumping con yoga y stretching profundo. Ideal para relajar, ganar flexibilidad y recuperarte activamente.',         'Todos los niveles',  60, 10, 'yellow',     '🌸', 3)
+        INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order, is_active) VALUES
+          ('Jumping Fitness',  'Full Body',                 'Clase de jumping fitness de cuerpo completo con música motivadora.',                        'jumping',  'Alta',   'Todos los niveles', 50, 10, '#E15CB8', '🏋️', 1, true),
+          ('Jumping Dance',    'Coreografías',              'Coreografías dinámicas sobre el trampolín con ritmos contagiosos.',                         'jumping',  'Media',  'Todos los niveles', 50, 10, '#CA71E1', '�', 2, true),
+          ('Jump & Tone',      'Tonificación y resistencia','Combina jumping con ejercicios de tonificación y resistencia muscular.',                    'jumping',  'Alta',   'Intermedio',        55, 10, '#E7EB6E', '💪', 3, true),
+          ('Strong Jump',      'Fuerza y glúteo',           'Enfocada en fuerza de tren inferior y glúteo con intervalos de alta intensidad.',           'jumping',  'Alta',   'Intermedio',        55, 10, '#E15CB8', '🔥', 4, true),
+          ('Mindful Jump',     'Pilates en trampolín',      'Pilates sobre trampolín para mejorar equilibrio, flexibilidad y conciencia corporal.',      'jumping',  'Baja',   'Todos los niveles', 60, 10, '#CA71E1', '🧘', 5, true),
+          ('Hot Pilates',      'Pesada',                    'Clase de pilates de alta intensidad enfocada en fuerza y control.',                         'pilates',  'Alta',   'Intermedio',        55, 10, '#E7EB6E', '🔥', 6, true),
+          ('Flow Pilates',     'Media',                     'Pilates fluido de intensidad media para fortalecer y elongar.',                             'pilates',  'Media',  'Todos los niveles', 55, 10, '#E15CB8', '🌊', 7, true),
+          ('Pilates Mat',      'Ligera',                    'Pilates en mat de baja intensidad enfocado en técnica y control corporal.',                 'pilates',  'Baja',   'Principiante',      50, 10, '#CA71E1', '🌸', 8, true)
         ON CONFLICT DO NOTHING;
       `);
     }
@@ -170,19 +180,19 @@ async function ensureSchema() {
     if (parseInt(ssCount.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO schedule_slots (time_slot, day_of_week, class_type_name) VALUES
-          ('7:00 am', 1, 'Jumping Basics'), ('7:00 am', 2, 'Power Jump'),
-          ('7:00 am', 3, 'Jumping Basics'), ('7:00 am', 4, 'Power Jump'),
-          ('7:00 am', 5, 'Jump & Stretch'),('7:00 am', 6, 'Jumping Basics'),
-          ('9:00 am', 1, 'Power Jump'),     ('9:00 am', 2, 'Jumping Basics'),
-          ('9:00 am', 3, 'Power Jump'),     ('9:00 am', 4, 'Jumping Basics'),
-          ('9:00 am', 5, 'Power Jump'),     ('9:00 am', 6, 'Power Jump'),
-          ('11:00 am',1, 'Jump & Stretch'), ('11:00 am',3, 'Jump & Stretch'),
-          ('11:00 am',5, 'Jumping Basics'), ('11:00 am',6, 'Jump & Stretch'),
-          ('6:00 pm', 1, 'Jumping Basics'), ('6:00 pm', 2, 'Power Jump'),
-          ('6:00 pm', 3, 'Jumping Basics'), ('6:00 pm', 4, 'Power Jump'),
-          ('6:00 pm', 5, 'Power Jump'),
-          ('7:30 pm', 1, 'Power Jump'),     ('7:30 pm', 2, 'Jump & Stretch'),
-          ('7:30 pm', 3, 'Power Jump'),     ('7:30 pm', 4, 'Jump & Stretch')
+          ('7:00 am', 1, 'Jumping Fitness'), ('7:00 am', 2, 'Jumping Dance'),
+          ('7:00 am', 3, 'Jump & Tone'),     ('7:00 am', 4, 'Strong Jump'),
+          ('7:00 am', 5, 'Mindful Jump'),    ('7:00 am', 6, 'Jumping Fitness'),
+          ('9:00 am', 1, 'Jumping Dance'),   ('9:00 am', 2, 'Jump & Tone'),
+          ('9:00 am', 3, 'Strong Jump'),     ('9:00 am', 4, 'Jumping Fitness'),
+          ('9:00 am', 5, 'Jumping Dance'),   ('9:00 am', 6, 'Hot Pilates'),
+          ('11:00 am',1, 'Flow Pilates'),    ('11:00 am',3, 'Pilates Mat'),
+          ('11:00 am',5, 'Hot Pilates'),     ('11:00 am',6, 'Flow Pilates'),
+          ('6:00 pm', 1, 'Jumping Fitness'), ('6:00 pm', 2, 'Strong Jump'),
+          ('6:00 pm', 3, 'Jumping Dance'),   ('6:00 pm', 4, 'Jump & Tone'),
+          ('6:00 pm', 5, 'Mindful Jump'),
+          ('7:30 pm', 1, 'Jump & Tone'),     ('7:30 pm', 2, 'Pilates Mat'),
+          ('7:30 pm', 3, 'Strong Jump'),     ('7:30 pm', 4, 'Flow Pilates')
         ON CONFLICT DO NOTHING;
       `);
     }

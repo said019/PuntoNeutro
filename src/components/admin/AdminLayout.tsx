@@ -16,8 +16,6 @@ const NAV_ITEMS = [
   { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
   { path: "/admin/clients", label: "Clientes", icon: Users },
   { path: "/admin/classes", label: "Clases", icon: CalendarDays },
-  { path: "/admin/classes/types", label: "Tipos de clase", icon: Calendar },
-  { path: "/admin/classes/generate", label: "Generar clases", icon: BookOpen },
   { path: "/admin/schedules", label: "Horarios", icon: Calendar },
   { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
   { path: "/admin/staff", label: "Instructores", icon: UserCheck },
@@ -58,7 +56,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         {/* Logo */}
         <div className="flex items-center justify-between px-4 py-5 border-b border-border">
           {!collapsed && (
-            <img src={opheliaLogo} alt="Ophelia" className="h-9 w-auto object-contain" />
+            <img src={opheliaLogo} alt="Ophelia" className="h-12 w-auto object-contain" />
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
