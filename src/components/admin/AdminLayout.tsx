@@ -6,8 +6,8 @@ import opheliaLogo from "@/assets/ophelia-logo-full.png";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
   Calendar, BookOpen, UserCheck, DollarSign, ShoppingBag,
-  ShoppingCart, Tag, Gift, Share2, Video, BarChart2,
-  Star, Settings, ChevronLeft, ChevronRight, LogOut, Globe,
+  ShoppingCart, Tag, Gift, Video, BarChart2,
+  Settings, ChevronLeft, ChevronRight, LogOut, Globe,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -16,6 +16,8 @@ const NAV_ITEMS = [
   { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
   { path: "/admin/clients", label: "Clientes", icon: Users },
   { path: "/admin/classes", label: "Clases", icon: CalendarDays },
+  { path: "/admin/classes/types", label: "Tipos de clase", icon: Calendar },
+  { path: "/admin/classes/generate", label: "Generar clases", icon: BookOpen },
   { path: "/admin/schedules", label: "Horarios", icon: Calendar },
   { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
   { path: "/admin/staff", label: "Instructores", icon: UserCheck },
@@ -24,10 +26,8 @@ const NAV_ITEMS = [
   { path: "/admin/pos", label: "POS", icon: ShoppingCart },
   { path: "/admin/discount-codes", label: "Descuentos", icon: Tag },
   { path: "/admin/loyalty", label: "Lealtad", icon: Gift },
-  { path: "/admin/referrals", label: "Referidos", icon: Share2 },
   { path: "/admin/videos", label: "Videos", icon: Video },
   { path: "/admin/reports", label: "Reportes", icon: BarChart2 },
-  { path: "/admin/reviews", label: "Reseñas", icon: Star },
   { path: "/admin/settings", label: "Configuración", icon: Settings },
 ];
 
@@ -58,7 +58,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         {/* Logo */}
         <div className="flex items-center justify-between px-4 py-5 border-b border-border">
           {!collapsed && (
-            <img src={opheliaLogo} alt="Ophelia" className="h-7 w-auto" />
+            <img src={opheliaLogo} alt="Ophelia" className="h-9 w-auto object-contain" />
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
@@ -77,9 +77,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 key={path}
                 to={path}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-2.5 text-sm transition-colors no-underline",
+                  "flex items-center gap-3 px-4 py-2.5 text-sm transition-colors no-underline rounded-lg mx-2",
                   active
-                    ? "bg-primary/10 text-primary font-medium"
+                    ? "bg-gradient-to-r from-[#CA71E1]/20 to-[#E15CB8]/10 text-[#CA71E1] font-medium border border-[#CA71E1]/20"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
                 title={collapsed ? label : undefined}

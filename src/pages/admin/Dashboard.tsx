@@ -32,11 +32,11 @@ const Dashboard = () => {
     queryFn: async () => (await api.get("/orders/pending")).data,
   });
 
-  const metric = (label: string, value: number | undefined, icon: React.ReactNode, prefix = "") => (
-    <Card>
+  const metric = (label: string, value: number | undefined, icon: React.ReactNode, prefix = "", accent = "#CA71E1") => (
+    <Card className="border-t-2" style={{ borderTopColor: accent }}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        <span className="text-muted-foreground">{icon}</span>
+        <span style={{ color: accent }}>{icon}</span>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -58,10 +58,10 @@ const Dashboard = () => {
 
           {/* Metric cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {metric("Clases de hoy", stats?.classesToday, <CalendarDays size={18} />)}
-            {metric("Membresías activas", stats?.activeMembers, <Users size={18} />)}
-            {metric("Ingresos del mes", stats?.monthlyRevenue, <DollarSign size={18} />, "$")}
-            {metric("Alertas pendientes", stats?.pendingAlerts, <AlertCircle size={18} />)}
+            {metric("Clases de hoy", stats?.classesToday, <CalendarDays size={18} />, "", "#CA71E1")}
+            {metric("Membresías activas", stats?.activeMembers, <Users size={18} />, "", "#E15CB8")}
+            {metric("Ingresos del mes", stats?.monthlyRevenue, <DollarSign size={18} />, "$", "#E7EB6E")}
+            {metric("Alertas pendientes", stats?.pendingAlerts, <AlertCircle size={18} />, "", "#F97316")}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -17,16 +17,27 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus } from "lucide-react";
 
+const PALETTE_COLORS = [
+  { label: "Violeta", value: "#CA71E1" },
+  { label: "Rosa", value: "#E15CB8" },
+  { label: "Lima", value: "#E7EB6E" },
+  { label: "Púrpura", value: "#8B5CF6" },
+  { label: "Primario", value: "#c026d3" },
+  { label: "Azul", value: "#3B82F6" },
+  { label: "Esmeralda", value: "#10B981" },
+  { label: "Naranja", value: "#F97316" },
+];
+
 const typeSchema = z.object({
   name: z.string().min(1),
-  color: z.string().default("#8B5CF6"),
+  color: z.string().default("#CA71E1"),
   defaultDuration: z.coerce.number().min(1),
   maxCapacity: z.coerce.number().min(1),
   isActive: z.boolean().default(true),
 });
 
 type TypeFormData = z.infer<typeof typeSchema>;
-interface ClassType extends TypeFormData { id: string }
+interface ClassType extends TypeFormData { id: string; durationMin?: number; capacity?: number }
 
 const ClassTypesList = () => {
   const { toast } = useToast();
@@ -40,7 +51,7 @@ const ClassTypesList = () => {
   });
   const types = Array.isArray(data?.data) ? data.data : [];
 
-  const form = useForm<TypeFormData>({ resolver: zodResolver(typeSchema), defaultValues: { color: "#8B5CF6", defaultDuration: 60, maxCapacity: 20, isActive: true } });
+  const form = useForm<TypeFormData>({ resolver: zodResolver(typeSchema), defaultValues: { color: "#CA71E1", defaultDuration: 60, maxCapacity: 20, isActive: true } });
 
   const createMutation = useMutation({
     mutationFn: (d: TypeFormData) => api.post("/class-types", d),
@@ -57,8 +68,18 @@ const ClassTypesList = () => {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["class-types"] }); toast({ title: "Tipo eliminado" }); },
   });
 
-  const openEdit = (t: ClassType) => { form.reset(t); setEditing(t); setOpen(true); };
-  const openCreate = () => { form.reset({ color: "#8B5CF6", defaultDuration: 60, maxCapacity: 20, isActive: true }); setEditing(null); setOpen(true); };
+  const openEdit = (t: ClassType) => {
+    form.reset({
+      name: t.name,
+      color: t.color,
+      defaultDuration: t.defaultDuration ?? t.durationMin ?? 60,
+      maxCapacity: t.maxCapacity ?? t.capacity ?? 20,
+      isActive: t.isActive,
+    });
+    setEditing(t);
+    setOpen(true);
+  };
+  const openCreate = () => { form.reset({ color: "#CA71E1", defaultDuration: 60, maxCapacity: 20, isActive: true }); setEditing(null); setOpen(true); };
 
   return (
     <AuthGuard>
@@ -85,8 +106,8 @@ const ClassTypesList = () => {
                   <TableRow key={t.id}>
                     <TableCell><div className="w-5 h-5 rounded-full" style={{ backgroundColor: t.color }} /></TableCell>
                     <TableCell className="font-medium">{t.name}</TableCell>
-                    <TableCell>{t.defaultDuration} min</TableCell>
-                    <TableCell>{t.maxCapacity}</TableCell>
+                    <TableCell>{t.defaultDuration ?? t.durationMin ?? "—"} min</TableCell>
+                    <TableCell>{t.maxCapacity ?? t.capacity ?? "—"}</TableCell>
                     <TableCell><Badge variant={t.isActive ? "default" : "secondary"}>{t.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -109,7 +130,22 @@ const ClassTypesList = () => {
             <DialogHeader><DialogTitle>{editing ? "Editar tipo" : "Nuevo tipo de clase"}</DialogTitle></DialogHeader>
             <form onSubmit={form.handleSubmit((d) => editing ? updateMutation.mutate({ ...d, id: editing.id }) : createMutation.mutate(d))} className="space-y-4">
               <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("name")} /></div>
-              <div className="space-y-1"><Label>Color</Label><Input type="color" {...form.register("color")} className="h-10 cursor-pointer" /></div>
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PALETTE_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => form.setValue("color", c.value)}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${form.watch("color") === c.value ? "border-foreground scale-110" : "border-transparent opacity-70 hover:opacity-100"}`}
+                      style={{ backgroundColor: c.value }}
+                      title={c.label}
+                    />
+                  ))}
+                </div>
+                <Input type="color" {...form.register("color")} className="h-8 w-16 cursor-pointer" />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1"><Label>Duración (min)</Label><Input type="number" {...form.register("defaultDuration")} /></div>
                 <div className="space-y-1"><Label>Capacidad máx.</Label><Input type="number" {...form.register("maxCapacity")} /></div>

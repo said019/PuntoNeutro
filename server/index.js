@@ -373,6 +373,18 @@ async function ensureSchema() {
 app.use(cors());
 app.use(express.json());
 
+// ─── Helper: snake_case → camelCase row mapper ──────────────────────────────
+function camelRow(row) {
+  if (!row || typeof row !== "object") return row;
+  const out = {};
+  for (const [k, v] of Object.entries(row)) {
+    const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    out[camel] = v;
+  }
+  return out;
+}
+function camelRows(rows) { return rows.map(camelRow); }
+
 // ─── Auth helpers ────────────────────────────────────────────────────────────
 function signToken(userId) {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: "30d" });
@@ -405,19 +417,19 @@ async function adminMiddleware(req, res, next) {
 function mapUser(u) {
   return {
     id: u.id,
-    display_name: u.display_name,
+    displayName: u.display_name,
     email: u.email,
     phone: u.phone,
     role: u.role,
-    photo_url: u.photo_url ?? null,
-    date_of_birth: u.date_of_birth ?? null,
-    emergency_contact_name: u.emergency_contact_name ?? null,
-    emergency_contact_phone: u.emergency_contact_phone ?? null,
-    health_notes: u.health_notes ?? null,
-    receive_reminders: u.receive_reminders ?? true,
-    receive_promotions: u.receive_promotions ?? false,
-    receive_weekly_summary: u.receive_weekly_summary ?? false,
-    created_at: u.created_at,
+    photoUrl: u.photo_url ?? null,
+    dateOfBirth: u.date_of_birth ?? null,
+    emergencyContactName: u.emergency_contact_name ?? null,
+    emergencyContactPhone: u.emergency_contact_phone ?? null,
+    healthNotes: u.health_notes ?? null,
+    receiveReminders: u.receive_reminders ?? true,
+    receivePromotions: u.receive_promotions ?? false,
+    receiveWeeklySummary: u.receive_weekly_summary ?? false,
+    createdAt: u.created_at,
   };
 }
 
@@ -1209,7 +1221,7 @@ app.get("/api/referrals/code", authMiddleware, async (req, res) => {
 app.get("/api/admin/class-types", async (req, res) => {
   try {
     const r = await pool.query("SELECT * FROM class_types ORDER BY sort_order, name");
-    return res.json({ data: r.rows });
+    return res.json({ data: camelRows(r.rows) });
   } catch (err) {
     console.error("GET admin/class-types error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -1591,7 +1603,44 @@ app.get("/api/users/:id", adminMiddleware, async (req, res) => {
 app.get("/api/class-types", async (req, res) => {
   try {
     const r = await pool.query("SELECT * FROM class_types WHERE is_active = true ORDER BY sort_order ASC");
-    return res.json({ data: r.rows });
+    return res.json({ data: camelRows(r.rows) });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// POST /api/class-types — alias CRUD (admin)
+app.post("/api/class-types", adminMiddleware, async (req, res) => {
+  const { name, color, defaultDuration, maxCapacity, isActive } = req.body;
+  if (!name?.trim()) return res.status(400).json({ message: "name requerido" });
+  try {
+    const r = await pool.query(
+      `INSERT INTO class_types (name, color, duration_min, capacity, is_active, sort_order)
+       VALUES ($1,$2,$3,$4,$5,0) RETURNING *`,
+      [name.trim(), color || "#c026d3", defaultDuration || 60, maxCapacity || 20, isActive !== false]
+    );
+    return res.status(201).json({ data: camelRow(r.rows[0]) });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// PUT /api/class-types/:id — alias CRUD (admin)
+app.put("/api/class-types/:id", adminMiddleware, async (req, res) => {
+  const { name, color, defaultDuration, maxCapacity, isActive } = req.body;
+  try {
+    const r = await pool.query(
+      `UPDATE class_types SET name=COALESCE($1,name), color=COALESCE($2,color),
+       duration_min=COALESCE($3,duration_min), capacity=COALESCE($4,capacity),
+       is_active=COALESCE($5,is_active), updated_at=NOW() WHERE id=$6 RETURNING *`,
+      [name || null, color || null, defaultDuration || null, maxCapacity || null, isActive ?? null, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "No encontrado" });
+    return res.json({ data: camelRow(r.rows[0]) });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// DELETE /api/class-types/:id — alias CRUD (admin)
+app.delete("/api/class-types/:id", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM class_types WHERE id = $1", [req.params.id]);
+    return res.json({ message: "Eliminado" });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
@@ -1621,13 +1670,37 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
 // POST /api/classes/generate — bulk generate
 app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
   try {
-    const { startDate, endDate, instructorId } = req.body;
+    const { startDate, endDate, classTypeId, instructorId, daysOfWeek, startTime, endTime, maxCapacity = 10 } = req.body;
     if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
+
+    const created = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // If classTypeId + daysOfWeek provided → generate from form data
+    if (classTypeId && Array.isArray(daysOfWeek) && daysOfWeek.length && startTime && endTime) {
+      const [sh, sm] = startTime.split(":").map(Number);
+      const [eh, em] = endTime.split(":").map(Number);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const jsDay = d.getDay(); // 0=Sun,1=Mon...
+        if (!daysOfWeek.includes(jsDay)) continue;
+        const classStart = new Date(d); classStart.setHours(sh, sm, 0, 0);
+        const classEnd = new Date(d); classEnd.setHours(eh, em, 0, 0);
+        const exists = await pool.query("SELECT id FROM classes WHERE start_time=$1 AND class_type_id=$2", [classStart.toISOString(), classTypeId]);
+        if (exists.rows.length) continue;
+        const r = await pool.query(
+          "INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, status) VALUES ($1,$2,$3,$4,$5,'scheduled') RETURNING *",
+          [classTypeId, instructorId || null, classStart.toISOString(), classEnd.toISOString(), maxCapacity]
+        );
+        created.push(r.rows[0]);
+      }
+      return res.json({ created: created.length, data: created });
+    }
+
+    // Fallback: generate from schedule_templates
     const slotsRes = await pool.query("SELECT * FROM schedule_templates WHERE is_active = true");
     const classTypeRes = await pool.query("SELECT id, name, category FROM class_types WHERE is_active = true");
     const classTypes = classTypeRes.rows;
-    const created = [];
-    const start = new Date(startDate); const end = new Date(endDate);
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay();
       const daySlots = slotsRes.rows.filter(s => s.day_of_week === dayOfWeek);
@@ -1643,7 +1716,7 @@ app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
         let ct = classTypes.find(c => c.category?.toLowerCase() === label || c.name?.toLowerCase().includes(label));
         if (!ct) ct = classTypes[0];
         if (!ct) continue;
-        const exists = await pool.query("SELECT id FROM classes WHERE start_time = $1 AND class_type_id = $2", [classDate.toISOString(), ct.id]);
+        const exists = await pool.query("SELECT id FROM classes WHERE start_time=$1 AND class_type_id=$2", [classDate.toISOString(), ct.id]);
         if (exists.rows.length) continue;
         const r = await pool.query(
           "INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, status) VALUES ($1,$2,$3,$4,10,'scheduled') RETURNING *",
@@ -2143,7 +2216,7 @@ app.get("/api/users", adminMiddleware, async (req, res) => {
     if (search) { params.push(`%${search}%`); q += ` AND (display_name ILIKE $${params.length} OR email ILIKE $${params.length})`; }
     q += " ORDER BY created_at DESC LIMIT 100";
     const r = await pool.query(q, params);
-    return res.json({ data: r.rows });
+    return res.json({ data: camelRows(r.rows) });
   } catch (err) {
     console.error("GET /api/users error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -2664,7 +2737,7 @@ app.post("/api/admin/loyalty/adjust", adminMiddleware, async (req, res) => {
 app.get("/api/instructors", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query("SELECT * FROM instructors ORDER BY created_at DESC");
-    return res.json({ data: r.rows });
+    return res.json({ data: camelRows(r.rows) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -2679,7 +2752,7 @@ app.post("/api/instructors", adminMiddleware, async (req, res) => {
       "INSERT INTO instructors (display_name, email, phone, bio, specialties, is_active) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
       [displayName, email || null, phone || null, bio || null, specialties || null, isActive]
     );
-    return res.status(201).json({ data: r.rows[0] });
+    return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -2694,7 +2767,7 @@ app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
       [displayName, email || null, phone || null, bio || null, specialties || null, isActive !== false, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Instructor no encontrado" });
-    return res.json({ data: r.rows[0] });
+    return res.json({ data: camelRow(r.rows[0]) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
