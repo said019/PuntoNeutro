@@ -90,9 +90,11 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
 
   const initials = user?.display_name
     ? user.display_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
-    : "?";
+    : user?.email
+      ? user.email[0].toUpperCase()
+      : "U";
 
-  const firstName = user?.display_name?.split(" ")[0] ?? "Tú";
+  const firstName = user?.display_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Tú";
 
   /* ── mobile bottom nav items ── */
   const BOTTOM_NAV = [
