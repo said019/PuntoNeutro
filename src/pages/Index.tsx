@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
+import { useAuthStore } from "@/stores/authStore";
 import ophelia14 from "@/assets/ophelia-14.jpg";
 import ophelia15 from "@/assets/ophelia-15.jpg";
 import ophelia28 from "@/assets/ophelia-28.jpg";
@@ -134,6 +135,7 @@ const Index = () => {
   const [activePkgTab, setActivePkgTab] = useState<"jumping" | "pilates" | "mixtos">("jumping");
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuthStore();
 
   useEffect(() => {
     const handleScroll = () => setNavScrolled(window.scrollY > 50);
@@ -221,12 +223,32 @@ const Index = () => {
             </li>
           ))}
         </ul>
-        <button
-          onClick={() => navigate("/auth/register")}
-          className="bg-primary text-primary-foreground px-7 py-3 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:scale-[1.04] hover:shadow-[0_0_30px_hsl(var(--pink-glow)/0.35)] transition-all"
-        >
-          Unirse ahora
-        </button>
+        {isAuthenticated && user ? (
+          <button
+            onClick={() => navigate(["admin","super_admin","instructor","reception"].includes(user.role) ? "/admin/dashboard" : "/app")}
+            className="flex items-center gap-2 bg-primary/15 border border-primary/40 text-primary px-5 py-2.5 rounded-full text-[0.82rem] font-medium tracking-wide hover:bg-primary/25 transition-all"
+          >
+            <span className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-[0.75rem] font-bold uppercase">
+              {user.displayName?.[0] ?? user.email?.[0] ?? "U"}
+            </span>
+            {["admin","super_admin"].includes(user.role) ? "Admin" : user.displayName?.split(" ")[0] ?? "Mi cuenta"}
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate("/auth/login")}
+              className="text-muted-foreground text-[0.82rem] font-normal tracking-widest uppercase hover:text-foreground transition-colors bg-transparent border-none cursor-pointer px-2"
+            >
+              Iniciar sesión
+            </button>
+            <button
+              onClick={() => navigate("/auth/register")}
+              className="bg-primary text-primary-foreground px-7 py-3 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:scale-[1.04] hover:shadow-[0_0_30px_hsl(var(--pink-glow)/0.35)] transition-all"
+            >
+              Unirse
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* ── HERO ── */}

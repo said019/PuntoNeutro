@@ -308,18 +308,15 @@ async function ensureSchema() {
       ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT;
       ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
     `);
-    // ── Seed admin user si no existe ───────────────────────────────────────
-    const adminExists = await pool.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
-    if (adminExists.rows.length === 0) {
-      const adminHash = await bcrypt.hash("Ophelia2026!", 12);
-      await pool.query(
-        `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
-         VALUES ('Admin Ophelia', 'admin@opheliajumping.mx', '0000000000', $1, 'admin', true, false)
-         ON CONFLICT (email) DO UPDATE SET role = 'admin', password_hash = $1`,
-        [adminHash]
-      );
-      console.log("✅ Admin user seeded: admin@opheliajumping.mx / Ophelia2026!");
-    }
+    // ── Seed/reset admin user (always upsert so deploy always resets pwd) ──
+    const adminHash = await bcrypt.hash("Ophelia2026!", 12);
+    await pool.query(
+      `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
+       VALUES ('Admin Ophelia', 'admin@opheliajumping.mx', '0000000000', $1, 'admin', true, false)
+       ON CONFLICT (email) DO UPDATE SET role = 'admin', password_hash = $1`,
+      [adminHash]
+    );
+    console.log("✅ Admin user ready: admin@opheliajumping.mx / Ophelia2026!");
     console.log("✅ Schema ensured");
   } catch (err) {
     console.error("Schema migration warning:", err.message);
