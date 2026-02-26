@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Send, Users, MessageSquare, RefreshCw, Wifi, WifiOff } from "lucide-react";
 
 // Generic settings section
 const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: { key: string; label: string; type?: string }[] }) => {
@@ -60,59 +61,182 @@ const WhatsAppSettings = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const { data: statusData, refetch } = useQuery({
+  // ── Connection ──────────────────────────────────────────────────────
+  const { data: statusData, refetch, isFetching } = useQuery({
     queryKey: ["evolution-status"],
     queryFn: async () => (await api.get("/evolution/status")).data,
-    refetchInterval: (data: any) => (data?.state === "qr_pending" ? 3000 : false),
+    refetchInterval: (query) => {
+      const d = query.state.data as any;
+      return d?.data?.state === "qr_pending" || d?.state === "qr_pending" ? 3000 : false;
+    },
   });
 
-  const status = statusData?.data ?? statusData ?? {};
+  const status = (statusData as any)?.data ?? statusData ?? {};
 
   const connectMutation = useMutation({
     mutationFn: () => api.post("/evolution/connect"),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["evolution-status"] }); refetch(); },
+    onError: () => toast({ title: "Error al conectar", variant: "destructive" }),
   });
 
   const disconnectMutation = useMutation({
     mutationFn: () => api.post("/evolution/disconnect"),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["evolution-status"] }); toast({ title: "Desconectado" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["evolution-status"] }); toast({ title: "WhatsApp desconectado" }); },
+    onError: () => toast({ title: "Error al desconectar", variant: "destructive" }),
   });
 
+  // ── Test message ────────────────────────────────────────────────────
+  const [testPhone, setTestPhone] = useState("");
   const testMutation = useMutation({
-    mutationFn: () => api.post("/evolution/send-test"),
-    onSuccess: () => toast({ title: "Mensaje de prueba enviado" }),
+    mutationFn: () => api.post("/evolution/send-test", { phone: testPhone }),
+    onSuccess: () => toast({ title: "✅ Mensaje de prueba enviado" }),
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al enviar prueba", variant: "destructive" }),
   });
+
+  // ── Notify clients ──────────────────────────────────────────────────
+  const [notifyFilter, setNotifyFilter] = useState<"all" | "members" | "active">("all");
+  const [notifyMessage, setNotifyMessage] = useState("");
+  const [notifyResult, setNotifyResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
+
+  const notifyMutation = useMutation({
+    mutationFn: () => api.post("/evolution/notify-clients", { filter: notifyFilter, message: notifyMessage }),
+    onSuccess: (res) => {
+      const d = (res as any).data?.data ?? (res as any).data;
+      setNotifyResult(d);
+      toast({ title: `✅ Enviados ${d.sent} / ${d.total}` });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al enviar notificaciones", variant: "destructive" }),
+  });
+
+  const filterLabels: Record<string, string> = {
+    all: "Todos los clientes",
+    members: "Solo con membresía activa",
+    active: "Clientes activos (últimos 60 días)",
+  };
 
   return (
-    <div className="space-y-6 max-w-md">
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-medium">Estado:</span>
-        <Badge variant={status.connected ? "default" : "secondary"}>
-          {status.state ?? "no_configured"}
-        </Badge>
-        {status.number && <span className="text-sm text-muted-foreground">{status.number}</span>}
+    <div className="space-y-8 max-w-xl">
+      {/* ── Status ─────────────────────────────────────────────────── */}
+      <div className="rounded-xl border p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold flex items-center gap-2">
+            {status.connected ? <Wifi size={16} className="text-green-500" /> : <WifiOff size={16} className="text-muted-foreground" />}
+            Conexión WhatsApp
+          </h3>
+          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} />
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Badge variant={status.connected ? "default" : "secondary"} className={status.connected ? "bg-green-500" : ""}>
+            {status.connected ? "Conectado" : status.state === "qr_pending" ? "Esperando QR" : "Desconectado"}
+          </Badge>
+          {status.number && <span className="text-sm text-muted-foreground">{status.number}</span>}
+        </div>
+
+        {status.state === "qr_pending" && status.qrCode && (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Escanea con WhatsApp para conectar:</p>
+            <img src={status.qrCode} alt="QR Code" className="w-52 h-52 border border-border rounded-xl" />
+            <p className="text-xs text-muted-foreground">Actualizando cada 3 segundos…</p>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          {!status.connected ? (
+            <Button onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>
+              {connectMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
+              {status.state === "qr_pending" ? "Obtener nuevo QR" : "Conectar WhatsApp"}
+            </Button>
+          ) : (
+            <Button variant="destructive" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending}>
+              {disconnectMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
+              Desconectar
+            </Button>
+          )}
+        </div>
       </div>
 
-      {status.state === "qr_pending" && status.qrCode && (
-        <div>
-          <p className="text-sm text-muted-foreground mb-3">Escanea con WhatsApp para conectar:</p>
-          <img src={status.qrCode} alt="QR Code" className="w-48 h-48 border border-border rounded-xl" />
-          <p className="text-xs text-muted-foreground mt-2">Actualizando automáticamente...</p>
+      {/* ── Test message ────────────────────────────────────────────── */}
+      {status.connected && (
+        <div className="rounded-xl border p-5 space-y-4">
+          <h3 className="font-semibold flex items-center gap-2">
+            <MessageSquare size={16} />
+            Mensaje de prueba
+          </h3>
+          <div className="flex gap-3">
+            <Input
+              placeholder="Ej. 5219991234567"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              className="flex-1"
+            />
+            <Button
+              onClick={() => testMutation.mutate()}
+              disabled={testMutation.isPending || !testPhone}
+            >
+              {testMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Incluye código de país. Ej: 521 + 10 dígitos para México.</p>
         </div>
       )}
 
-      <div className="flex gap-3">
-        {!status.connected
-          ? <Button onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>
-              {connectMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
-              Conectar WhatsApp
-            </Button>
-          : <>
-              <Button variant="outline" onClick={() => testMutation.mutate()} disabled={testMutation.isPending}>Enviar mensaje de prueba</Button>
-              <Button variant="destructive" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending}>Desconectar</Button>
-            </>
-        }
-      </div>
+      {/* ── Notify clients ──────────────────────────────────────────── */}
+      {status.connected && (
+        <div className="rounded-xl border p-5 space-y-4">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Users size={16} />
+            Notificar a clientes
+          </h3>
+
+          <div className="space-y-1">
+            <Label>Destinatarios</Label>
+            <Select value={notifyFilter} onValueChange={(v) => setNotifyFilter(v as any)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los clientes</SelectItem>
+                <SelectItem value="members">Solo con membresía activa</SelectItem>
+                <SelectItem value="active">Clientes activos (últimos 60 días)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">{filterLabels[notifyFilter]}</p>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Mensaje</Label>
+            <Textarea
+              placeholder="Escribe tu mensaje aquí…"
+              rows={4}
+              value={notifyMessage}
+              onChange={(e) => setNotifyMessage(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">{notifyMessage.length} caracteres</p>
+          </div>
+
+          {notifyResult && (
+            <div className="rounded-lg bg-muted px-4 py-3 text-sm space-y-1">
+              <p>✅ Enviados: <strong>{notifyResult.sent}</strong></p>
+              {notifyResult.failed > 0 && <p>❌ Fallidos: <strong>{notifyResult.failed}</strong></p>}
+              <p className="text-muted-foreground">Total: {notifyResult.total}</p>
+            </div>
+          )}
+
+          <Button
+            onClick={() => { setNotifyResult(null); notifyMutation.mutate(); }}
+            disabled={notifyMutation.isPending || !notifyMessage.trim()}
+            className="w-full"
+          >
+            {notifyMutation.isPending
+              ? <><Loader2 className="animate-spin mr-2" size={14} /> Enviando…</>
+              : <><Send size={14} className="mr-2" /> Enviar notificación</>
+            }
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

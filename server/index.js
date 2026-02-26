@@ -7,11 +7,22 @@ import jwt from "jsonwebtoken";
 import path from "path";
 import { fileURLToPath } from "url";
 import multer from "multer";
+import axios from "axios";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || "ophelia_secret_2026";
+
+// ─── Evolution API (WhatsApp) config ────────────────────────────────────────
+const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "https://evolution-api-production-c1cb.up.railway.app";
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || "xoL0b1t0s-2026";
+const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || "ophelia-jump-studio";
+const evolutionApi = axios.create({
+  baseURL: EVOLUTION_API_URL,
+  headers: { apikey: EVOLUTION_API_KEY },
+  timeout: 20000,
+});
 
 // ─── File upload (memory storage, max 10 MB) ────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -230,7 +241,22 @@ async function ensureSchema() {
       ALTER TABLE plans ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
       ALTER TABLE plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
-    // ── Seed plans si la tabla está vacía ──────────────────────────────────
+    // ── Seed plans: remove old schema_complete.sql plans & ensure only correct ones ──
+    // Delete old plans that came from the migration seed (wrong data)
+    await pool.query(`
+      DELETE FROM plans WHERE name IN (
+        'Inscripción (Pago Anual)',
+        'Sesión Muestra o Individual',
+        'Sesión Extra (Socias o Inscritas)',
+        'Una Sesión (4 al Mes)',
+        'Dos Sesiones (8 al Mes)',
+        'Tres Sesiones (12 al Mes)',
+        'Cuatro Sesiones (16 al Mes)',
+        'Cinco Sesiones (20 al Mes)',
+        'Seis Sesiones (24 al Mes)',
+        'Siete Sesiones (28 al Mes)'
+      );
+    `);
     const plCount = await pool.query("SELECT COUNT(*) FROM plans");
     if (parseInt(plCount.rows[0].count) === 0) {
       await pool.query(`
@@ -545,9 +571,9 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 app.get("/api/plans", async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT * FROM plans WHERE is_active = true ORDER BY sort_order ASC, price ASC"
+      "SELECT * FROM plans ORDER BY sort_order ASC, price ASC"
     );
-    return res.json({ data: r.rows });
+    return res.json({ data: camelRows(r.rows) });
   } catch (err) {
     console.error("Plans error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -2150,22 +2176,194 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-// ─── Evolution (WhatsApp) stubs ───────────────────────────────────────────────
+// ─── Evolution API (WhatsApp) ─────────────────────────────────────────────────
 
+// Helper: normalise phone to WhatsApp format (521XXXXXXXXXX for MX)
+function normalisePhone(raw) {
+  let phone = String(raw).replace(/\D/g, "");
+  if (phone.startsWith("52") && phone.length === 12) return phone; // already 521XXXXXXXXXX or 52XXXXXXXXXX
+  if (phone.length === 10) return "52" + phone; // local MX 10 digits
+  return phone;
+}
+
+// Webhook (no auth) — receives Evolution API events
+app.post("/api/webhook/evolution", async (req, res) => {
+  try {
+    const body = req.body;
+    console.log("[EVOLUTION WEBHOOK]", JSON.stringify(body).slice(0, 400));
+    // TODO: handle inbound messages / delivery receipts
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error("[EVOLUTION WEBHOOK ERROR]", err.message);
+    return res.sendStatus(200);
+  }
+});
+
+// GET /api/evolution/status
 app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
-  return res.json({ data: { connected: false, status: "not_configured" } });
+  try {
+    // Check if instance exists first
+    let instanceExists = false;
+    try {
+      const listRes = await evolutionApi.get("/instance/fetchInstances");
+      const instances = listRes.data?.data || listRes.data || [];
+      instanceExists = Array.isArray(instances)
+        ? instances.some((i) => i.instance?.instanceName === EVOLUTION_INSTANCE || i.name === EVOLUTION_INSTANCE)
+        : false;
+    } catch (_) { instanceExists = false; }
+
+    if (!instanceExists) {
+      return res.json({ data: { connected: false, state: "disconnected", instanceExists: false } });
+    }
+
+    const r = await evolutionApi.get(`/instance/connectionState/${EVOLUTION_INSTANCE}`);
+    const state = r.data?.instance?.state || r.data?.state || "unknown";
+
+    let qrCode = null;
+    if (state === "connecting" || state === "qr") {
+      try {
+        const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
+        qrCode = qrRes.data?.code || qrRes.data?.qrcode?.base64 || null;
+      } catch (_) {}
+    }
+
+    return res.json({
+      data: {
+        connected: state === "open",
+        state: state === "open" ? "connected" : state === "qr" || state === "connecting" ? "qr_pending" : "disconnected",
+        number: r.data?.instance?.profileName || null,
+        instanceExists: true,
+        qrCode,
+      },
+    });
+  } catch (err) {
+    console.error("[EVOLUTION STATUS]", err.response?.data || err.message);
+    return res.json({ data: { connected: false, state: "disconnected", instanceExists: false } });
+  }
 });
 
+// POST /api/evolution/connect — create instance (or fetch QR if already exists)
 app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
-  return res.json({ data: { message: "Integración WhatsApp no configurada" } });
+  try {
+    // Try creating the instance
+    try {
+      await evolutionApi.post("/instance/create", {
+        instanceName: EVOLUTION_INSTANCE,
+        qrcode: true,
+        integration: "WHATSAPP-BAILEYS",
+      });
+    } catch (createErr) {
+      // 409 = already exists, ignore
+      if (createErr.response?.status !== 409) {
+        console.error("[EVOLUTION CREATE]", createErr.response?.data || createErr.message);
+      }
+    }
+
+    // Get QR
+    const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
+    const qrCode = qrRes.data?.code || qrRes.data?.qrcode?.base64 || null;
+
+    return res.json({ data: { qrCode, state: "qr_pending", message: "Escanea el código QR con WhatsApp" } });
+  } catch (err) {
+    console.error("[EVOLUTION CONNECT]", err.response?.data || err.message);
+    return res.status(500).json({ message: "Error al conectar con Evolution API" });
+  }
 });
 
+// POST /api/evolution/disconnect
 app.post("/api/evolution/disconnect", adminMiddleware, async (req, res) => {
-  return res.json({ data: { message: "Desconectado" } });
+  try {
+    await evolutionApi.delete(`/instance/logout/${EVOLUTION_INSTANCE}`);
+    return res.json({ data: { message: "WhatsApp desconectado correctamente" } });
+  } catch (err) {
+    // If instance not found it's already disconnected
+    if (err.response?.status === 404) {
+      return res.json({ data: { message: "Ya estaba desconectado" } });
+    }
+    console.error("[EVOLUTION DISCONNECT]", err.response?.data || err.message);
+    return res.status(500).json({ message: "Error al desconectar WhatsApp" });
+  }
 });
 
+// POST /api/evolution/send-test  { phone: "5219XXXXXXXXX" }
 app.post("/api/evolution/send-test", adminMiddleware, async (req, res) => {
-  return res.json({ data: { message: "Función no disponible aún" } });
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ message: "Se requiere número de teléfono" });
+    const number = normalisePhone(phone);
+    await evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, {
+      number,
+      text: "✅ Mensaje de prueba desde Ophelia Jump Studio. ¡WhatsApp conectado correctamente!",
+    });
+    return res.json({ data: { message: "Mensaje de prueba enviado correctamente" } });
+  } catch (err) {
+    console.error("[EVOLUTION SEND-TEST]", err.response?.data || err.message);
+    return res.status(500).json({ message: "Error al enviar mensaje de prueba" });
+  }
+});
+
+// POST /api/evolution/send-message  { phone, message }
+app.post("/api/evolution/send-message", adminMiddleware, async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+    if (!phone || !message) return res.status(400).json({ message: "Se requieren teléfono y mensaje" });
+    const number = normalisePhone(phone);
+    await evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, { number, text: message });
+    return res.json({ data: { message: "Mensaje enviado", number } });
+  } catch (err) {
+    console.error("[EVOLUTION SEND-MSG]", err.response?.data || err.message);
+    return res.status(500).json({ message: "Error al enviar mensaje" });
+  }
+});
+
+// POST /api/evolution/notify-clients  { filter: "all"|"members"|"active", message }
+app.post("/api/evolution/notify-clients", adminMiddleware, async (req, res) => {
+  try {
+    const { filter = "all", message } = req.body;
+    if (!message) return res.status(400).json({ message: "El mensaje es requerido" });
+
+    let query;
+    if (filter === "members") {
+      query = `SELECT DISTINCT u.id, u.name, u.phone FROM users u
+               JOIN memberships m ON m.user_id = u.id
+               WHERE u.role = 'client' AND u.phone IS NOT NULL AND u.phone != ''
+               AND m.status = 'active'`;
+    } else if (filter === "active") {
+      query = `SELECT DISTINCT u.id, u.name, u.phone FROM users u
+               JOIN bookings b ON b.user_id = u.id
+               WHERE u.role = 'client' AND u.phone IS NOT NULL AND u.phone != ''
+               AND b.status IN ('confirmed','attended')
+               AND b.created_at > NOW() - INTERVAL '60 days'`;
+    } else {
+      query = `SELECT id, name, phone FROM users
+               WHERE role = 'client' AND phone IS NOT NULL AND phone != ''`;
+    }
+
+    const clients = (await pool.query(query)).rows;
+    if (!clients.length) return res.json({ data: { sent: 0, failed: 0, total: 0, message: "No hay clientes con teléfono registrado" } });
+
+    let sent = 0;
+    let failed = 0;
+    const errors = [];
+
+    for (const client of clients) {
+      try {
+        const number = normalisePhone(client.phone);
+        await evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, { number, text: message });
+        sent++;
+        // Small delay to avoid rate-limiting
+        await new Promise((r) => setTimeout(r, 300));
+      } catch (sendErr) {
+        failed++;
+        errors.push({ name: client.name, phone: client.phone, error: sendErr.response?.data?.message || sendErr.message });
+      }
+    }
+
+    return res.json({ data: { sent, failed, total: clients.length, errors: errors.slice(0, 10) } });
+  } catch (err) {
+    console.error("[EVOLUTION NOTIFY-CLIENTS]", err.response?.data || err.message);
+    return res.status(500).json({ message: "Error al enviar notificaciones" });
+  }
 });
 
 // ─── Videos purchases approve/reject ────────────────────────────────────────
@@ -2416,7 +2614,7 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
       [name, description || null, price, currency || "MXN", durationDays || 30, classLimit ?? null, features || null, isActive !== false, sortOrder || 0, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
-    return res.json({ data: r.rows[0] });
+    return res.json({ data: camelRow(r.rows[0]) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -2442,7 +2640,7 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [name, description || null, price || 0, currency, durationDays, classLimit ?? null, features || null, isActive, sortOrder]
     );
-    return res.status(201).json({ data: r.rows[0] });
+    return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
