@@ -39,6 +39,15 @@ const Login = () => {
     clearError();
     try {
       await login(data);
+      // Navigate immediately after login resolves, reading fresh state
+      const { user: authedUser } = useAuthStore.getState();
+      const returnUrl = params.get("returnUrl");
+      if (returnUrl) { navigate(returnUrl, { replace: true }); return; }
+      if (["admin", "super_admin", "instructor", "reception"].includes(authedUser?.role ?? "")) {
+        navigate("/admin/dashboard", { replace: true });
+      } else {
+        navigate("/app", { replace: true });
+      }
     } catch {
       toast({ title: "Error al iniciar sesión", description: error ?? "Verifica tus credenciales", variant: "destructive" });
     }

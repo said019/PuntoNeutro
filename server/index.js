@@ -212,19 +212,19 @@ async function authMiddleware(req, res, next) {
 function mapUser(u) {
   return {
     id: u.id,
-    displayName: u.display_name,
+    display_name: u.display_name,
     email: u.email,
     phone: u.phone,
     role: u.role,
-    photoUrl: u.photo_url ?? null,
-    dateOfBirth: u.date_of_birth ?? null,
-    emergencyContactName: u.emergency_contact_name ?? null,
-    emergencyContactPhone: u.emergency_contact_phone ?? null,
-    healthNotes: u.health_notes ?? null,
-    receiveReminders: u.receive_reminders ?? true,
-    receivePromotions: u.receive_promotions ?? false,
-    receiveWeeklySummary: u.receive_weekly_summary ?? false,
-    createdAt: u.created_at,
+    photo_url: u.photo_url ?? null,
+    date_of_birth: u.date_of_birth ?? null,
+    emergency_contact_name: u.emergency_contact_name ?? null,
+    emergency_contact_phone: u.emergency_contact_phone ?? null,
+    health_notes: u.health_notes ?? null,
+    receive_reminders: u.receive_reminders ?? true,
+    receive_promotions: u.receive_promotions ?? false,
+    receive_weekly_summary: u.receive_weekly_summary ?? false,
+    created_at: u.created_at,
   };
 }
 
