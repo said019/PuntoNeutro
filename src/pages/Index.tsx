@@ -8,6 +8,7 @@ import ophelia31 from "@/assets/ophelia-31.jpg";
 import ophelia32 from "@/assets/ophelia-32.jpg";
 import ophelia38 from "@/assets/ophelia-38.jpg";
 import ophelia50 from "@/assets/ophelia-50.jpg";
+import opheliaLogo from "@/assets/ophelia-logo-full.png";
 
 type ClassTypeRow = {
   id: string;
@@ -46,9 +47,14 @@ type ScheduleSlot = {
 };
 
 const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
-  { id: "c1", name: "Jumping Basics", subtitle: "El punto de partida perfecto", description: "Aprende los fundamentos del jumping fitness con movimientos accesibles y musica motivadora.", category: "jumping", intensity: "ligera", color: "#E040FB", emoji: "🚀", level: "Principiante", duration_min: 50, capacity: 15, is_active: true, sort_order: 1 },
-  { id: "c2", name: "Power Jump", subtitle: "Lleva tu limite al siguiente nivel", description: "Coreografias dinamicas, intervalos HIIT y musica que no para. Para quienes ya dominan las bases.", category: "jumping", intensity: "pesada", color: "#CA71E1", emoji: "⚡", level: "Intermedio", duration_min: 55, capacity: 12, is_active: true, sort_order: 2 },
-  { id: "c3", name: "Jump & Stretch", subtitle: "Muevete y recuperate", description: "Combina jumping con yoga y stretching profundo. Ideal para relajar y ganar flexibilidad.", category: "mixto", intensity: "ligera", color: "#E7EB6E", emoji: "🌸", level: "Todos los niveles", duration_min: 60, capacity: 10, is_active: true, sort_order: 3 },
+  { id: "c1", name: "Jumping Fitness", subtitle: "Full Body", description: "Entrena todo el cuerpo en trampolín con coreografías dinámicas y música motivadora. Alta intensidad, bajo impacto.", category: "jumping", intensity: "media", color: "#E15CB8", emoji: "", level: "Todos los niveles", duration_min: 50, capacity: 10, is_active: true, sort_order: 1 },
+  { id: "c2", name: "Jumping Dance", subtitle: "Coreografías", description: "Combina el jumping con movimientos de danza. Divertido, enérgico y perfecto para liberar el estrés.", category: "jumping", intensity: "media", color: "#CA71E1", emoji: "", level: "Todos los niveles", duration_min: 50, capacity: 10, is_active: true, sort_order: 2 },
+  { id: "c3", name: "Jump & Tone", subtitle: "Tonificación y resistencia", description: "Tonificación y resistencia en tren superior del cuerpo. Usa el trampolín más accesorios de peso.", category: "mixto", intensity: "pesada", color: "#E7EB6E", emoji: "", level: "Intermedio", duration_min: 55, capacity: 10, is_active: true, sort_order: 3 },
+  { id: "c4", name: "Strong Jump", subtitle: "Fuerza y glúteo", description: "Fuerza y resistencia en pierna y glúteo. Resultados visibles desde las primeras sesiones.", category: "jumping", intensity: "pesada", color: "#E15CB8", emoji: "", level: "Intermedio", duration_min: 55, capacity: 10, is_active: true, sort_order: 4 },
+  { id: "c5", name: "Mindful Jump", subtitle: "Pilates en trampolín", description: "La calma del Pilates con la energía del jumping. Mejora postura, respiración y conciencia corporal.", category: "mixto", intensity: "ligera", color: "#CA71E1", emoji: "", level: "Todos los niveles", duration_min: 60, capacity: 10, is_active: true, sort_order: 5 },
+  { id: "c6", name: "Hot Pilates", subtitle: "Pesada", description: "Pilates de alta intensidad con accesorios. Fortalece el core y mejora la postura de manera efectiva.", category: "pilates", intensity: "pesada", color: "#E7EB6E", emoji: "", level: "Avanzado", duration_min: 55, capacity: 10, is_active: true, sort_order: 6 },
+  { id: "c7", name: "Flow Pilates", subtitle: "Media", description: "Secuencias fluidas de Pilates Mat que conectan movimiento y respiración. Ideal para todos los niveles.", category: "pilates", intensity: "media", color: "#E15CB8", emoji: "", level: "Todos los niveles", duration_min: 55, capacity: 10, is_active: true, sort_order: 7 },
+  { id: "c8", name: "Pilates Mat", subtitle: "Liger", description: "Fundamentos del Pilates en colchoneta. El mejor punto de partida para conocer este método.", category: "pilates", intensity: "ligera", color: "#CA71E1", emoji: "", level: "Principiante", duration_min: 50, capacity: 10, is_active: true, sort_order: 8 },
 ];
 
 const FALLBACK_PACKAGES: PackageRow[] = [
@@ -90,12 +96,6 @@ const FALLBACK_SCHEDULE: ScheduleSlot[] = [
 ];
 
 const DAYS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
-
-const LABEL_STYLE: Record<string, string> = {
-  JUMPING:  "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30",
-  PILATES:  "bg-pink-500/20 text-pink-300 border border-pink-500/30",
-  SORPRESA: "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30",
-};
 
 const TESTIMONIOS = [
   { name: "Karla M.", stars: 5, text: "Llevo 6 meses y no puedo parar! Baje 8 kg y me siento increible. El ambiente del studio es unico, las instructoras te motivan a dar lo mejor.", avatar: "KM" },
@@ -179,15 +179,16 @@ const Index = () => {
             : "bg-gradient-to-b from-background/95 to-transparent"
         }`}
       >
-        <a href="#" className="font-syne font-extrabold text-xl tracking-tight text-foreground">
-          Ophelia<span className="text-primary">.</span>
+        <a href="#" className="flex items-center">
+          <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-10 w-auto" />
         </a>
         <ul className="hidden lg:flex gap-8 list-none">
           {[
-            { label: "Clases",      id: "clases" },
+          { label: "Clases",      id: "clases" },
             { label: "Horario",     id: "horario" },
             { label: "Paquetes",    id: "membresias" },
             { label: "Instructoras",id: "instructoras" },
+            { label: "Políticas",   id: "politicas" },
             { label: "Contacto",    id: "contacto" },
           ].map((item) => (
             <li key={item.id}>
@@ -255,12 +256,10 @@ const Index = () => {
           </div>
           <div className="grid grid-cols-2 gap-4 mt-6">
             <div className="bg-secondary border border-border rounded-[18px] p-[22px] hover:border-primary hover:-translate-y-[3px] transition-all">
-              <div className="text-[1.6rem] mb-[10px]">🔥</div>
               <div className="font-syne text-[0.95rem] font-bold mb-1">800 kcal</div>
               <div className="text-[0.78rem] text-muted-foreground leading-[1.5]">Quema promedio por sesión de 50 min</div>
             </div>
             <div className="bg-secondary border border-border rounded-[18px] p-[22px] hover:border-primary hover:-translate-y-[3px] transition-all">
-              <div className="text-[1.6rem] mb-[10px]">⚡</div>
               <div className="font-syne text-[0.95rem] font-bold mb-1">Bajo impacto</div>
               <div className="text-[0.78rem] text-muted-foreground leading-[1.5]">Cuida tus articulaciones mientras entrenas fuerte</div>
             </div>
@@ -293,159 +292,191 @@ const Index = () => {
       </div>
 
       {/* ── BENEFITS ── */}
-      <section id="beneficios" className="py-20 lg:py-[120px] px-6 lg:px-[60px]">
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 lg:grid-cols-2 items-end gap-[60px] mb-20">
+      <section id="beneficios" className="py-16 lg:py-24 px-6 lg:px-[60px]">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 lg:grid-cols-2 items-end gap-10 mb-12">
           <div>
             <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
               <span className="w-[30px] h-[1px] bg-primary inline-block" />
               Por qué elegirnos
             </div>
-            <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
+            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
               BENEFICIOS QUE<br />TRANSFORMAN
             </h2>
           </div>
-          <p className="text-base leading-[1.8] text-muted-foreground pt-5">
+          <p className="text-[0.9rem] leading-[1.8] text-muted-foreground">
             El jumping fitness en trampolín no es solo un entrenamiento — es una experiencia completa. Activa tu cuerpo, mejora tu postura, fortalece tu sistema linfático y libera endorfinas desde el primer salto.
           </p>
         </div>
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[2px] bg-border rounded-[28px] overflow-hidden">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-border rounded-[24px] overflow-hidden">
           {[
-            { num: "01", icon: "💪", title: "Tonificación total", text: "Trabaja piernas, glúteos, abdomen y brazos en una sola sesión de alta intensidad y bajo impacto articular." },
-            { num: "02", icon: "🫀", title: "Cardio sin dolor", text: "El trampolín absorbe hasta el 80% del impacto. Tu corazón se fortalece mientras tus rodillas y cadera se protegen." },
-            { num: "03", icon: "🧠", title: "Bienestar mental", text: "Cada sesión libera serotonina y dopamina. Reduce el estrés, mejora el sueño y eleva tu estado de ánimo naturalmente." },
-            { num: "04", icon: "⚖️", title: "Control de peso", text: "Quema entre 600 y 1000 kcal por clase. Activa tu metabolismo hasta 24 horas después del entrenamiento." },
-            { num: "05", icon: "🦋", title: "Sistema linfático", text: "Los rebotes activan el drenaje linfático de forma natural, reduciendo la retención de líquidos y la celulitis." },
-            { num: "06", icon: "🏆", title: "Comunidad de élite", text: "Entrena rodeada de mujeres que se inspiran mutuamente. Nuestro ambiente motiva y celebra cada logro tuyo." },
+            { num: "01", title: "Tonificación total", text: "Piernas, glúteos, abdomen y brazos en una sola sesión de alta intensidad y bajo impacto articular." },
+            { num: "02", title: "Cardio sin dolor", text: "El trampolín absorbe hasta el 80% del impacto. Tu corazón se fortalece mientras cuidas rodillas y cadera." },
+            { num: "03", title: "Bienestar mental", text: "Cada sesión libera serotonina y dopamina. Reduce el estrés, mejora el sueño y eleva tu ánimo." },
+            { num: "04", title: "Control de peso", text: "Quema entre 600 y 1000 kcal por clase. Activa tu metabolismo hasta 24 horas después." },
+            { num: "05", title: "Sistema linfático", text: "Los rebotes activan el drenaje linfático natural, reduciendo retención de líquidos y celulitis." },
+            { num: "06", title: "Comunidad", text: "Entrena rodeada de mujeres que se inspiran mutuamente. Nuestro ambiente celebra cada logro." },
           ].map((b) => (
-            <div key={b.num} className="bg-background p-[44px_36px] relative overflow-hidden group hover:bg-secondary transition-colors">
-              <div className="absolute -bottom-[60px] -right-[60px] w-[150px] h-[150px] bg-[radial-gradient(circle,hsl(var(--primary)/0.1)_0%,transparent_70%)] rounded-full transition-transform duration-400 group-hover:scale-[2]" />
-              <div className="font-bebas text-[5rem] text-foreground/[0.06] leading-none -mb-[10px]">{b.num}</div>
-              <div className="text-[2rem] mb-[18px]">{b.icon}</div>
-              <div className="font-syne font-bold text-[1.15rem] mb-3 text-foreground">{b.title}</div>
-              <div className="text-[0.88rem] text-muted-foreground leading-[1.7]">{b.text}</div>
+            <div key={b.num} className="bg-background p-8 relative overflow-hidden group hover:bg-secondary transition-colors">
+              <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-[radial-gradient(circle,hsl(var(--primary)/0.1)_0%,transparent_70%)] rounded-full transition-transform duration-400 group-hover:scale-[2.5]" />
+              <div className="font-bebas text-[3.5rem] text-foreground/[0.06] leading-none -mb-2">{b.num}</div>
+              <div className="font-syne font-bold text-[1rem] mb-2 text-foreground">{b.title}</div>
+              <div className="text-[0.84rem] text-muted-foreground leading-[1.65]">{b.text}</div>
             </div>
           ))}
         </div>
       </section>
 
       {/* ── CLASSES ── */}
-      <section id="clases" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary">
+      <section id="clases" className="py-16 lg:py-24 px-6 lg:px-[60px] bg-secondary">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
             Oferta
           </div>
-          <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">NUESTRAS CLASES</h2>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
+            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">NUESTRAS CLASES</h2>
+            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
+              Cada semana cambian los tipos de clases, no los horarios. Siempre algo nuevo que descubrir.
+            </p>
+          </div>
         </div>
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-16">
-          {classTypes.slice(0, 6).map((c, i) => {
-            const imgs = [ophelia14, ophelia28, ophelia50, ophelia31, ophelia15, ophelia32];
-            const gradients = [
-              "from-[#1a0820] to-[#2d0a30]",
-              "from-[#0d1a20] to-[#0a2030]",
-              "from-[#1a1a0d] to-[#2a2010]",
-              "from-[#1a0820] to-[#2d0a30]",
-              "from-[#0d1a20] to-[#0a2030]",
-              "from-[#1a1a0d] to-[#2a2010]",
-            ];
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {classTypes.slice(0, 8).map((c) => {
+            const catColors: Record<string, string> = {
+              jumping: "border-[#E15CB8]/40 bg-[#E15CB8]/5",
+              pilates: "border-[#CA71E1]/40 bg-[#CA71E1]/5",
+              mixto:   "border-[#E7EB6E]/30 bg-[#E7EB6E]/5",
+            };
+            const catAccent: Record<string, string> = {
+              jumping: "text-[#E15CB8]",
+              pilates: "text-[#CA71E1]",
+              mixto:   "text-[#E7EB6E]",
+            };
+            const catTag: Record<string, string> = {
+              jumping: "bg-[#E15CB8]/15 text-[#E15CB8] border-[#E15CB8]/25",
+              pilates: "bg-[#CA71E1]/15 text-[#CA71E1] border-[#CA71E1]/25",
+              mixto:   "bg-[#E7EB6E]/10 text-[#E7EB6E] border-[#E7EB6E]/20",
+            };
             return (
-              <div key={c.id} className="rounded-3xl overflow-hidden bg-secondary border border-border hover:-translate-y-2 hover:border-primary transition-all group">
-                <div className="h-[220px] relative overflow-hidden">
-                  <img src={imgs[i % imgs.length]} alt={c.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
-                  <div className={`absolute inset-0 bg-gradient-to-br ${gradients[i % gradients.length]} opacity-60`} />
-                  <span className="absolute top-4 right-4 z-10 text-[0.65rem] tracking-widest uppercase px-3 py-[5px] rounded-full bg-primary/20 text-primary border border-primary/30">{c.level}</span>
-                  <span className="relative z-10 flex items-center justify-center h-full text-[4rem] drop-shadow-[0_0_30px_hsl(var(--primary)/0.5)]">{c.emoji}</span>
+              <div key={c.id} className={`rounded-2xl border p-6 flex flex-col gap-3 hover:-translate-y-1 transition-all ${catColors[c.category] ?? "border-border bg-background"}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-syne font-bold text-[1rem] text-foreground leading-tight">{c.name}</h3>
+                  <span className={`flex-shrink-0 text-[0.6rem] tracking-wider uppercase px-2 py-[3px] rounded-full border ${catTag[c.category] ?? ""}`}>
+                    {c.category}
+                  </span>
                 </div>
-                <div className="p-7">
-                  <h3 className="font-syne font-bold text-[1.1rem] mb-1">{c.name}</h3>
-                  {c.subtitle && <p className="text-xs text-primary mb-2">{c.subtitle}</p>}
-                  <p className="text-[0.84rem] text-muted-foreground leading-[1.6] mb-5">{c.description}</p>
-                  <div className="flex gap-4">
-                    {[["⏱", `${c.duration_min} min`], ["👥", `Max. ${c.capacity}`]].map(([icon, val]) => (
-                      <span key={val} className="text-[0.75rem] text-muted-foreground flex items-center gap-[6px]">
-                        {icon} <span className="text-foreground font-medium">{val}</span>
-                      </span>
-                    ))}
-                  </div>
+                {c.subtitle && (
+                  <p className={`text-[0.78rem] font-medium ${catAccent[c.category] ?? "text-primary"}`}>{c.subtitle}</p>
+                )}
+                <p className="text-[0.82rem] text-muted-foreground leading-[1.6] flex-1">{c.description}</p>
+                <div className="flex gap-4 pt-1 border-t border-white/[0.06]">
+                  <span className="text-[0.72rem] text-muted-foreground">{c.duration_min} min</span>
+                  <span className="text-[0.72rem] text-muted-foreground">Max. {c.capacity} personas</span>
+                  <span className={`text-[0.72rem] ml-auto font-medium ${catAccent[c.category] ?? ""}`}>{c.level}</span>
                 </div>
               </div>
             );
           })}
         </div>
+        <p className="text-[0.72rem] text-muted-foreground text-center mt-6 tracking-wide">
+          NOTA: CADA SEMANA CAMBIAN LOS TIPOS DE CLASES, NO LOS HORARIOS
+        </p>
       </section>
 
       {/* ── HORARIO ── */}
-      <section id="horario" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary">
+      <section id="horario" className="py-16 lg:py-24 px-6 lg:px-[60px]">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
             Disponibilidad
           </div>
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
-            <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-10">
+            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
               HORARIO<br />SEMANAL
             </h2>
             <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Clases de lunes a sabado. Elige el horario que mejor se adapte a tu dia y reserva tu lugar desde la app.
+              Clases de lunes a sábado. Reserva tu lugar desde la app con anticipación.
             </p>
           </div>
-          {/* Leyenda */}
+
+          {/* Legend */}
           <div className="flex flex-wrap gap-3 mb-8">
-            {(["JUMPING", "PILATES", "SORPRESA"] as const).map((label) => (
-              <span key={label} className={`text-[0.7rem] tracking-wider px-3 py-1 rounded-full font-medium ${LABEL_STYLE[label]}`}>{label}</span>
+            {([
+              { label: "JUMPING", bg: "bg-[#E15CB8]", border: "border-[#E15CB8]/50" },
+              { label: "PILATES", bg: "bg-[#CA71E1]", border: "border-[#CA71E1]/50" },
+              { label: "SORPRESA", bg: "bg-[#E7EB6E]", border: "border-[#E7EB6E]/50" },
+            ] as const).map(({ label, bg, border }) => (
+              <div key={label} className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${border} bg-white/[0.04]`}>
+                <span className={`w-2 h-2 rounded-full ${bg}`} />
+                <span className="text-[0.7rem] font-semibold tracking-wider text-foreground/80">{label}</span>
+              </div>
             ))}
           </div>
-          {/* Tabla desktop */}
+
+          {/* Desktop grid */}
           {(() => {
-            const times = [...new Set(schedule.map((s) => s.time_slot))].sort();
+            const CELL_STYLE: Record<string, string> = {
+              JUMPING:  "bg-[#E15CB8] text-white",
+              PILATES:  "bg-[#CA71E1] text-white",
+              SORPRESA: "bg-[#E7EB6E] text-[#1F0047]",
+            };
+            const times = [...new Set(schedule.map((s) => s.time_slot))].sort((a, b) => {
+              const toMin = (t: string) => {
+                const [h, rest] = t.replace("am","am").replace("pm","pm").split(/(?=[ap]m)/i);
+                const [hh, mm] = h.split(":").map(Number);
+                const pm = rest?.toLowerCase() === "pm";
+                return (pm && hh !== 12 ? hh + 12 : (!pm && hh === 12 ? 0 : hh)) * 60 + (mm || 0);
+              };
+              return toMin(a) - toMin(b);
+            });
             return (
               <>
-                <div className="hidden lg:block rounded-2xl overflow-hidden border border-border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-background/60">
-                        <th className="py-4 px-5 text-left text-[0.7rem] tracking-widest uppercase text-muted-foreground font-medium w-[90px]">Hora</th>
-                        {DAYS.map((d) => (
-                          <th key={d} className="py-4 px-3 text-[0.7rem] tracking-widest uppercase text-muted-foreground font-medium text-center">{d}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {times.map((time) => (
-                        <tr key={time} className="border-t border-border hover:bg-background/40 transition-colors">
-                          <td className="py-4 px-5 text-foreground font-medium text-[0.82rem] whitespace-nowrap">{time}</td>
-                          {[1, 2, 3, 4, 5, 6].map((day) => {
-                            const cell = schedule.find((s) => s.time_slot === time && s.day_of_week === day);
-                            return (
-                              <td key={day} className="py-3 px-3 text-center">
-                                {cell ? (
-                                  <span className={`inline-block text-[0.68rem] tracking-wide px-2 py-[5px] rounded-lg font-medium ${LABEL_STYLE[cell.class_label] ?? "bg-secondary text-foreground"}`}>
-                                    {cell.class_label}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground/20 text-[0.8rem]">—</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                {/* Desktop */}
+                <div className="hidden lg:block">
+                  <div className="grid grid-cols-[80px_repeat(6,1fr)] gap-2">
+                    {/* Header */}
+                    <div />
+                    {DAYS.map((d) => (
+                      <div key={d} className="text-center py-2.5 px-2 bg-secondary rounded-xl text-[0.72rem] font-semibold tracking-widest uppercase text-muted-foreground">{d}</div>
+                    ))}
+                    {/* Rows */}
+                    {times.map((time) => (
+                      <>
+                        <div key={`t-${time}`} className="flex items-center justify-end pr-2">
+                          <span className="text-[0.78rem] font-semibold text-foreground/70 whitespace-nowrap">{time}</span>
+                        </div>
+                        {[1, 2, 3, 4, 5, 6].map((day) => {
+                          const cell = schedule.find((s) => s.time_slot === time && s.day_of_week === day);
+                          return (
+                            <div key={`${time}-${day}`} className="rounded-xl overflow-hidden h-12">
+                              {cell ? (
+                                <div className={`h-full flex items-center justify-center text-[0.65rem] font-bold tracking-wider ${CELL_STYLE[cell.class_label] ?? "bg-secondary text-foreground"}`}>
+                                  {cell.class_label}
+                                </div>
+                              ) : (
+                                <div className="h-full bg-secondary/40 rounded-xl" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </>
+                    ))}
+                  </div>
                 </div>
-                {/* Cards mobile */}
+
+                {/* Mobile — time blocks */}
                 <div className="lg:hidden flex flex-col gap-3">
                   {times.map((time) => (
-                    <div key={time} className="rounded-xl border border-border bg-background/40 p-4">
-                      <div className="text-foreground font-semibold text-sm mb-3">{time}</div>
+                    <div key={time} className="rounded-2xl border border-border bg-secondary/40 p-4">
+                      <p className="text-[0.82rem] font-bold text-foreground mb-3">{time}</p>
                       <div className="flex flex-wrap gap-2">
                         {[1, 2, 3, 4, 5, 6].map((day) => {
                           const cell = schedule.find((s) => s.time_slot === time && s.day_of_week === day);
                           if (!cell) return null;
                           return (
-                            <div key={day} className="flex flex-col items-center gap-1">
-                              <span className="text-[0.6rem] text-muted-foreground">{DAYS[day - 1]}</span>
-                              <span className={`text-[0.65rem] px-2 py-[3px] rounded-md font-medium ${LABEL_STYLE[cell.class_label] ?? ""}`}>{cell.class_label}</span>
+                            <div key={day} className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[0.65rem] font-bold ${CELL_STYLE[cell.class_label] ?? ""}`}>
+                              <span className="text-[0.6rem] opacity-70">{DAYS[day - 1]}</span>
+                              <span>{cell.class_label}</span>
                             </div>
                           );
                         })}
@@ -456,6 +487,7 @@ const Index = () => {
               </>
             );
           })()}
+
           <div className="mt-8 text-center">
             <button
               onClick={() => navigate("/auth/register")}
@@ -469,48 +501,59 @@ const Index = () => {
       </section>
 
       {/* ── GALERÍA ── */}
-      <section id="galeria" className="py-20 lg:py-[120px] px-6 lg:px-[60px]">
+      <section id="galeria" className="py-16 lg:py-24 px-6 lg:px-[60px] bg-secondary">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
             Galería
           </div>
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
-            <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-10">
+            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
               VIVE LA<br />EXPERIENCIA
             </h2>
             <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Cada sesión es única. Capturamos los mejores momentos de nuestras alumnas en el studio.
+              Cada sesión es única. Capturamos los mejores momentos de nuestras alumnas.
             </p>
           </div>
-          {/* Masonry grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-[200px]">
-            {[
-              { src: ophelia31, span: "md:col-span-2 md:row-span-2", h: "h-full" },
-              { src: ophelia14, span: "", h: "h-full" },
-              { src: ophelia50, span: "", h: "h-full" },
-              { src: ophelia28, span: "md:row-span-2", h: "h-full" },
-              { src: ophelia15, span: "", h: "h-full" },
-              { src: ophelia38, span: "", h: "h-full" },
-              { src: ophelia32, span: "md:col-span-2", h: "h-full" },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className={`relative overflow-hidden rounded-2xl group cursor-pointer ${item.span}`}
-              >
-                <img
-                  src={item.src}
-                  alt={`Ophelia Studio ${i + 1}`}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
-                  <span className="text-[0.7rem] tracking-widest uppercase text-primary bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full">
-                    Ophelia Studio
-                  </span>
-                </div>
+          {/* Clean 3-col grid */}
+          <div className="grid grid-cols-3 gap-3">
+            {/* Col 1 — tall + small */}
+            <div className="flex flex-col gap-3">
+              <div className="relative overflow-hidden rounded-2xl aspect-[4/5] group">
+                <img src={ophelia31} alt="Ophelia Studio" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-            ))}
+              <div className="relative overflow-hidden rounded-2xl aspect-square group">
+                <img src={ophelia14} alt="Ophelia Studio" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </div>
+            {/* Col 2 — small + tall */}
+            <div className="flex flex-col gap-3">
+              <div className="relative overflow-hidden rounded-2xl aspect-square group">
+                <img src={ophelia50} alt="Ophelia Studio" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div className="relative overflow-hidden rounded-2xl aspect-[4/5] group">
+                <img src={ophelia28} alt="Ophelia Studio" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </div>
+            {/* Col 3 — even split */}
+            <div className="flex flex-col gap-3">
+              <div className="relative overflow-hidden rounded-2xl aspect-square group">
+                <img src={ophelia15} alt="Ophelia Studio" className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div className="relative overflow-hidden rounded-2xl aspect-square group">
+                <img src={ophelia38} alt="Ophelia Studio" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div className="relative overflow-hidden rounded-2xl aspect-[3/2] group">
+                <img src={ophelia32} alt="Ophelia Studio" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -617,42 +660,38 @@ const Index = () => {
       </section>
 
       {/* ── INSTRUCTORAS ── */}
-      <section id="instructoras" className="py-20 lg:py-[120px] px-6 lg:px-[60px]">
+      <section id="instructoras" className="py-16 lg:py-24 px-6 lg:px-[60px]">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
             El equipo
           </div>
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
-            <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground">
+            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
               NUESTRAS<br />INSTRUCTORAS
             </h2>
             <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
               Certificadas, apasionadas y dedicadas a que cada clase sea tu mejor versión.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
             {[
-              { name: "Fernanda G.", role: "Fundadora · Jumping & Pilates", exp: "8 años de experiencia", certs: "FISAF · FitJump · Pilates Mat", img: ophelia38, color: "from-primary/20" },
-              { name: "Valeria M.", role: "Instructora Senior · Power Jump", exp: "5 años de experiencia", certs: "FitJump · HIIT Certified", img: ophelia15, color: "from-[#CA71E1]/20" },
-              { name: "Camila R.", role: "Instructora · Jumping Basics", exp: "3 años de experiencia", certs: "FitJump · Stretching Pro", img: ophelia32, color: "from-[#E7EB6E]/20" },
+              { label: "Instructora 1", sub: "Jumping & Pilates" },
+              { label: "Instructora 2", sub: "Jumping & Pilates" },
             ].map((inst, i) => (
               <div key={i} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 hover:-translate-y-2 transition-all">
-                <div className="h-[280px] relative overflow-hidden">
-                  <img src={inst.img} alt={inst.name} className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500" />
-                  <div className={`absolute inset-0 bg-gradient-to-t ${inst.color} to-transparent`} />
-                </div>
-                <div className="p-7">
-                  <h3 className="font-syne font-bold text-[1.1rem] text-foreground mb-1">{inst.name}</h3>
-                  <p className="text-primary text-[0.78rem] tracking-wide font-medium mb-3">{inst.role}</p>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-muted-foreground text-[0.78rem] flex items-center gap-2">
-                      <span className="text-[0.9rem]">🏅</span>{inst.exp}
-                    </span>
-                    <span className="text-muted-foreground text-[0.78rem] flex items-center gap-2">
-                      <span className="text-[0.9rem]">📋</span>{inst.certs}
-                    </span>
+                {/* Photo placeholder */}
+                <div className="h-[260px] bg-gradient-to-br from-[#1F0047] to-[#2d0a40] flex items-center justify-center">
+                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#E15CB8]/30 to-[#CA71E1]/20 border-2 border-[#E15CB8]/30">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#E15CB8]/60">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
                   </div>
+                </div>
+                <div className="p-6">
+                  <h3 className="font-syne font-bold text-[1.05rem] text-foreground mb-1">{inst.label}</h3>
+                  <p className="text-primary text-[0.78rem] tracking-wide font-medium">{inst.sub}</p>
                 </div>
               </div>
             ))}
@@ -728,8 +767,63 @@ const Index = () => {
         </div>
       </section>
 
+      {/* ── POLÍTICAS ── */}
+      <section id="politicas" className="py-16 lg:py-24 px-6 lg:px-[60px] bg-secondary">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
+          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
+            <span className="w-[30px] h-[1px] bg-primary inline-block" />
+            Información importante
+          </div>
+          <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground mb-10">
+            POLÍTICAS DE CLASE
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              {
+                num: "01", title: "Puntualidad",
+                text: "Tienes 5 minutos de tolerancia. Una vez iniciada la canción no podremos permitir el ingreso por seguridad y respeto al grupo.",
+              },
+              {
+                num: "02", title: "Reservación",
+                text: "Todas las clases requieren reservación previa. Cupo limitado a 10 lugares. Tu lugar queda confirmado desde la app.",
+              },
+              {
+                num: "03", title: "Cancelaciones",
+                text: "Con mínimo 2 horas de anticipación. Cancelaciones tardías o inasistencias sin aviso generarán pérdida de clase.",
+              },
+              {
+                num: "04", title: "Pagos",
+                text: "Los paquetes deben liquidarse antes o el mismo día. No son transferibles ni reembolsables. Vigencia de 30 días.",
+              },
+              {
+                num: "05", title: "Salud",
+                text: "Si estás embarazada, en postparto o tienes lesión, notifícalo antes. Cada alumna es responsable de su condición física.",
+              },
+              {
+                num: "06", title: "Vestimenta",
+                text: "Ropa deportiva cómoda. Tenis deportivos obligatorios para Jumping. Calcetas antideslizantes para Pilates.",
+              },
+              {
+                num: "07", title: "Celular",
+                text: "Celular en silencio durante la clase. No lo traigas al Mat. Si necesitas usarlo, sal de la clase.",
+              },
+              {
+                num: "08", title: "Artículos",
+                text: "Todos los artículos en los lockers. No lleves nada al mat. El agua también va en locker para evitar accidentes.",
+              },
+            ].map((p) => (
+              <div key={p.num} className="rounded-2xl border border-border bg-background p-5 hover:border-primary/30 transition-all">
+                <div className="font-bebas text-[2.5rem] text-foreground/[0.07] leading-none -mb-1">{p.num}</div>
+                <h4 className="font-syne font-bold text-[0.92rem] text-foreground mb-2">{p.title}</h4>
+                <p className="text-[0.8rem] text-muted-foreground leading-[1.65]">{p.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA ── */}
-      <section id="contacto" className="py-20 lg:py-[120px] px-6 lg:px-[60px] text-center relative overflow-hidden">
+      <section id="contacto" className="py-16 lg:py-24 px-6 lg:px-[60px] text-center relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.12)_0%,transparent_60%)] pointer-events-none" />
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700 relative z-10">
           <div className="text-primary text-[0.8rem] tracking-[0.15em] uppercase mb-6">¿Lista para transformarte?</div>
@@ -755,24 +849,37 @@ const Index = () => {
               rel="noopener noreferrer"
               className="border border-border text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-3 px-8 py-[18px] rounded-full opacity-70 hover:opacity-100 hover:border-primary transition-all no-underline"
             >
-              <span className="text-[1.1rem]">📱</span>
               WhatsApp
             </a>
           </div>
+
           {/* Datos de contacto */}
-          <div className="flex flex-wrap justify-center gap-8 border-t border-border pt-12">
+          <div className="flex flex-wrap justify-center gap-10 border-t border-border pt-12 mb-12">
             {[
-              { icon: "📍", label: "Ubicación", value: "San Juan del Río, Querétaro" },
-              { icon: "📞", label: "Teléfono", value: "+52 442 123 4567" },
-              { icon: "✉️", label: "Email", value: "info@opheliajumping.mx" },
-              { icon: "🕐", label: "Horarios", value: "Lun–Vie 6am–9pm · Sáb 7am–2pm" },
+              { label: "Ubicación", value: "San Juan del Río, Querétaro" },
+              { label: "Teléfono", value: "+52 442 123 4567" },
+              { label: "Email", value: "info@opheliajumping.mx" },
+              { label: "Horarios", value: "Lun–Vie 6am–9pm · Sáb 7am–2pm" },
             ].map((c) => (
               <div key={c.label} className="text-center">
-                <div className="text-[1.6rem] mb-2">{c.icon}</div>
                 <div className="text-[0.65rem] tracking-widest uppercase text-muted-foreground mb-1">{c.label}</div>
                 <div className="text-[0.85rem] text-foreground">{c.value}</div>
               </div>
             ))}
+          </div>
+
+          {/* Google Maps */}
+          <div className="rounded-2xl overflow-hidden border border-border max-w-3xl mx-auto">
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3739.577714731379!2d-99.99482528857814!3d20.40029408101758!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d30d002e88643b%3A0xb7eed5074cefa672!2sOphelia%20Jumping%20Studio!5e0!3m2!1ses-419!2smx!4v1772066339529!5m2!1ses-419!2smx"
+              width="100%"
+              height="340"
+              style={{ border: 0, display: "block" }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title="Ophelia Jumping Studio ubicación"
+            />
           </div>
         </div>
       </section>
@@ -780,10 +887,10 @@ const Index = () => {
       {/* ── FOOTER ── */}
       <footer className="bg-secondary px-6 lg:px-[60px] pt-[60px] border-t border-border">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 pb-10">
-          <div>
-            <h3 className="font-syne font-extrabold text-[1.4rem] mb-3 text-foreground">
-              Ophelia<span className="text-primary">.</span>
-            </h3>
+        <div>
+            <div className="mb-3">
+              <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-12 w-auto" />
+            </div>
             <p className="text-[0.82rem] text-muted-foreground leading-[1.7] max-w-[200px]">
               El jumping studio que eleva tu cuerpo y transforma tu vida, salto a salto.
             </p>
@@ -796,7 +903,7 @@ const Index = () => {
           <div>
             <div className="text-[0.72rem] tracking-widest uppercase text-muted-foreground mb-5">Estudio</div>
             <ul className="flex flex-col gap-[10px] list-none">
-              {[["Clases", "clases"], ["Horario", "horario"], ["Paquetes", "membresias"], ["Instructoras", "instructoras"]].map(([label, id]) => (
+              {[["Clases", "clases"], ["Horario", "horario"], ["Paquetes", "membresias"], ["Instructoras", "instructoras"], ["Políticas", "politicas"]].map(([label, id]) => (
                 <li key={id}>
                   <button onClick={() => scrollTo(id)} className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none cursor-pointer p-0">
                     {label}
