@@ -54,9 +54,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-4 py-5 border-b border-border">
+        <div className="flex items-center justify-between px-4 py-6 border-b border-border">
           {!collapsed && (
-            <img src={opheliaLogo} alt="Ophelia" className="h-12 w-auto object-contain" />
+            <img src={opheliaLogo} alt="Ophelia" className="h-20 w-full object-contain" />
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}

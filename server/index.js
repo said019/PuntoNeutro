@@ -154,18 +154,16 @@ async function ensureSchema() {
       );
       CREATE INDEX IF NOT EXISTS idx_packages_category ON packages(category);
     `);
-    // ── Seed class_types – replace old placeholders with real Ophelia types ──
-    const ctCount = await pool.query("SELECT COUNT(*) FROM class_types");
-    const hasOldSeed = await pool.query("SELECT 1 FROM class_types WHERE name = 'Jumping Basics' LIMIT 1");
-    if (parseInt(ctCount.rows[0].count) === 0 || hasOldSeed.rows.length > 0) {
-      // Delete old placeholder classes if present
-      if (hasOldSeed.rows.length > 0) {
-        await pool.query("DELETE FROM class_types WHERE name IN ('Jumping Basics','Power Jump','Jump & Stretch')");
-      }
+    // ── Seed class_types – ensure 8 real Ophelia types exist ──────────────
+    const hasOpheliaTypes = await pool.query("SELECT 1 FROM class_types WHERE name = 'Jumping Fitness' LIMIT 1");
+    if (hasOpheliaTypes.rows.length === 0) {
+      // Remove any old / placeholder class types
+      const opheliaNames = ['Jumping Fitness','Jumping Dance','Jump & Tone','Strong Jump','Mindful Jump','Hot Pilates','Flow Pilates','Pilates Mat'];
+      await pool.query("DELETE FROM class_types WHERE name != ALL($1::text[])", [opheliaNames]);
       await pool.query(`
         INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order, is_active) VALUES
           ('Jumping Fitness',  'Full Body',                 'Clase de jumping fitness de cuerpo completo con música motivadora.',                        'jumping',  'Alta',   'Todos los niveles', 50, 10, '#E15CB8', '🏋️', 1, true),
-          ('Jumping Dance',    'Coreografías',              'Coreografías dinámicas sobre el trampolín con ritmos contagiosos.',                         'jumping',  'Media',  'Todos los niveles', 50, 10, '#CA71E1', '�', 2, true),
+          ('Jumping Dance',    'Coreografías',              'Coreografías dinámicas sobre el trampolín con ritmos contagiosos.',                         'jumping',  'Media',  'Todos los niveles', 50, 10, '#CA71E1', '💃', 2, true),
           ('Jump & Tone',      'Tonificación y resistencia','Combina jumping con ejercicios de tonificación y resistencia muscular.',                    'jumping',  'Alta',   'Intermedio',        55, 10, '#E7EB6E', '💪', 3, true),
           ('Strong Jump',      'Fuerza y glúteo',           'Enfocada en fuerza de tren inferior y glúteo con intervalos de alta intensidad.',           'jumping',  'Alta',   'Intermedio',        55, 10, '#E15CB8', '🔥', 4, true),
           ('Mindful Jump',     'Pilates en trampolín',      'Pilates sobre trampolín para mejorar equilibrio, flexibilidad y conciencia corporal.',      'jumping',  'Baja',   'Todos los niveles', 60, 10, '#CA71E1', '🧘', 5, true),
@@ -174,6 +172,7 @@ async function ensureSchema() {
           ('Pilates Mat',      'Ligera',                    'Pilates en mat de baja intensidad enfocado en técnica y control corporal.',                 'pilates',  'Baja',   'Principiante',      50, 10, '#CA71E1', '🌸', 8, true)
         ON CONFLICT DO NOTHING;
       `);
+      console.log("✅ Seeded 8 Ophelia class types");
     }
     // ── Seed schedule_slots si la tabla está vacía ─────────────────────────
     const ssCount = await pool.query("SELECT COUNT(*) FROM schedule_slots");
