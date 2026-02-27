@@ -156,6 +156,7 @@ const MembershipTable = ({ status, title }: { status?: string; title: string }) 
                 );
               })
             }
+          </TableBody>
         </Table>
       </div>
     </div>
