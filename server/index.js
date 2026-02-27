@@ -2765,9 +2765,20 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
 // DELETE /api/plans/:id
 app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
   try {
-    await pool.query("DELETE FROM plans WHERE id = $1", [req.params.id]);
+    // Try hard-delete first; if FK constraint, soft-delete
+    try {
+      await pool.query("DELETE FROM plans WHERE id = $1", [req.params.id]);
+    } catch (delErr) {
+      if (delErr.code === '23503') {
+        // Foreign key violation — soft delete
+        await pool.query("UPDATE plans SET is_active = false, updated_at = NOW() WHERE id = $1", [req.params.id]);
+        return res.json({ message: "Plan desactivado (tiene registros asociados)" });
+      }
+      throw delErr;
+    }
     return res.json({ message: "Plan eliminado" });
   } catch (err) {
+    console.error("[DELETE /plans]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });

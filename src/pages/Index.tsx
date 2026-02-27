@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
+import Schedule from "@/components/Schedule";
 import ophelia14 from "@/assets/ophelia-14.jpg";
 import ophelia15 from "@/assets/ophelia-15.jpg";
 import ophelia28 from "@/assets/ophelia-28.jpg";
@@ -38,15 +39,6 @@ type PackageRow = {
   sort_order: number;
 };
 
-type ScheduleSlot = {
-  id: string;
-  time_slot: string;
-  day_of_week: number;
-  class_label: "JUMPING" | "PILATES" | "SORPRESA";
-  shift: "morning" | "evening";
-  is_active: boolean;
-};
-
 const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
   { id: "c1", name: "Jumping Fitness", subtitle: "Full Body", description: "Entrena todo el cuerpo en trampolín con coreografías dinámicas y música motivadora. Alta intensidad, bajo impacto.", category: "jumping", intensity: "media", color: "#E15CB8", emoji: "", level: "Todos los niveles", duration_min: 50, capacity: 10, is_active: true, sort_order: 1 },
   { id: "c2", name: "Jumping Dance", subtitle: "Coreografías", description: "Combina el jumping con movimientos de danza. Divertido, enérgico y perfecto para liberar el estrés.", category: "jumping", intensity: "media", color: "#CA71E1", emoji: "", level: "Todos los niveles", duration_min: 50, capacity: 10, is_active: true, sort_order: 2 },
@@ -80,51 +72,6 @@ const FALLBACK_PACKAGES: PackageRow[] = [
   { id: "p16", name: "Ilimitado Mixto",       num_classes: "ILIMITADO", price: 1000, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 5 },
 ];
 
-const FALLBACK_SCHEDULE: ScheduleSlot[] = [
-  { id: "s1",  time_slot: "7:00am",  day_of_week: 1, class_label: "JUMPING",  shift: "morning", is_active: true },
-  { id: "s2",  time_slot: "7:00am",  day_of_week: 2, class_label: "PILATES",  shift: "morning", is_active: true },
-  { id: "s3",  time_slot: "7:00am",  day_of_week: 3, class_label: "JUMPING",  shift: "morning", is_active: true },
-  { id: "s4",  time_slot: "7:00am",  day_of_week: 4, class_label: "PILATES",  shift: "morning", is_active: true },
-  { id: "s5",  time_slot: "7:00am",  day_of_week: 5, class_label: "SORPRESA", shift: "morning", is_active: true },
-  { id: "s6",  time_slot: "9:00am",  day_of_week: 1, class_label: "PILATES",  shift: "morning", is_active: true },
-  { id: "s7",  time_slot: "9:00am",  day_of_week: 2, class_label: "JUMPING",  shift: "morning", is_active: true },
-  { id: "s8",  time_slot: "9:00am",  day_of_week: 3, class_label: "PILATES",  shift: "morning", is_active: true },
-  { id: "s9",  time_slot: "9:00am",  day_of_week: 4, class_label: "JUMPING",  shift: "morning", is_active: true },
-  { id: "s10", time_slot: "9:00am",  day_of_week: 6, class_label: "JUMPING",  shift: "morning", is_active: true },
-  { id: "s11", time_slot: "6:00pm",  day_of_week: 1, class_label: "JUMPING",  shift: "evening", is_active: true },
-  { id: "s12", time_slot: "6:00pm",  day_of_week: 2, class_label: "PILATES",  shift: "evening", is_active: true },
-  { id: "s13", time_slot: "6:00pm",  day_of_week: 3, class_label: "JUMPING",  shift: "evening", is_active: true },
-  { id: "s14", time_slot: "6:00pm",  day_of_week: 4, class_label: "PILATES",  shift: "evening", is_active: true },
-  { id: "s15", time_slot: "6:00pm",  day_of_week: 5, class_label: "JUMPING",  shift: "evening", is_active: true },
-  { id: "s16", time_slot: "7:30pm",  day_of_week: 1, class_label: "PILATES",  shift: "evening", is_active: true },
-  { id: "s17", time_slot: "7:30pm",  day_of_week: 2, class_label: "JUMPING",  shift: "evening", is_active: true },
-  { id: "s18", time_slot: "7:30pm",  day_of_week: 3, class_label: "SORPRESA", shift: "evening", is_active: true },
-  { id: "s19", time_slot: "7:30pm",  day_of_week: 4, class_label: "JUMPING",  shift: "evening", is_active: true },
-  { id: "s20", time_slot: "7:30pm",  day_of_week: 5, class_label: "PILATES",  shift: "evening", is_active: true },
-];
-
-const DAYS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
-
-/** Returns e.g. "Semana del 23 al 28 de febrero · 2026" in CDMX time */
-function getCDMXWeekLabel(): string {
-  // Get today in CDMX timezone (UTC-6 / UTC-5 DST — use Intl for accuracy)
-  const nowCDMX = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City" })
-  );
-  const day = nowCDMX.getDay(); // 0=Sun
-  // Monday = start of week
-  const diffToMon = day === 0 ? -6 : 1 - day;
-  const diffToSat = day === 0 ? 0 : 6 - day;
-  const mon = new Date(nowCDMX); mon.setDate(nowCDMX.getDate() + diffToMon);
-  const sat = new Date(nowCDMX); sat.setDate(nowCDMX.getDate() + diffToSat);
-  const MONTHS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-  const monStr = `${mon.getDate()} de ${MONTHS[mon.getMonth()]}`;
-  const satStr = mon.getMonth() === sat.getMonth()
-    ? `${sat.getDate()} de ${MONTHS[sat.getMonth()]}`
-    : `${sat.getDate()} de ${MONTHS[sat.getMonth()]}`;
-  return `Semana del ${monStr} al ${satStr} · ${sat.getFullYear()}`;
-}
-
 const TESTIMONIOS = [
   { name: "Karla M.", stars: 5, text: "Llevo 6 meses y no puedo parar! Baje 8 kg y me siento increible. El ambiente del studio es unico, las instructoras te motivan a dar lo mejor.", avatar: "KM" },
   { name: "Sofia R.", stars: 5, text: "Empece sin forma fisica y ahora hago Power Jump sin problema. La comunidad de Ophelia es lo mejor, todas nos apoyamos.", avatar: "SR" },
@@ -138,7 +85,6 @@ const Index = () => {
   const [navScrolled, setNavScrolled] = useState(false);
   const [classTypes, setClassTypes] = useState<ClassTypeRow[]>(FALLBACK_CLASS_TYPES);
   const [packages, setPackages] = useState<PackageRow[]>(FALLBACK_PACKAGES);
-  const [schedule, setSchedule] = useState<ScheduleSlot[]>(FALLBACK_SCHEDULE);
   const [activePkgTab, setActivePkgTab] = useState<"jumping" | "pilates" | "mixtos">("jumping");
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const navigate = useNavigate();
@@ -161,13 +107,6 @@ const Index = () => {
     api.get<{ data: PackageRow[] }>("/packages").then(({ data }) => {
       const rows = Array.isArray(data?.data) ? data.data : [];
       if (rows.length > 0) setPackages(rows);
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    api.get<{ data: ScheduleSlot[] }>("/admin/schedule").then(({ data }) => {
-      const rows = Array.isArray(data?.data) ? data.data.filter((s) => s.is_active) : [];
-      if (rows.length > 0) setSchedule(rows);
     }).catch(() => {});
   }, []);
 
@@ -432,130 +371,8 @@ const Index = () => {
         </p>
       </section>
 
-      {/* ── HORARIO ── */}
-      <section id="horario" className="py-16 lg:py-24 px-6 lg:px-[60px]">
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
-          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
-            <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Disponibilidad
-          </div>
-          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-12">
-            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
-              HORARIO<br />SEMANAL
-            </h2>
-            <div className="rounded-3xl border-2 border-primary/40 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 lg:p-8 lg:min-w-[380px]">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="w-3 h-3 rounded-full bg-primary animate-pulse flex-shrink-0" />
-                <span className="font-bebas text-[clamp(1.3rem,2vw,1.8rem)] text-primary tracking-wide leading-tight">
-                  {getCDMXWeekLabel()}
-                </span>
-              </div>
-              <p className="text-[0.9rem] text-muted-foreground leading-[1.7]">
-                Clases de lunes a sábado. Reserva tu lugar desde la app con anticipación.
-              </p>
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div className="flex flex-wrap gap-3 mb-8">
-            {([
-              { label: "JUMPING", bg: "bg-[#E15CB8]", border: "border-[#E15CB8]/50" },
-              { label: "PILATES", bg: "bg-[#CA71E1]", border: "border-[#CA71E1]/50" },
-              { label: "SORPRESA", bg: "bg-[#E7EB6E]", border: "border-[#E7EB6E]/50" },
-            ] as const).map(({ label, bg, border }) => (
-              <div key={label} className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${border} bg-white/[0.04]`}>
-                <span className={`w-2 h-2 rounded-full ${bg}`} />
-                <span className="text-[0.7rem] font-semibold tracking-wider text-foreground/80">{label}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop grid */}
-          {(() => {
-            const CELL_STYLE: Record<string, string> = {
-              JUMPING:  "bg-[#E15CB8] text-white",
-              PILATES:  "bg-[#CA71E1] text-white",
-              SORPRESA: "bg-[#E7EB6E] text-[#1F0047]",
-            };
-            const times = [...new Set(schedule.map((s) => s.time_slot))].sort((a, b) => {
-              const toMin = (t: string) => {
-                const [h, rest] = t.replace("am","am").replace("pm","pm").split(/(?=[ap]m)/i);
-                const [hh, mm] = h.split(":").map(Number);
-                const pm = rest?.toLowerCase() === "pm";
-                return (pm && hh !== 12 ? hh + 12 : (!pm && hh === 12 ? 0 : hh)) * 60 + (mm || 0);
-              };
-              return toMin(a) - toMin(b);
-            });
-            return (
-              <>
-                {/* Desktop */}
-                <div className="hidden lg:block">
-                  <div className="grid grid-cols-[90px_repeat(6,1fr)] gap-2">
-                    {/* Header */}
-                    <div />
-                    {DAYS.map((d) => (
-                      <div key={d} className="text-center py-3 px-2 bg-secondary rounded-xl text-[0.8rem] font-bold tracking-widest uppercase text-muted-foreground">{d}</div>
-                    ))}
-                    {/* Rows */}
-                    {times.map((time) => (
-                      <>
-                        <div key={`t-${time}`} className="flex items-center justify-end pr-3">
-                          <span className="text-[0.88rem] font-bold text-foreground/80 whitespace-nowrap">{time}</span>
-                        </div>
-                        {[1, 2, 3, 4, 5, 6].map((day) => {
-                          const cell = schedule.find((s) => s.time_slot === time && s.day_of_week === day);
-                          return (
-                            <div key={`${time}-${day}`} className="rounded-xl overflow-hidden h-14">
-                              {cell ? (
-                                <div className={`h-full flex items-center justify-center text-[0.75rem] font-bold tracking-wider ${CELL_STYLE[cell.class_label] ?? "bg-secondary text-foreground"}`}>
-                                  {cell.class_label}
-                                </div>
-                              ) : (
-                                <div className="h-full bg-secondary/40 rounded-xl" />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Mobile — time blocks */}
-                <div className="lg:hidden flex flex-col gap-3">
-                  {times.map((time) => (
-                    <div key={time} className="rounded-2xl border border-border bg-secondary/40 p-4">
-                      <p className="text-[0.82rem] font-bold text-foreground mb-3">{time}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[1, 2, 3, 4, 5, 6].map((day) => {
-                          const cell = schedule.find((s) => s.time_slot === time && s.day_of_week === day);
-                          if (!cell) return null;
-                          return (
-                            <div key={day} className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[0.65rem] font-bold ${CELL_STYLE[cell.class_label] ?? ""}`}>
-                              <span className="text-[0.6rem] opacity-70">{DAYS[day - 1]}</span>
-                              <span>{cell.class_label}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            );
-          })()}
-
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => navigate("/auth/register")}
-              className="bg-primary text-primary-foreground px-8 py-4 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:-translate-y-1 hover:shadow-[0_15px_40px_hsl(var(--primary)/0.35)] transition-all inline-flex items-center gap-2"
-            >
-              Reservar mi lugar
-              <span className="text-[0.7rem]">↗</span>
-            </button>
-          </div>
-        </div>
-      </section>
+      {/* ── HORARIO — calendario dinámico ── */}
+      <Schedule />
 
       {/* ── GALERÍA ── */}
       <section id="galeria" className="py-16 lg:py-24 px-6 lg:px-[60px] bg-secondary">
@@ -901,11 +718,11 @@ const Index = () => {
               },
               {
                 num: "03", title: "Cancelaciones",
-                text: "Con mínimo 2 horas de anticipación. Cancelaciones tardías o inasistencias sin aviso generarán pérdida de clase.",
+                text: "Puedes cancelar hasta 2 horas antes de tu clase y se te devuelve el crédito automáticamente. Solo puedes cancelar un máximo de 2 veces. Después de ese límite o pasadas las 2 horas, se pierde la clase.",
               },
               {
                 num: "04", title: "Pagos",
-                text: "Los paquetes deben liquidarse antes o el mismo día. No son transferibles ni reembolsables. Vigencia de 30 días.",
+                text: "Los pagos se realizan por transferencia bancaria a: Montserrath Cornejo Ramírez · BBVA · CLABE: 012 180 01578244526 8. Envía tu comprobante por WhatsApp para activar tu paquete.",
               },
               {
                 num: "05", title: "Salud",
