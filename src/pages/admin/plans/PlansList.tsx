@@ -30,7 +30,7 @@ const planSchema = z.object({
   price: z.coerce.number().min(0),
   currency: z.string().default("MXN"),
   durationDays: z.coerce.number().min(1),
-  classLimit: z.coerce.number().nullable(),
+  classLimit: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().nullable()),
   features: z.string().optional(),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().default(0),
@@ -48,6 +48,26 @@ const EMPTY: PlanFormData = {
   isActive: true, sortOrder: 0,
 };
 
+/** Convert comma-string features → array for the API */
+function serializePlan(d: PlanFormData) {
+  return {
+    ...d,
+    features: d.features
+      ? d.features.split(",").map((s) => s.trim()).filter(Boolean)
+      : [],
+  };
+}
+
+/** Normalize a plan from the API so it works in the form */
+function normalizePlan(p: Plan): PlanFormData {
+  return {
+    ...p,
+    features: Array.isArray(p.features)
+      ? (p.features as unknown as string[]).join(", ")
+      : (p.features as unknown as string) ?? "",
+  };
+}
+
 const PlansList = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -63,12 +83,12 @@ const PlansList = () => {
   const form = useForm<PlanFormData>({ resolver: zodResolver(planSchema), defaultValues: EMPTY });
 
   const createMutation = useMutation({
-    mutationFn: (d: PlanFormData) => api.post("/plans", d),
+    mutationFn: (d: PlanFormData) => api.post("/plans", serializePlan(d)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); toast({ title: "Plan creado" }); closeDialog(); },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: Plan) => api.put(`/plans/${id}`, d),
+    mutationFn: ({ id, ...d }: Plan) => api.put(`/plans/${id}`, serializePlan(d)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); toast({ title: "Plan actualizado" }); closeDialog(); },
   });
 
@@ -78,7 +98,7 @@ const PlansList = () => {
   });
 
   const openCreate = () => { form.reset(EMPTY); setEditing(null); setOpen(true); };
-  const openEdit = (p: Plan) => { form.reset(p); setEditing(p); setOpen(true); };
+  const openEdit = (p: Plan) => { form.reset(normalizePlan(p)); setEditing(p); setOpen(true); };
   const closeDialog = () => { setOpen(false); setEditing(null); };
 
   const onSubmit = (d: PlanFormData) => {
@@ -117,7 +137,7 @@ const PlansList = () => {
                       <TableCell className="font-medium">{p.name}</TableCell>
                       <TableCell>${p.price} {p.currency}</TableCell>
                       <TableCell>{p.durationDays} días</TableCell>
-                      <TableCell>{p.classLimit ?? "Ilimitado"}</TableCell>
+                      <TableCell>{p.classLimit == null ? "Ilimitado" : p.classLimit === 0 ? "0" : p.classLimit}</TableCell>
                       <TableCell>
                         <Badge variant={p.isActive ? "default" : "secondary"}>
                           {p.isActive ? "Activo" : "Inactivo"}

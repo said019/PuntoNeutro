@@ -2607,15 +2607,22 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
 app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
   try {
     const { name, description, price, currency, durationDays, classLimit, features, isActive, sortOrder } = req.body;
+    // features can be array or comma-string — always store as jsonb array
+    const featuresArr = Array.isArray(features)
+      ? features
+      : typeof features === "string" && features.trim()
+        ? features.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
     const r = await pool.query(
       `UPDATE plans SET name=$1, description=$2, price=$3, currency=$4, duration_days=$5,
        class_limit=$6, features=$7, is_active=$8, sort_order=$9, updated_at=NOW()
        WHERE id=$10 RETURNING *`,
-      [name, description || null, price, currency || "MXN", durationDays || 30, classLimit ?? null, features || null, isActive !== false, sortOrder || 0, req.params.id]
+      [name, description || null, price, currency || "MXN", durationDays || 30, classLimit ?? null, JSON.stringify(featuresArr), isActive !== false, sortOrder || 0, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     return res.json({ data: camelRow(r.rows[0]) });
   } catch (err) {
+    console.error("[PUT /plans]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -2635,13 +2642,19 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
   try {
     const { name, description, price, currency = "MXN", durationDays = 30, classLimit, features, isActive = true, sortOrder = 0 } = req.body;
     if (!name) return res.status(400).json({ message: "Nombre requerido" });
+    const featuresArr = Array.isArray(features)
+      ? features
+      : typeof features === "string" && features.trim()
+        ? features.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
     const r = await pool.query(
       `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, features, is_active, sort_order)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [name, description || null, price || 0, currency, durationDays, classLimit ?? null, features || null, isActive, sortOrder]
+      [name, description || null, price || 0, currency, durationDays, classLimit ?? null, JSON.stringify(featuresArr), isActive, sortOrder]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) {
+    console.error("[POST /plans]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });
