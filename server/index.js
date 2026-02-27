@@ -415,13 +415,22 @@ async function ensureSchema() {
     // ── Loyalty rewards table ──────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS loyalty_rewards (
-        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        name        VARCHAR(150) NOT NULL,
-        description TEXT,
-        points_cost INTEGER NOT NULL,
-        is_active   BOOLEAN DEFAULT true,
-        created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name         VARCHAR(150) NOT NULL,
+        description  TEXT,
+        points_cost  INTEGER NOT NULL,
+        reward_type  VARCHAR(30) NOT NULL DEFAULT 'custom',
+        reward_value VARCHAR(150),
+        stock        INTEGER,
+        is_active    BOOLEAN DEFAULT true,
+        created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+    // ── Loyalty rewards: add new columns if table already exists ───────────
+    await pool.query(`
+      ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_type  VARCHAR(30) NOT NULL DEFAULT 'custom';
+      ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_value VARCHAR(150);
+      ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS stock        INTEGER;
     `);
     // ── Review tags table ──────────────────────────────────────────────────
     await pool.query(`
@@ -626,6 +635,18 @@ app.post("/api/auth/register", async (req, res) => {
       "INSERT INTO referral_codes (user_id, code) VALUES ($1, $2) ON CONFLICT DO NOTHING",
       [user.id, code]
     );
+    // Award welcome bonus loyalty points
+    try {
+      const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+      const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+      const pts = cfg.welcome_bonus ?? 50;
+      if (cfg.enabled !== false && pts > 0) {
+        await pool.query(
+          "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Bono de bienvenida')",
+          [user.id, pts]
+        );
+      }
+    } catch (e) { /* loyalty earn error shouldn't fail register */ }
     const token = signToken(user.id);
     return res.status(201).json({ user: mapUser(user), token });
   } catch (err) {
@@ -1100,7 +1121,7 @@ app.post("/api/discount-codes/validate", authMiddleware, async (req, res) => {
 app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
   try {
     const pointsRes = await pool.query(
-      "SELECT COALESCE(SUM(points), 0) AS total FROM loyalty_points WHERE user_id = $1",
+      "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
       [req.userId]
     );
     const total = parseInt(pointsRes.rows[0].total);
@@ -1124,11 +1145,11 @@ app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
 app.get("/api/loyalty/my-history", authMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT lp.*,
-              CASE WHEN lp.points > 0 THEN 'earned' ELSE 'redeemed' END AS movement_type
-       FROM loyalty_points lp
-       WHERE lp.user_id = $1
-       ORDER BY lp.created_at DESC
+      `SELECT lt.*,
+              CASE WHEN lt.type = 'earn' OR lt.points > 0 THEN 'earned' ELSE 'redeemed' END AS movement_type
+       FROM loyalty_transactions lt
+       WHERE lt.user_id = $1
+       ORDER BY lt.created_at DESC
        LIMIT 100`,
       [req.userId]
     );
@@ -1143,7 +1164,7 @@ app.get("/api/loyalty/my-history", authMiddleware, async (req, res) => {
 app.get("/api/loyalty/rewards", authMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT * FROM rewards WHERE is_active = true ORDER BY points_cost ASC"
+      "SELECT * FROM loyalty_rewards WHERE is_active = true ORDER BY points_cost ASC"
     );
     return res.json({ data: r.rows });
   } catch (err) {
@@ -1158,31 +1179,29 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
   if (!rewardId) return res.status(400).json({ message: "rewardId requerido" });
   try {
     const rewardRes = await pool.query(
-      "SELECT * FROM rewards WHERE id = $1 AND is_active = true",
+      "SELECT * FROM loyalty_rewards WHERE id = $1 AND is_active = true",
       [rewardId]
     );
     if (rewardRes.rows.length === 0) return res.status(404).json({ message: "Recompensa no encontrada" });
     const reward = rewardRes.rows[0];
-    // Check user points
-    const pointsRes = await pool.query(
-      "SELECT COALESCE(SUM(points), 0) AS total FROM loyalty_points WHERE user_id = $1",
+    // Check user balance from loyalty_transactions
+    const balanceRes = await pool.query(
+      "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS balance FROM loyalty_transactions WHERE user_id = $1",
       [req.userId]
     );
-    const total = parseInt(pointsRes.rows[0].total);
-    if (total < reward.points_cost) {
-      return res.status(400).json({ message: `Necesitas ${reward.points_cost} puntos. Tienes ${total}.` });
+    const balance = parseInt(balanceRes.rows[0].balance);
+    if (balance < reward.points_cost) {
+      return res.status(400).json({ message: `Necesitas ${reward.points_cost} puntos. Tienes ${balance}.` });
     }
-    // Deduct points
+    // Deduct points via loyalty_transactions (type=redeem)
     await pool.query(
-      `INSERT INTO loyalty_points (user_id, points, type, description, related_reward_id)
-       VALUES ($1, $2, 'redemption', $3, $4)`,
-      [req.userId, -reward.points_cost, `Canje: ${reward.name}`, rewardId]
+      "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'redeem', $2, $3)",
+      [req.userId, reward.points_cost, `Canje: ${reward.name}`]
     );
-    // Create redemption record
-    await pool.query(
-      "INSERT INTO redemptions (user_id, reward_id, points_spent, status) VALUES ($1, $2, $3, 'pending')",
-      [req.userId, rewardId, reward.points_cost]
-    );
+    // Decrement stock if limited
+    if (reward.stock !== null) {
+      await pool.query("UPDATE loyalty_rewards SET stock = stock - 1 WHERE id = $1 AND stock > 0", [rewardId]);
+    }
     return res.json({ message: `¡Recompensa canjeada! ${reward.name}` });
   } catch (err) {
     console.error("Loyalty/redeem error:", err);
@@ -1986,8 +2005,22 @@ app.put("/api/orders/:id/verify", adminMiddleware, async (req, res) => {
            VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)
            ON CONFLICT (order_id) DO UPDATE SET status='active'`,
           [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
-        ).catch(() => {}); // ignore if order_id unique constraint not in place
+        ).catch(() => {});
       }
+    }
+    // Award loyalty points for purchase (points_per_peso)
+    if (order.user_id && order.total_amount > 0) {
+      try {
+        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+        const pts = Math.floor((order.total_amount || 0) * (cfg.points_per_peso ?? 1));
+        if (cfg.enabled !== false && pts > 0) {
+          await pool.query(
+            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
+            [order.user_id, pts, `Compra aprobada — $${order.total_amount}`]
+          );
+        }
+      } catch (e) { /* loyalty earn error shouldn't fail verify */ }
     }
     return res.json({ data: order });
   } catch (err) { console.error("orders/:id/verify error:", err); return res.status(500).json({ message: "Error interno" }); }
@@ -2044,45 +2077,47 @@ app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
 app.get("/api/loyalty/config", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-    const defaults = { pointsPerClass: 10, pointsPerReferral: 200, pointsPerReview: 50, expirationDays: 365 };
-    return res.json({ data: r.rows.length ? r.rows[0].value : defaults });
+    const defaults = { enabled: true, points_per_class: 10, points_per_peso: 1, welcome_bonus: 50, birthday_bonus: 100 };
+    return res.json({ data: r.rows.length ? { ...defaults, ...r.rows[0].value } : defaults });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 app.put("/api/loyalty/config", adminMiddleware, async (req, res) => {
   try {
+    // Strip referral_bonus if accidentally sent
+    const { referral_bonus, pointsPerReferral, ...clean } = req.body;
     await pool.query(
       `INSERT INTO settings (key, value) VALUES ('loyalty_config', $1)
        ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
-      [JSON.stringify(req.body)]
+      [JSON.stringify(clean)]
     );
-    return res.json({ data: req.body });
+    return res.json({ data: clean });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 // POST /api/loyalty/rewards — admin CRUD for loyalty rewards
 app.post("/api/loyalty/rewards", adminMiddleware, async (req, res) => {
   try {
-    const { name, description, pointsCost, isActive = true } = req.body;
-    if (!name || !pointsCost) return res.status(400).json({ message: "name y pointsCost requeridos" });
+    const { name, description, points_cost, reward_type = "custom", reward_value = "", is_active = true, stock = null } = req.body;
+    if (!name || !points_cost) return res.status(400).json({ message: "name y points_cost requeridos" });
     const r = await pool.query(
-      "INSERT INTO loyalty_rewards (name, description, points_cost, is_active) VALUES ($1,$2,$3,$4) RETURNING *",
-      [name, description || null, pointsCost, isActive]
+      "INSERT INTO loyalty_rewards (name, description, points_cost, reward_type, reward_value, stock, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+      [name, description || null, points_cost, reward_type, reward_value || null, stock || null, is_active]
     );
     return res.status(201).json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+  } catch (err) { console.error("loyalty rewards POST:", err); return res.status(500).json({ message: "Error interno" }); }
 });
 
 app.put("/api/loyalty/rewards/:id", adminMiddleware, async (req, res) => {
   try {
-    const { name, description, pointsCost, isActive } = req.body;
+    const { name, description, points_cost, reward_type, reward_value, stock, is_active } = req.body;
     const r = await pool.query(
-      "UPDATE loyalty_rewards SET name=$1, description=$2, points_cost=$3, is_active=$4 WHERE id=$5 RETURNING *",
-      [name, description || null, pointsCost, isActive !== false, req.params.id]
+      "UPDATE loyalty_rewards SET name=$1, description=$2, points_cost=$3, reward_type=$4, reward_value=$5, stock=$6, is_active=$7 WHERE id=$8 RETURNING *",
+      [name, description || null, points_cost, reward_type || "custom", reward_value || null, stock || null, is_active !== false, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Recompensa no encontrada" });
     return res.json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+  } catch (err) { console.error("loyalty rewards PUT:", err); return res.status(500).json({ message: "Error interno" }); }
 });
 
 app.delete("/api/loyalty/rewards/:id", adminMiddleware, async (req, res) => {
@@ -2837,6 +2872,21 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
       [req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Reserva no encontrada" });
+    const booking = r.rows[0];
+    // Award loyalty points for attending a class
+    if (booking.user_id) {
+      try {
+        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+        const pts = cfg.points_per_class ?? 10;
+        if (cfg.enabled !== false && pts > 0) {
+          await pool.query(
+            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
+            [booking.user_id, pts]
+          );
+        }
+      } catch (e) { /* loyalty earn error shouldn't fail check-in */ }
+    }
     return res.json({ data: r.rows[0] });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });

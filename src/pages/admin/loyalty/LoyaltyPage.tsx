@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,18 +20,30 @@ import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus, Settings } from "lucide-react";
 
 // ── Loyalty Config ──────────────────────────────────────
+const defaultConfig = { enabled: true, points_per_class: 10, points_per_peso: 1, welcome_bonus: 50, birthday_bonus: 100 };
+
 const LoyaltyConfig = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ["loyalty-config"], queryFn: async () => (await api.get("/loyalty/config")).data });
+  const { data, isLoading } = useQuery({ queryKey: ["loyalty-config"], queryFn: async () => (await api.get("/loyalty/config")).data });
   const config = data?.data ?? data ?? {};
 
-  const [form, setForm] = useState({ enabled: true, points_per_class: 10, points_per_peso: 1, welcome_bonus: 50, birthday_bonus: 100, referral_bonus: 200, ...config });
+  const [form, setForm] = useState({ ...defaultConfig });
+
+  // Sync form when config loads from server
+  useEffect(() => {
+    if (config && Object.keys(config).length) {
+      setForm((f) => ({ ...f, ...config }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   const updateMutation = useMutation({
     mutationFn: (d: typeof form) => api.put("/loyalty/config", d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["loyalty-config"] }); toast({ title: "Configuración guardada" }); },
   });
+
+  if (isLoading) return <p className="text-sm text-muted-foreground">Cargando…</p>;
 
   return (
     <div className="max-w-md space-y-4">
@@ -44,7 +56,6 @@ const LoyaltyConfig = () => {
         ["points_per_peso", "Puntos por peso gastado"],
         ["welcome_bonus", "Bono de bienvenida"],
         ["birthday_bonus", "Bono de cumpleaños"],
-        ["referral_bonus", "Bono por referido"],
       ].map(([key, label]) => (
         <div key={key} className="space-y-1">
           <Label>{label}</Label>
