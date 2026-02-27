@@ -44,11 +44,13 @@ interface Membership {
   userName?: string;
   planId: string;
   planName?: string;
+  classCategory?: string;
   status: MembershipStatus;
   paymentMethod?: string;
-  startDate: string;
-  endDate: string;
-  classesRemaining: number;
+  startDate?: string;
+  endDate?: string;
+  classesRemaining?: number | null;
+  classLimit?: number | null;
 }
 
 const membershipSchema = z.object({
@@ -91,7 +93,7 @@ const MembershipTable = ({ status, title }: { status?: string; title: string }) 
               <TableHead>Cliente</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead>Vence</TableHead>
+              <TableHead>Vigencia</TableHead>
               <TableHead>Clases</TableHead>
               <TableHead />
             </TableRow>
@@ -101,33 +103,59 @@ const MembershipTable = ({ status, title }: { status?: string; title: string }) 
               ? Array(4).fill(0).map((_, i) => (
                 <TableRow key={i}>{Array(6).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
               ))
-              : memberships.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell>{m.userName ?? m.userId}</TableCell>
-                  <TableCell>{m.planName ?? m.planId}</TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANTS[m.status]}>{STATUS_LABELS[m.status]}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{m.endDate ? new Date(m.endDate).toLocaleDateString("es-MX") : "—"}</TableCell>
-                  <TableCell>{m.classesRemaining}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        {m.status !== "active" && (
-                          <DropdownMenuItem onClick={() => activateMutation.mutate(m.id)}>Activar</DropdownMenuItem>
+              : memberships.map((m) => {
+                const catColors: Record<string, string> = {
+                  jumping: "bg-[#E15CB8]/15 text-[#E15CB8] border-[#E15CB8]/30",
+                  pilates: "bg-[#CA71E1]/15 text-[#CA71E1] border-[#CA71E1]/30",
+                  mixto: "bg-[#E7EB6E]/15 text-[#E7EB6E] border-[#E7EB6E]/30",
+                };
+                const cat = m.classCategory ?? "";
+                return (
+                  <TableRow key={m.id}>
+                    <TableCell className="font-medium">{m.userName ?? m.userId}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span>{m.planName ?? m.planId}</span>
+                        {cat && cat !== "all" && (
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border capitalize ${catColors[cat] ?? "text-white/40 border-white/10"}`}>
+                            {cat}
+                          </span>
                         )}
-                        {m.status !== "cancelled" && (
-                          <DropdownMenuItem className="text-destructive" onClick={() => cancelMutation.mutate(m.id)}>Cancelar</DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-          </TableBody>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={STATUS_VARIANTS[m.status]}>{STATUS_LABELS[m.status]}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {m.endDate ? new Date(m.endDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {m.classesRemaining === null || m.classesRemaining === undefined
+                        ? (m.classLimit === null ? "∞" : "—")
+                        : m.classesRemaining === 9999
+                          ? "∞"
+                          : `${m.classesRemaining}${m.classLimit ? ` / ${m.classLimit}` : ""}`
+                      }
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          {m.status !== "active" && (
+                            <DropdownMenuItem onClick={() => activateMutation.mutate(m.id)}>Activar</DropdownMenuItem>
+                          )}
+                          {m.status !== "cancelled" && (
+                            <DropdownMenuItem className="text-destructive" onClick={() => cancelMutation.mutate(m.id)}>Cancelar</DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            }
         </Table>
       </div>
     </div>

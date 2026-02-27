@@ -28,12 +28,16 @@ const STEP_META = [
 
 // ── Category groups for plan display ──────────────────────
 function groupPlans(plans: any[]) {
-  const groups: Record<string, any[]> = { Jumping: [], Pilates: [], Mixto: [], Otro: [] };
+  const groups: Record<string, any[]> = { jumping: [], pilates: [], mixto: [], otro: [] };
   for (const p of plans) {
-    if (p.name.includes("Jumping")) groups.Jumping.push(p);
-    else if (p.name.includes("Pilates")) groups.Pilates.push(p);
-    else if (p.name.includes("Mixto")) groups.Mixto.push(p);
-    else groups.Otro.push(p);
+    const cat = p.classCategory ?? p.class_category ?? "";
+    if (cat === "jumping") groups.jumping.push(p);
+    else if (cat === "pilates") groups.pilates.push(p);
+    else if (cat === "mixto") groups.mixto.push(p);
+    else if (p.name?.toLowerCase().includes("jumping") || p.name?.toLowerCase().includes("jump")) groups.jumping.push(p);
+    else if (p.name?.toLowerCase().includes("pilates")) groups.pilates.push(p);
+    else if (p.name?.toLowerCase().includes("mixto")) groups.mixto.push(p);
+    else groups.otro.push(p);
   }
   return groups;
 }
@@ -86,12 +90,19 @@ const CashAssignment = () => {
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
   const { data: usersData, isLoading: usersLoading } = useQuery<{ data: { id: string; displayName: string; email: string }[] }>({
-    queryKey: ["users-search", debouncedSearch],
-    queryFn: async () => (await api.get(`/users?role=client&search=${debouncedSearch}`)).data,
-    enabled: !!debouncedSearch,
+    queryKey: ["users-search"],
+    queryFn: async () => (await api.get(`/users?role=client`)).data,
   });
 
-  const { data: plansData } = useQuery<{ data: { id: string; name: string; price: number; classLimit?: number | null; durationDays?: number }[] }>({
+  const allUsers = Array.isArray(usersData?.data) ? usersData.data : [];
+  const filteredUsers = debouncedSearch
+    ? allUsers.filter(u =>
+        u.displayName?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        u.email?.toLowerCase().includes(debouncedSearch.toLowerCase())
+      )
+    : allUsers;
+
+  const { data: plansData } = useQuery<{ data: { id: string; name: string; price: number; classLimit?: number | null; durationDays?: number; classCategory?: string }[] }>({
     queryKey: ["plans"],
     queryFn: async () => (await api.get("/plans")).data,
   });
@@ -142,7 +153,7 @@ const CashAssignment = () => {
           )}
 
           <div className="space-y-2">
-            {(Array.isArray(usersData?.data) ? usersData.data : []).map((u) => (
+            {filteredUsers.map((u) => (
               <button
                 key={u.id}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] hover:bg-[#E15CB8]/5 hover:border-[#E15CB8]/25 transition-all group text-left"
@@ -158,7 +169,7 @@ const CashAssignment = () => {
                 <ArrowRight size={14} className="text-white/20 group-hover:text-[#E15CB8]/60 transition-colors shrink-0" />
               </button>
             ))}
-            {debouncedSearch && !usersLoading && (usersData?.data?.length ?? 0) === 0 && (
+            {filteredUsers.length === 0 && !usersLoading && (
               <p className="text-center py-6 text-white/30 text-sm">No se encontraron clientes</p>
             )}
           </div>
@@ -186,15 +197,21 @@ const CashAssignment = () => {
           {Object.entries(planGroups).map(([group, items]) => {
             if (!items.length) return null;
             const groupColors: Record<string, string> = {
-              Jumping: "text-[#E15CB8]",
-              Pilates: "text-[#CA71E1]",
-              Mixto: "text-[#E7EB6E]",
-              Otro: "text-white/50",
+              jumping: "text-[#E15CB8]",
+              pilates: "text-[#CA71E1]",
+              mixto: "text-[#E7EB6E]",
+              otro: "text-white/50",
+            };
+            const groupLabels: Record<string, string> = {
+              jumping: "Paquetes Jumping",
+              pilates: "Paquetes Pilates",
+              mixto: "Paquetes Mixto",
+              otro: "Otros paquetes",
             };
             return (
               <div key={group}>
                 <p className={cn("text-[11px] font-semibold uppercase tracking-widest mb-2 px-1", groupColors[group])}>
-                  {group === "Otro" ? "Otros" : `Paquetes ${group}`}
+                  {groupLabels[group] ?? group}
                 </p>
                 <div className="grid grid-cols-1 gap-2">
                   {items.map((p) => (

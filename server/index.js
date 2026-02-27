@@ -240,6 +240,7 @@ async function ensureSchema() {
       ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
       ALTER TABLE plans ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
       ALTER TABLE plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_category VARCHAR(20) DEFAULT 'all';
     `);
     // ── Seed plans: remove old schema_complete.sql plans & ensure only correct ones ──
     // Delete old plans that came from the migration seed (wrong data)
@@ -260,14 +261,30 @@ async function ensureSchema() {
     const plCount = await pool.query("SELECT COUNT(*) FROM plans");
     if (parseInt(plCount.rows[0].count) === 0) {
       await pool.query(`
-        INSERT INTO plans (name, price, currency, duration_days, class_limit, is_active, sort_order) VALUES
-          ('4 Clases',   380,  'MXN', 30,   4,    true, 1),
-          ('8 Clases',   700,  'MXN', 30,   8,    true, 2),
-          ('12 Clases',  980,  'MXN', 30,   12,   true, 3),
-          ('Ilimitado',  1350, 'MXN', 30,   NULL, true, 4)
+        INSERT INTO plans (name, price, currency, duration_days, class_limit, class_category, is_active, sort_order) VALUES
+          ('Jumping — 4 Clases',    380,  'MXN', 30, 4,    'jumping', true, 1),
+          ('Jumping — 8 Clases',    700,  'MXN', 30, 8,    'jumping', true, 2),
+          ('Jumping — 12 Clases',   980,  'MXN', 30, 12,   'jumping', true, 3),
+          ('Jumping — Ilimitado',   1350, 'MXN', 30, NULL, 'jumping', true, 4),
+          ('Pilates — 4 Clases',    380,  'MXN', 30, 4,    'pilates', true, 5),
+          ('Pilates — 8 Clases',    700,  'MXN', 30, 8,    'pilates', true, 6),
+          ('Pilates — 12 Clases',   980,  'MXN', 30, 12,   'pilates', true, 7),
+          ('Pilates — Ilimitado',   1350, 'MXN', 30, NULL, 'pilates', true, 8),
+          ('Mixto — 8 Clases',      800,  'MXN', 30, 8,    'mixto',   true, 9),
+          ('Mixto — 12 Clases',     1100, 'MXN', 30, 12,   'mixto',   true, 10),
+          ('Mixto — Ilimitado',     1500, 'MXN', 30, NULL, 'mixto',   true, 11)
         ON CONFLICT DO NOTHING;
       `);
     }
+    // ── Backfill class_category on existing plans that have no category set ──
+    await pool.query(`
+      UPDATE plans SET class_category = 'jumping' WHERE class_category IS NULL OR class_category = 'all'
+        AND (name ILIKE '%jumping%' OR name ILIKE '%jump%' OR name ILIKE '%strong%' OR name ILIKE '%dance%' OR name ILIKE '%tone%' OR name ILIKE '%mindful jump%');
+      UPDATE plans SET class_category = 'pilates' WHERE class_category IS NULL OR class_category = 'all'
+        AND (name ILIKE '%pilates%' OR name ILIKE '%mat%' OR name ILIKE '%flow%' OR name ILIKE '%hot%');
+      UPDATE plans SET class_category = 'mixto' WHERE class_category IS NULL OR class_category = 'all'
+        AND name ILIKE '%mixto%';
+    `);
     // ── Products table ─────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
@@ -669,7 +686,7 @@ app.get("/api/plans", async (req, res) => {
 app.get("/api/memberships/my", authMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT m.*, p.name AS plan_name, p.class_limit, p.duration_days, p.features
+      `SELECT m.*, p.name AS plan_name, p.class_limit, p.duration_days, p.features, p.class_category
        FROM memberships m
        JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1
@@ -682,7 +699,7 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
        LIMIT 1`,
       [req.userId]
     );
-    return res.json({ data: r.rows[0] ?? null });
+    return res.json({ data: r.rows[0] ? camelRows([r.rows[0]])[0] : null });
   } catch (err) {
     console.error("Memberships/my error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -2558,8 +2575,11 @@ app.get("/api/users", adminMiddleware, async (req, res) => {
     let q = `SELECT id, display_name, email, phone, role, created_at FROM users WHERE 1=1`;
     const params = [];
     if (role) { params.push(role); q += ` AND role = $${params.length}`; }
-    if (search) { params.push(`%${search}%`); q += ` AND (display_name ILIKE $${params.length} OR email ILIKE $${params.length})`; }
-    q += " ORDER BY created_at DESC LIMIT 100";
+    if (search) {
+      params.push(`%${search}%`);
+      q += ` AND (display_name ILIKE $${params.length} OR email ILIKE $${params.length})`;
+    }
+    q += " ORDER BY display_name ASC LIMIT 200";
     const r = await pool.query(q, params);
     return res.json({ data: camelRows(r.rows) });
   } catch (err) {
@@ -2606,8 +2626,9 @@ app.delete("/api/users/:id", adminMiddleware, async (req, res) => {
 // GET /api/memberships — admin list all
 app.get("/api/memberships", adminMiddleware, async (req, res) => {
   try {
-    const { status, limit = 50 } = req.query;
-    let q = `SELECT m.*, u.display_name AS user_name, p.name AS plan_name
+    const { status, limit = 100 } = req.query;
+    let q = `SELECT m.*, u.display_name AS user_name, p.name AS plan_name,
+                    p.class_limit, p.duration_days, p.class_category
              FROM memberships m
              LEFT JOIN users u ON m.user_id = u.id
              LEFT JOIN plans p ON m.plan_id = p.id
@@ -2616,7 +2637,23 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
     if (status) { params.push(status); q += ` AND m.status = $${params.length}`; }
     params.push(parseInt(limit)); q += ` ORDER BY m.created_at DESC LIMIT $${params.length}`;
     const r = await pool.query(q, params);
-    return res.json({ data: r.rows.map(m => ({ ...m, userName: m.user_name, planName: m.plan_name })) });
+    return res.json({
+      data: r.rows.map(m => ({
+        id: m.id,
+        userId: m.user_id,
+        userName: m.user_name ?? m.user_id,
+        planId: m.plan_id,
+        planName: m.plan_name ?? m.plan_id,
+        classCategory: m.class_category ?? "all",
+        status: m.status,
+        paymentMethod: m.payment_method,
+        startDate: m.start_date,
+        endDate: m.end_date,
+        classesRemaining: m.classes_remaining,
+        classLimit: m.class_limit,
+        createdAt: m.created_at,
+      }))
+    });
   } catch (err) {
     console.error("GET /memberships error:", err);
     return res.status(500).json({ message: "Error interno" });
