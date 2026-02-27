@@ -210,285 +210,346 @@ export default function Schedule() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <section id="horario" className="scroll-mt-16">
-      {/* ── Header dark ───────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-[#1A0F0A] via-[#2A1C14] to-[#1A0F0A] relative overflow-hidden py-14 px-6 lg:px-[60px]">
-        {/* Blobs */}
-        <div className="pointer-events-none absolute -top-20 -left-20 w-72 h-72 rounded-full bg-primary/10 blur-3xl" />
-        <div className="pointer-events-none absolute top-0 right-0 w-56 h-56 rounded-full bg-primary/8 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 w-80 h-40 rounded-full bg-primary/6 blur-3xl" />
+    <section id="horario" className="scroll-mt-16 bg-[#0e0b12] relative overflow-hidden">
 
-        <div className="relative z-10 max-w-5xl mx-auto">
-          {/* Label + title */}
-          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-3 flex items-center gap-[10px]">
-            <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Reserva tu lugar
-          </div>
-          <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4rem)] leading-[0.95] text-white mb-2">
-            Horario de clases
-          </h2>
-          <div className="w-12 h-[2px] bg-primary mb-8" />
+      {/* ── Atmospheric glows ─────────────────────────────────────────────── */}
+      <div className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full"
+        style={{ background: "radial-gradient(ellipse, rgba(164,133,80,0.10) 0%, transparent 70%)" }} />
+      <div className="pointer-events-none fixed bottom-0 right-0 w-[400px] h-[400px] rounded-full"
+        style={{ background: "radial-gradient(ellipse, rgba(202,113,225,0.06) 0%, transparent 70%)" }} />
 
-          {/* Week nav */}
-          <div className="flex items-center gap-4 mb-6">
+      <div className="relative z-10 max-w-[1200px] mx-auto px-6 lg:px-10">
+
+        {/* ── HEADER ──────────────────────────────────────────────────────── */}
+        <div className="pt-14 pb-0">
+
+          {/* Studio label */}
+          <p className="text-[11px] font-normal tracking-[0.25em] uppercase text-white/40 mb-8">
+            ✦ Ophelia · Jumping &amp; Pilates
+          </p>
+
+          {/* Month nav */}
+          <div className="flex items-center gap-5 mb-8">
             <button
               onClick={() => setWeekStart((p) => subWeeks(p, 1))}
-              className="w-9 h-9 rounded-full border border-white/20 flex items-center justify-center text-white/70 hover:border-primary hover:text-primary transition-all"
+              className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/50 hover:border-primary hover:text-primary transition-all"
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="text-white/80 text-sm font-medium capitalize min-w-[160px] text-center">
-              {format(weekStart, "MMMM yyyy", { locale: es })}
-            </span>
+            <h2 className="flex-1 font-serif text-[2.1rem] font-light tracking-tight text-white">
+              <span className="capitalize">{format(weekStart, "MMMM", { locale: es })}</span>{" "}
+              <span className="font-bold text-primary">{format(weekStart, "yyyy")}</span>
+            </h2>
             <button
               onClick={() => setWeekStart((p) => addWeeks(p, 1))}
-              className="w-9 h-9 rounded-full border border-white/20 flex items-center justify-center text-white/70 hover:border-primary hover:text-primary transition-all"
+              className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/50 hover:border-primary hover:text-primary transition-all"
             >
               <ChevronRight size={16} />
             </button>
           </div>
 
-          {/* Day pills */}
-          <div className="flex gap-2 flex-wrap">
+          {/* Week strip — day pills */}
+          <div className="flex gap-2 overflow-x-auto pb-1 mb-14 scrollbar-none"
+            style={{ scrollbarWidth: "none" }}>
             {weekDays.map((day) => {
-              const past      = isPastDay(day);
-              const selected  = isSameDay(day, selectedDate);
-              const todayDay  = isToday(day);
-              const dayKey    = format(day, "yyyy-MM-dd");
-              const count     = classCountByDay[dayKey] ?? 0;
-              const dots      = !past && count > 0
-                ? Array.from({ length: Math.min(count, 4) })
-                : [];
+              const past     = isPastDay(day);
+              const selected = isSameDay(day, selectedDate);
+              const todayDay = isToday(day);
+              const dayKey   = format(day, "yyyy-MM-dd");
+              const count    = classCountByDay[dayKey] ?? 0;
+              const dotCount = Math.min(count, 4);
 
               return (
                 <button
                   key={dayKey}
                   disabled={past}
                   onClick={() => setSelectedDate(day)}
+                  style={selected ? {
+                    background: "linear-gradient(135deg, var(--color-primary, #A48550) 0%, #7a6038 100%)",
+                    boxShadow: "0 8px 32px rgba(164,133,80,0.38), inset 0 0 0 1px rgba(255,255,255,0.1)",
+                    transform: "translateY(-3px) scale(1.04)",
+                    borderColor: "transparent",
+                  } : {}}
                   className={[
-                    "flex flex-col items-center px-3 py-2.5 rounded-2xl min-w-[54px] transition-all duration-200 select-none",
-                    past     ? "opacity-30 cursor-not-allowed" : "cursor-pointer",
-                    selected ? "bg-primary text-white scale-[1.04] shadow-lg shadow-primary/30"
-                    : todayDay ? "border border-primary/40 bg-white/5 text-white"
-                    : "bg-white/5 hover:bg-white/10 text-white/80",
+                    "flex flex-col items-center gap-1.5 px-5 py-3.5 rounded-[20px] min-w-[72px] select-none transition-all duration-200 border",
+                    past ? "opacity-25 cursor-not-allowed" : "cursor-pointer",
+                    selected
+                      ? "text-white"
+                      : todayDay
+                      ? "bg-white/5 border-primary/30 text-white"
+                      : "bg-white/[0.04] border-white/8 text-white/80 hover:border-primary/30 hover:-translate-y-0.5",
                   ].join(" ")}
                 >
-                  <span className="text-[0.65rem] uppercase tracking-wide opacity-70">
+                  <span className={[
+                    "text-[10px] font-semibold tracking-[0.12em] uppercase transition-colors",
+                    selected ? "text-white/75" : "text-white/40",
+                  ].join(" ")}>
                     {format(day, "EEE", { locale: es })}
                   </span>
                   <span className={[
-                    "text-[1.15rem] font-bold leading-tight",
+                    "font-serif text-[1.6rem] font-semibold leading-none transition-colors",
                     !selected && todayDay ? "text-primary" : "",
                   ].join(" ")}>
                     {format(day, "d")}
                   </span>
                   {/* Dots */}
-                  <div className="flex gap-[3px] mt-1 h-[5px] items-center">
-                    {dots.map((_, i) => (
+                  <div className="flex gap-[3px] h-[8px] items-center justify-center">
+                    {Array.from({ length: dotCount }).map((_, i) => (
                       <span
                         key={i}
-                        className="w-[4px] h-[4px] rounded-full"
+                        className="w-1 h-1 rounded-full transition-all"
                         style={{
-                          background: selected ? "#fff" : todayDay ? "#A48550" : "rgba(255,255,255,0.35)",
+                          background: selected ? "rgba(255,255,255,0.75)"
+                            : todayDay ? "var(--color-primary, #A48550)"
+                            : "rgba(255,255,255,0.25)",
                         }}
                       />
                     ))}
-                    {count > 4 && (
-                      <span className="text-[0.45rem] leading-none" style={{ color: selected ? "#fff" : "#A48550" }}>+</span>
-                    )}
                   </div>
                 </button>
               );
             })}
           </div>
         </div>
-      </div>
 
-      {/* ── Content ───────────────────────────────────────────────────────── */}
-      <div className="py-10 px-6 lg:px-[60px] bg-background">
-        <div className="max-w-5xl mx-auto">
+        {/* ── FILTERS ROW ─────────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 flex-wrap">
+          <div className="font-serif text-[1.35rem] font-semibold text-white">
+            {filteredClasses.length} clase{filteredClasses.length !== 1 ? "s" : ""}{" "}
+            <span className="text-white/40 text-base font-light font-sans">
+              · {format(selectedDate, "EEE d 'de' MMMM", { locale: es })}
+            </span>
+          </div>
 
-          {/* Summary + filter pills */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{filteredClasses.length} clase{filteredClasses.length !== 1 ? "s" : ""}</span>
-              {" · "}
-              <span className="capitalize">{format(selectedDate, "EEE d 'de' MMM", { locale: es })}</span>
-            </p>
-
-            {uniqueTypes.length > 1 && (
-              <div className="flex flex-wrap gap-2">
+          {uniqueTypes.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilter("all")}
+                className={[
+                  "px-4 py-[7px] rounded-full text-xs font-medium transition-all border tracking-wide",
+                  filter === "all"
+                    ? "bg-primary border-transparent text-white shadow-[0_4px_16px_rgba(164,133,80,0.35)]"
+                    : "bg-white/[0.04] border-white/10 text-white/50 hover:border-primary/40 hover:text-primary",
+                ].join(" ")}
+              >
+                Todas
+              </button>
+              {uniqueTypes.map((t) => (
                 <button
-                  onClick={() => setFilter("all")}
+                  key={t}
+                  onClick={() => setFilter(t)}
                   className={[
-                    "px-3 py-1 rounded-full text-xs font-medium transition-all border",
-                    filter === "all"
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40",
+                    "px-4 py-[7px] rounded-full text-xs font-medium transition-all border tracking-wide",
+                    filter === t
+                      ? "bg-primary border-transparent text-white shadow-[0_4px_16px_rgba(164,133,80,0.35)]"
+                      : "bg-white/[0.04] border-white/10 text-white/50 hover:border-primary/40 hover:text-primary",
                   ].join(" ")}
                 >
-                  Todas
+                  {t}
                 </button>
-                {uniqueTypes.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setFilter(t)}
-                    className={[
-                      "px-3 py-1 rounded-full text-xs font-medium transition-all border",
-                      filter === t
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "border-border text-muted-foreground hover:border-primary/40",
-                    ].join(" ")}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Classes grid */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20 text-muted-foreground gap-2">
-              <Loader2 size={20} className="animate-spin" />
-              <span className="text-sm">Cargando clases…</span>
-            </div>
-          ) : filteredClasses.length === 0 ? (
-            <div className="text-center py-20 text-muted-foreground">
-              <p className="text-sm">No hay clases para este día.</p>
-              {filter !== "all" && (
-                <button onClick={() => setFilter("all")} className="mt-3 text-primary text-sm underline underline-offset-2">
-                  Ver todas
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredClasses.map((cls) => {
-                const ts        = getTimeStatus(cls);
-                const isPast    = ts?.status === "past";
-                const inProg    = ts?.status === "in-progress";
-                const full      = cls.spots === 0;
-                const spotsPercent = ((cls.maxSpots - cls.spots) / cls.maxSpots) * 100;
-                const barColor  = full ? "#E57373" : cls.spots <= 2 ? "#F0A050" : cls.color;
-
-                return (
-                  <div
-                    key={cls.id}
-                    className={[
-                      "rounded-2xl border bg-card overflow-hidden transition-all duration-200",
-                      "hover:-translate-y-0.5 hover:shadow-md",
-                      inProg ? "ring-2 ring-primary/40 shadow-md" : "shadow-sm border-border/80",
-                      (isPast || full) ? "opacity-55" : "",
-                    ].join(" ")}
-                  >
-                    {/* Color bar */}
-                    <div className="h-[3px]" style={{ background: isPast ? "#888" : cls.color }} />
-
-                    <div className="p-4 space-y-3">
-                      {/* Time badge (only today) */}
-                      {ts && (
-                        <div className={[
-                          "inline-flex items-center gap-1.5 text-[0.68rem] font-semibold px-2 py-0.5 rounded-full",
-                          isPast    ? "bg-muted text-muted-foreground"
-                          : inProg  ? "bg-primary/15 text-primary"
-                          : "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-                        ].join(" ")}>
-                          {inProg && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                          )}
-                          {!inProg && !isPast && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          )}
-                          {ts.label}
-                        </div>
-                      )}
-
-                      {/* Name + book button */}
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold text-[0.95rem] leading-tight">{cls.name}</h3>
-                        <button
-                          disabled={isPast || full}
-                          onClick={() => !isPast && !full && handleBook(cls)}
-                          className={[
-                            "shrink-0 text-[0.7rem] font-semibold px-3 py-1 rounded-full transition-all",
-                            isPast || full
-                              ? "bg-muted text-muted-foreground cursor-not-allowed"
-                              : "text-primary-foreground hover:opacity-90 hover:scale-105",
-                          ].join(" ")}
-                          style={!isPast && !full ? { background: cls.color } : {}}
-                        >
-                          {isPast ? "Finalizada" : full ? "Llena" : "Reservar"}
-                        </button>
-                      </div>
-
-                      {/* Time + instructor */}
-                      <div className="flex flex-col gap-1 text-[0.78rem] text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <Clock size={12} />
-                          {formatTime(cls.time)}
-                          {cls.endTime ? ` — ${cls.endTime.slice(0, 5)}` : ` · ${cls.duration} min`}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          {cls.instructorPhoto ? (
-                            <img
-                              src={cls.instructorPhoto}
-                              alt={cls.instructor}
-                              className="w-5 h-5 rounded-full object-cover ring-1 ring-border"
-                            />
-                          ) : (
-                            <span
-                              className="w-5 h-5 rounded-full flex items-center justify-center text-[0.55rem] font-bold text-white shrink-0"
-                              style={{ background: isPast ? "#888" : cls.color }}
-                            >
-                              {cls.instructor.split(" ").map((w) => w[0]).slice(0, 2).join("")}
-                            </span>
-                          )}
-                          {cls.instructor}
-                        </span>
-                      </div>
-
-                      {/* Capacity bar */}
-                      <div className="space-y-1">
-                        <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${spotsPercent}%`, background: barColor }}
-                          />
-                        </div>
-                        <p className="text-[0.7rem]" style={{ color: barColor }}>
-                          {full
-                            ? "Sin lugares"
-                            : <><span className="font-semibold">{cls.spots}</span> / {cls.maxSpots} lugares</>
-                          }
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              ))}
             </div>
           )}
+        </div>
 
-          {/* ── CTA ─────────────────────────────────────────────────────── */}
-          <div className="mt-12 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent p-8 text-center">
-            <p className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-2">
-              ¿Primera vez en Ophelia?
-            </p>
-            <h3 className="font-bebas text-[clamp(1.8rem,3vw,2.5rem)] leading-none text-foreground mb-2">
-              Prueba una clase sin compromiso
-            </h3>
-            <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-              Reserva tu sesión muestra y descubre por qué cientos de mujeres eligen Ophelia.
-            </p>
-            <Link
-              to="/auth/register?returnUrl=/app/book"
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:-translate-y-1 hover:shadow-[0_15px_40px_hsl(var(--primary)/0.35)] transition-all"
-            >
-              Reservar mi primera clase
-              <span className="text-[0.7rem]">↗</span>
-            </Link>
+        {/* ── CARDS ───────────────────────────────────────────────────────── */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-24 text-white/30 gap-2">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-sm tracking-wide">Cargando clases…</span>
           </div>
+        ) : filteredClasses.length === 0 ? (
+          <div className="text-center py-24 text-white/30">
+            <p className="text-sm">No hay clases para este día.</p>
+            {filter !== "all" && (
+              <button onClick={() => setFilter("all")} className="mt-3 text-primary text-sm underline underline-offset-2">
+                Ver todas
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 pb-16">
+            {filteredClasses.map((cls, idx) => {
+              const ts           = getTimeStatus(cls);
+              const isPast       = ts?.status === "past";
+              const inProg       = ts?.status === "in-progress";
+              const upcoming     = ts?.status === "upcoming";
+              const full         = cls.spots === 0;
+              const spotsPercent = ((cls.maxSpots - cls.spots) / cls.maxSpots) * 100;
+              const accent       = isPast ? "rgba(255,255,255,0.25)" : cls.color;
+              const initials     = cls.instructor.split(" ").map((w: string) => w[0]).slice(0, 2).join("");
+
+              // Status badge config
+              const badgeCfg = (() => {
+                if (isPast)   return { label: "Finalizada",      bg: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.35)", dot: false };
+                if (inProg)   return { label: ts!.label,         bg: `${accent}22`,            color: accent,                   dot: "pulse" };
+                if (upcoming) return { label: ts!.label,         bg: `${accent}18`,            color: accent,                   dot: true };
+                return null;
+              })();
+
+              return (
+                <div
+                  key={cls.id}
+                  style={{
+                    animationDelay: `${idx * 0.07}s`,
+                    ["--card-accent" as string]: accent,
+                  }}
+                  className={[
+                    "relative bg-white/[0.04] border border-white/8 rounded-3xl p-7 overflow-hidden",
+                    "transition-all duration-300 cursor-pointer group",
+                    "hover:-translate-y-1.5 hover:scale-[1.01] hover:border-white/15",
+                    "hover:shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
+                    isPast ? "opacity-50 pointer-events-none" : "",
+                    "animate-[fadeSlideUp_0.4s_both]",
+                  ].join(" ")}
+                >
+                  {/* Top accent line on hover */}
+                  <div
+                    className="absolute top-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
+                  />
+
+                  {/* Background glow orb */}
+                  <div
+                    className="absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-[0.04] group-hover:opacity-[0.08] transition-opacity pointer-events-none"
+                    style={{ background: accent }}
+                  />
+
+                  {/* ── Card top row ── */}
+                  <div className="flex items-start justify-between mb-5">
+                    {/* Status badge */}
+                    {badgeCfg ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 px-[11px] py-[5px] rounded-full text-[11px] font-semibold tracking-wide uppercase border"
+                        style={{
+                          background: badgeCfg.bg,
+                          color: badgeCfg.color,
+                          borderColor: `${badgeCfg.color}40`,
+                        }}
+                      >
+                        {badgeCfg.dot && (
+                          <span
+                            className={["w-1.5 h-1.5 rounded-full", badgeCfg.dot === "pulse" ? "animate-pulse" : ""].join(" ")}
+                            style={{ background: badgeCfg.color }}
+                          />
+                        )}
+                        {badgeCfg.label}
+                      </span>
+                    ) : (
+                      <span />
+                    )}
+
+                    {/* Book button */}
+                    {!isPast && (
+                      <button
+                        disabled={full}
+                        onClick={(e) => { e.stopPropagation(); !full && handleBook(cls); }}
+                        className={[
+                          "px-5 py-[9px] rounded-full text-[12px] font-semibold tracking-wide transition-all",
+                          full
+                            ? "bg-white/8 text-white/30 cursor-not-allowed"
+                            : "text-white hover:scale-105",
+                        ].join(" ")}
+                        style={!full ? {
+                          background: `linear-gradient(135deg, ${accent} 0%, ${accent}cc 100%)`,
+                          boxShadow: `0 4px 20px ${accent}55`,
+                        } : {}}
+                      >
+                        {full ? "Llena" : "Reservar"}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ── Class name ── */}
+                  <h3 className="font-serif text-[1.6rem] font-semibold leading-tight tracking-tight text-white mb-4">
+                    {cls.name}
+                  </h3>
+
+                  {/* ── Time row ── */}
+                  <div className="flex items-center gap-2 mb-3 text-white/40 text-[13px] font-medium">
+                    <Clock size={13} className="opacity-60 shrink-0" />
+                    <span className="text-white text-[14px] font-medium">
+                      {formatTime(cls.time)}{cls.endTime ? ` — ${cls.endTime.slice(0, 5)}` : ""}
+                    </span>
+                    <span className="ml-auto bg-white/8 text-white/40 text-[11px] px-2 py-0.5 rounded-md">
+                      {cls.duration} min
+                    </span>
+                  </div>
+
+                  {/* ── Instructor ── */}
+                  <div className="flex items-center gap-2.5 mb-5">
+                    {cls.instructorPhoto ? (
+                      <img
+                        src={cls.instructorPhoto}
+                        alt={cls.instructor}
+                        className="w-7 h-7 rounded-full object-cover ring-[1.5px] ring-white/15 shrink-0"
+                      />
+                    ) : (
+                      <span
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white ring-[1.5px] ring-white/15 shrink-0"
+                        style={{ background: `linear-gradient(135deg, ${accent}cc 0%, ${accent} 100%)` }}
+                      >
+                        {initials}
+                      </span>
+                    )}
+                    <span className="text-[13px] text-white/40 font-normal">{cls.instructor}</span>
+                  </div>
+
+                  {/* ── Divider ── */}
+                  <div className="h-px bg-white/8 mb-4" />
+
+                  {/* ── Capacity bar ── */}
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-white/30">Lugares</span>
+                      <span
+                        className="text-[12px] font-semibold"
+                        style={{ color: full ? accent : "rgba(255,255,255,0.8)" }}
+                      >
+                        {full
+                          ? `${cls.maxSpots} / ${cls.maxSpots} — Lleno`
+                          : `${cls.spots} disponibles`}
+                      </span>
+                    </div>
+                    <div className="h-1 rounded-full bg-white/8 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${spotsPercent}%`,
+                          background: full
+                            ? `linear-gradient(90deg, ${accent}, ${accent}cc)`
+                            : spotsPercent > 60
+                            ? `linear-gradient(90deg, rgba(167,139,250,0.8), ${accent})`
+                            : `linear-gradient(90deg, ${accent}cc, ${accent})`,
+                          boxShadow: full ? `0 0 8px ${accent}88` : "none",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── CTA ─────────────────────────────────────────────────────────── */}
+        <div className="mb-16 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/[0.07] via-primary/[0.03] to-transparent p-10 text-center">
+          <p className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-2">
+            ¿Primera vez en Ophelia?
+          </p>
+          <h3 className="font-bebas text-[clamp(1.8rem,3vw,2.5rem)] leading-none text-white mb-3">
+            Prueba una clase sin compromiso
+          </h3>
+          <p className="text-sm text-white/40 mb-7 max-w-sm mx-auto">
+            Reserva tu sesión muestra y descubre por qué cientos de mujeres eligen Ophelia.
+          </p>
+          <Link
+            to="/auth/register?returnUrl=/app/book"
+            className="inline-flex items-center gap-2 bg-primary text-white px-8 py-3.5 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(164,133,80,0.35)] transition-all"
+          >
+            Reservar mi primera clase
+            <span className="text-[0.7rem]">↗</span>
+          </Link>
         </div>
       </div>
 
@@ -499,6 +560,14 @@ export default function Schedule() {
         onOpenChange={setDialogOpen}
         onSuccess={() => {}}
       />
+
+      {/* Keyframe for card entrance */}
+      <style>{`
+        @keyframes fadeSlideUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+      `}</style>
     </section>
   );
 }
