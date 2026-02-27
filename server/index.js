@@ -735,8 +735,9 @@ app.get("/api/classes", async (req, res) => {
     const { start, end, limit } = req.query;
     let query = `
       SELECT c.*,
-             (c.date || 'T' || c.start_time) AS start_time,
-             (c.date || 'T' || c.end_time)   AS end_time,
+             c.max_capacity                         AS capacity,
+             (c.date || 'T' || c.start_time)        AS start_time_full,
+             (c.date || 'T' || c.end_time)          AS end_time_full,
              ct.name  AS class_type_name,
              ct.color AS class_type_color,
              ct.icon  AS class_type_icon,
@@ -756,7 +757,13 @@ app.get("/api/classes", async (req, res) => {
     query += " ORDER BY c.date ASC, c.start_time ASC";
     if (limit) { params.push(parseInt(limit)); query += ` LIMIT $${params.length}`; }
     const r = await pool.query(query, params);
-    return res.json({ data: r.rows });
+    // Normalise: expose start_time / end_time as full ISO strings for front-end consumers
+    const rows = r.rows.map((row) => ({
+      ...row,
+      start_time:     row.start_time_full ?? row.start_time,
+      end_time:       row.end_time_full   ?? row.end_time,
+    }));
+    return res.json({ data: rows });
   } catch (err) {
     console.error("Classes error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -1856,15 +1863,38 @@ app.delete("/api/class-types/:id", adminMiddleware, async (req, res) => {
 // POST /api/classes — admin creates a class (alias)
 app.post("/api/classes", adminMiddleware, async (req, res) => {
   try {
-    const { classTypeId, instructorId, startTime, endTime, capacity = 10, location, notes } = req.body;
+    const { classTypeId, instructorId, startTime, endTime, maxCapacity, capacity, notes } = req.body;
     if (!classTypeId) return res.status(400).json({ message: "classTypeId requerido" });
+    if (!instructorId) return res.status(400).json({ message: "instructorId requerido" });
+
+    // startTime may come as a full ISO/datetime-local string "YYYY-MM-DDTHH:mm"
+    // The classes table uses separate DATE and TIME columns
+    let dateStr, startTimeStr, endTimeStr;
+    if (startTime && startTime.includes("T")) {
+      const [d, t] = startTime.split("T");
+      dateStr     = d;
+      startTimeStr = t.slice(0, 5); // "HH:mm"
+    } else {
+      return res.status(400).json({ message: "startTime debe ser datetime (YYYY-MM-DDTHH:mm)" });
+    }
+    if (endTime && endTime.includes("T")) {
+      endTimeStr = endTime.split("T")[1].slice(0, 5);
+    } else if (endTime && endTime.length === 5) {
+      endTimeStr = endTime; // already "HH:mm"
+    } else {
+      // default +55 min
+      const [h, m] = startTimeStr.split(":").map(Number);
+      const total = h * 60 + m + 55;
+      endTimeStr = String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
+    }
+    const cap = maxCapacity ?? capacity ?? 10;
     const r = await pool.query(
-      `INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, location, notes, status)
+      `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, notes, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'scheduled') RETURNING *`,
-      [classTypeId, instructorId || null, startTime, endTime || null, capacity, location || null, notes || null]
+      [classTypeId, instructorId, dateStr, startTimeStr, endTimeStr, cap, notes || null]
     );
     return res.status(201).json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+  } catch (err) { console.error("POST /classes error:", err); return res.status(500).json({ message: "Error interno" }); }
 });
 
 // PUT /api/classes/:id/cancel

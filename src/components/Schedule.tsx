@@ -6,7 +6,7 @@ import {
   isToday, addWeeks, subWeeks, differenceInMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, ChevronLeft, ChevronRight, Clock, User } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import api from "@/lib/api";
 import { BookingDialog, type ClassItem } from "@/components/BookingDialog";
 
@@ -21,7 +21,9 @@ interface ApiClass {
   class_type_name: string;
   class_type_color: string;
   instructor_name: string;
+  instructor_photo?: string;
   capacity: number;
+  max_capacity?: number;
   current_bookings: number;
   status: string;
 }
@@ -33,6 +35,7 @@ interface ScheduleClass {
   endTime: string;
   duration: number;
   instructor: string;
+  instructorPhoto?: string | null;
   spots: number;
   maxSpots: number;
   color: string;
@@ -99,17 +102,26 @@ export default function Schedule() {
     return rawClasses
       .filter((c) => c.status !== "cancelled")
       .map((c) => {
-        const dateStr = (c.date || c.class_date || "").split("T")[0];
-        const available = (c.capacity ?? 0) - (c.current_bookings ?? 0);
+        // start_time is now a full ISO string "YYYY-MM-DDTHH:mm" from the server
+        const dateStr = (c.date || c.class_date || (c.start_time?.split("T")[0]) || "").split("T")[0];
+        // Extract just the HH:mm part from whatever format start_time comes in
+        const startTimePart = c.start_time?.includes("T")
+          ? c.start_time.split("T")[1].slice(0, 5)
+          : (c.start_time ?? "00:00").slice(0, 5);
+        const endTimePart = c.end_time?.includes("T")
+          ? c.end_time.split("T")[1].slice(0, 5)
+          : (c.end_time ?? "").slice(0, 5);
+        const available = (c.capacity ?? c.max_capacity ?? 0) - (c.current_bookings ?? 0);
         return {
           id:         c.id,
           name:       c.class_type_name ?? "Clase",
-          time:       `${dateStr}T${(c.start_time ?? "00:00:00").slice(0, 5)}`,
-          endTime:    c.end_time ?? "",
+          time:       `${dateStr}T${startTimePart}`,
+          endTime:    endTimePart,
           duration:   50,
           instructor: c.instructor_name ?? "Por confirmar",
+          instructorPhoto: (c as any).instructor_photo ?? null,
           spots:      Math.max(0, available),
-          maxSpots:   c.capacity ?? 1,
+          maxSpots:   c.capacity ?? (c as any).max_capacity ?? 1,
           color:      c.class_type_color || fallbackColors[c.class_type_name] || DEFAULT_COLOR,
         };
       });
@@ -418,7 +430,20 @@ export default function Schedule() {
                           {cls.endTime ? ` — ${cls.endTime.slice(0, 5)}` : ` · ${cls.duration} min`}
                         </span>
                         <span className="flex items-center gap-1.5">
-                          <User size={12} />
+                          {cls.instructorPhoto ? (
+                            <img
+                              src={cls.instructorPhoto}
+                              alt={cls.instructor}
+                              className="w-5 h-5 rounded-full object-cover ring-1 ring-border"
+                            />
+                          ) : (
+                            <span
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-[0.55rem] font-bold text-white shrink-0"
+                              style={{ background: isPast ? "#888" : cls.color }}
+                            >
+                              {cls.instructor.split(" ").map((w) => w[0]).slice(0, 2).join("")}
+                            </span>
+                          )}
                           {cls.instructor}
                         </span>
                       </div>

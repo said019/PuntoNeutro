@@ -41,10 +41,13 @@ interface ClassInstance {
   classTypeColor?: string;
   instructorId: string;
   instructorName?: string;
+  instructorPhoto?: string;
   startTime: string;
   endTime: string;
   maxCapacity: number;
+  capacity?: number;
   bookedCount?: number;
+  currentBookings?: number;
   isCancelled: boolean;
   notes?: string;
 }
@@ -189,7 +192,29 @@ function CalendarTab({
 
   const { data } = useQuery<{ data: ClassInstance[] }>({
     queryKey: ["classes", start, end],
-    queryFn: async () => (await api.get("/classes?start=" + start + "&end=" + end)).data,
+    queryFn: async () => {
+      const res = await api.get("/classes?start=" + start + "&end=" + end);
+      const raw: any[] = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      // Normalise snake_case → camelCase expected by ClassInstance
+      const mapped: ClassInstance[] = raw.map((c: any) => ({
+        id:               c.id,
+        classTypeId:      c.class_type_id,
+        classTypeName:    c.class_type_name,
+        classTypeColor:   c.class_type_color,
+        instructorId:     c.instructor_id,
+        instructorName:   c.instructor_name,
+        instructorPhoto:  c.instructor_photo,
+        startTime:        c.start_time,   // already full ISO from server normalisation
+        endTime:          c.end_time,
+        maxCapacity:      c.max_capacity ?? c.capacity ?? 10,
+        capacity:         c.max_capacity ?? c.capacity ?? 10,
+        bookedCount:      c.current_bookings ?? 0,
+        currentBookings:  c.current_bookings ?? 0,
+        isCancelled:      c.status === "cancelled" || c.is_cancelled === true,
+        notes:            c.notes,
+      }));
+      return { data: mapped };
+    },
   });
   const classes = Array.isArray(data?.data) ? data.data : [];
 
@@ -264,7 +289,27 @@ function CalendarTab({
                   >
                     <div className="font-medium truncate">{c.classTypeName ?? "Clase"}</div>
                     <div className="text-muted-foreground">{c.startTime ? format(parseISO(c.startTime), "HH:mm") : ""}</div>
-                    <div className="text-muted-foreground">{(c.bookedCount ?? 0) + "/" + c.maxCapacity}</div>
+                    {/* Instructor avatar */}
+                    <div className="flex items-center gap-1 mt-1">
+                      {c.instructorPhoto ? (
+                        <img
+                          src={c.instructorPhoto}
+                          alt={c.instructorName ?? ""}
+                          className="w-4 h-4 rounded-full object-cover ring-1 ring-white/30"
+                        />
+                      ) : (
+                        <span
+                          className="w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold text-white ring-1 ring-white/30"
+                          style={{ background: c.classTypeColor ?? "#CA71E1" }}
+                        >
+                          {(c.instructorName ?? "?")[0].toUpperCase()}
+                        </span>
+                      )}
+                      <span className="text-muted-foreground truncate text-[0.65rem]">{c.instructorName ?? "—"}</span>
+                    </div>
+                    <div className="text-muted-foreground mt-0.5">
+                      {(c.bookedCount ?? c.currentBookings ?? 0)}/{c.maxCapacity ?? c.capacity ?? "?"}
+                    </div>
                     {c.isCancelled && <Badge variant="destructive" className="text-[0.6rem] px-1 mt-1">Cancelada</Badge>}
                   </div>
                 ))}
@@ -332,9 +377,22 @@ function CalendarTab({
           <SheetHeader><SheetTitle>{selectedClass?.classTypeName ?? "Clase"}</SheetTitle></SheetHeader>
           {selectedClass && (
             <div className="mt-6 space-y-4 text-sm">
-              <div><span className="font-medium">Instructor:</span> {selectedClass.instructorName ?? selectedClass.instructorId}</div>
+              {/* Instructor with avatar */}
+              <div className="flex items-center gap-3">
+                {selectedClass.instructorPhoto ? (
+                  <img src={selectedClass.instructorPhoto} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-offset-1" style={{ outline: `2px solid ${selectedClass.classTypeColor ?? "#CA71E1"}` }} />
+                ) : (
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm" style={{ background: selectedClass.classTypeColor ?? "#CA71E1" }}>
+                    {(selectedClass.instructorName ?? "?")[0].toUpperCase()}
+                  </span>
+                )}
+                <div>
+                  <div className="font-medium">{selectedClass.instructorName ?? selectedClass.instructorId}</div>
+                  <div className="text-xs text-muted-foreground">Instructor</div>
+                </div>
+              </div>
               <div><span className="font-medium">Inicio:</span> {selectedClass.startTime ? new Date(selectedClass.startTime).toLocaleString("es-MX") : "—"}</div>
-              <div><span className="font-medium">Cupo:</span> {(selectedClass.bookedCount ?? 0) + " / " + selectedClass.maxCapacity}</div>
+              <div><span className="font-medium">Cupo:</span> {(selectedClass.bookedCount ?? selectedClass.currentBookings ?? 0) + " / " + (selectedClass.maxCapacity ?? selectedClass.capacity ?? "?")}</div>
               {selectedClass.notes && <div><span className="font-medium">Notas:</span> {selectedClass.notes}</div>}
               <div className="pt-4 flex flex-col gap-2">
                 {!selectedClass.isCancelled && (
