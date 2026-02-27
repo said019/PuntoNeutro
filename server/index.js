@@ -410,6 +410,10 @@ async function ensureSchema() {
     await pool.query(`
       UPDATE memberships SET classes_remaining = NULL WHERE classes_remaining >= 9999;
     `).catch(() => {});
+    // ── memberships: track how many times a user has cancelled ────────────
+    await pool.query(`
+      ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0;
+    `).catch(() => {});
     // ── discount_codes: normalise discount_type values ────────────────────
     await pool.query(`
       ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0;
@@ -1041,40 +1045,92 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
 // DELETE /api/bookings/:id
 app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
   try {
+    // Load booking
     const r = await pool.query(
-      "SELECT * FROM bookings WHERE id = $1 AND user_id = $2",
+      `SELECT b.*, c.date, c.start_time
+       FROM bookings b
+       JOIN classes c ON b.class_id = c.id
+       WHERE b.id = $1 AND b.user_id = $2`,
       [req.params.id, req.userId]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "Reserva no encontrada" });
     const booking = r.rows[0];
+
+    if (booking.status === "cancelled") {
+      return res.status(400).json({ message: "Esta reserva ya fue cancelada" });
+    }
+
+    // ── Check membership cancellation limit (max 2 per membership period) ──
+    let membership = null;
+    if (booking.membership_id) {
+      const memRes = await pool.query(
+        "SELECT id, classes_remaining, cancellations_used, plan_id FROM memberships WHERE id = $1",
+        [booking.membership_id]
+      );
+      membership = memRes.rows[0] ?? null;
+    }
+
+    if (membership && (membership.cancellations_used ?? 0) >= 2) {
+      return res.status(403).json({
+        message: "Has alcanzado el límite de 2 cancelaciones permitidas en tu membresía actual. Contacta con el studio si necesitas ayuda.",
+      });
+    }
+
+    // ── Check 2-hour advance notice window ─────────────────────────────────
+    const dateStr  = booking.date?.toISOString?.()?.split("T")[0] ?? String(booking.date).split("T")[0];
+    const timeStr  = String(booking.start_time).slice(0, 5);           // "HH:MM"
+    const classStart = new Date(`${dateStr}T${timeStr}:00`);
+    const now        = new Date();
+    const minutesUntilClass = (classStart.getTime() - now.getTime()) / 60_000;
+    const isLate     = minutesUntilClass < 120; // less than 2 hours
+
+    // Cancel the booking
     await pool.query(
       "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1",
       [req.params.id]
     );
-    // Restore class slot if was confirmed
+
     if (booking.status === "confirmed") {
+      // Always free the class spot
       await pool.query(
         "UPDATE classes SET current_bookings = GREATEST(current_bookings - 1, 0) WHERE id = $1",
         [booking.class_id]
       );
-      // Restore class credit if membership had limit
-      if (booking.membership_id) {
-        const memRes = await pool.query(
-          "SELECT classes_remaining, plan_id FROM memberships WHERE id = $1",
-          [booking.membership_id]
+
+      if (membership) {
+        // Increment cancellations_used regardless of timing
+        await pool.query(
+          "UPDATE memberships SET cancellations_used = COALESCE(cancellations_used, 0) + 1 WHERE id = $1",
+          [membership.id]
         );
-        if (memRes.rows.length > 0 && memRes.rows[0].classes_remaining !== null) {
+
+        if (isLate) {
+          // Late cancellation: credit is LOST — do not restore
+          return res.json({
+            message: "Reserva cancelada. Por ser con menos de 2 horas de anticipación, la clase NO se devuelve a tu paquete.",
+            creditRestored: false,
+          });
+        }
+
+        // On-time cancellation: restore credit only if membership has a counted limit
+        if (membership.classes_remaining !== null && membership.classes_remaining < 9999) {
           await pool.query(
             "UPDATE memberships SET classes_remaining = classes_remaining + 1 WHERE id = $1",
-            [booking.membership_id]
+            [membership.id]
           );
         }
       }
     }
-    return res.json({ message: "Reserva cancelada" });
+
+    return res.json({
+      message: isLate
+        ? "Reserva cancelada. La clase no se devolvió al paquete (cancelación tardía)."
+        : "Reserva cancelada. Se devolvió el crédito a tu paquete.",
+      creditRestored: !isLate,
+    });
   } catch (err) {
-    console.error("DELETE bookings error:", err);
-    return res.status(500).json({ message: "Error interno" });
+    console.error("DELETE bookings error:", err.message, err.stack);
+    return res.status(500).json({ message: "Error interno", detail: err.message });
   }
 });
 
