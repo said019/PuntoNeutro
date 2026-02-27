@@ -294,6 +294,21 @@ async function ensureSchema() {
       );
       CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
     `);
+    // ── Payment proofs table ────────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_proofs (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        order_id    UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        file_url    TEXT NOT NULL,
+        file_name   VARCHAR(255),
+        mime_type   VARCHAR(100),
+        status      VARCHAR(30) NOT NULL DEFAULT 'pending',
+        uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP WITH TIME ZONE,
+        CONSTRAINT uq_payment_proofs_order UNIQUE (order_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_payment_proofs_order ON payment_proofs(order_id);
+    `);
     // ── Instructors table ──────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS instructors (
@@ -990,19 +1005,34 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.single("proof"), async 
       [req.params.id, req.userId]
     );
     if (orderRes.rows.length === 0) return res.status(404).json({ message: "Orden no encontrada" });
-    // In production you'd upload to cloud storage. For now, store a placeholder.
-    const fileUrl = req.file
-      ? `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64").slice(0, 20)}...`
-      : req.body.fileUrl || "uploaded";
-    const fileName = req.file?.originalname || "comprobante";
+
+    // Store file as base64 data-URI (no external storage needed)
+    let fileUrl, fileName, mimeType;
+    if (req.file) {
+      mimeType  = req.file.mimetype;
+      fileName  = req.file.originalname;
+      fileUrl   = `data:${mimeType};base64,${req.file.buffer.toString("base64")}`;
+    } else if (req.body.fileUrl) {
+      fileUrl  = req.body.fileUrl;
+      fileName = req.body.fileName || "comprobante";
+      mimeType = req.body.mimeType || "application/octet-stream";
+    } else {
+      return res.status(400).json({ message: "No se recibió ningún archivo" });
+    }
+
     await pool.query(
       `INSERT INTO payment_proofs (order_id, file_url, file_name, mime_type, status)
        VALUES ($1, $2, $3, $4, 'pending')
-       ON CONFLICT DO NOTHING`,
-      [req.params.id, fileUrl, fileName, req.file?.mimetype || "application/octet-stream"]
+       ON CONFLICT (order_id) DO UPDATE
+         SET file_url    = EXCLUDED.file_url,
+             file_name   = EXCLUDED.file_name,
+             mime_type   = EXCLUDED.mime_type,
+             status      = 'pending',
+             uploaded_at = NOW()`,
+      [req.params.id, fileUrl, fileName, mimeType]
     );
     await pool.query(
-      "UPDATE orders SET status = 'pending_verification', paid_at = NOW() WHERE id = $1",
+      "UPDATE orders SET status = 'pending_verification', paid_at = COALESCE(paid_at, NOW()) WHERE id = $1",
       [req.params.id]
     );
     return res.json({ message: "Comprobante recibido — estamos verificando tu pago" });
