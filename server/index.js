@@ -87,7 +87,7 @@ async function ensureSchema() {
         name         VARCHAR(100) NOT NULL,
         subtitle     VARCHAR(150),
         description  TEXT,
-        category     VARCHAR(20)  NOT NULL DEFAULT 'jumping' CHECK (category IN ('jumping','pilates','mixto')),
+        category     VARCHAR(20)  NOT NULL DEFAULT 'jumping' CHECK (category IN ('jumping','pilates')),
         intensity    VARCHAR(20)  DEFAULT 'media' CHECK (intensity IN ('ligera','media','pesada','todas')),
         level        VARCHAR(50)  DEFAULT 'Todos los niveles',
         duration_min INTEGER      DEFAULT 50,
@@ -241,6 +241,13 @@ async function ensureSchema() {
       ALTER TABLE plans ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
       ALTER TABLE plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
       ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_category VARCHAR(20) DEFAULT 'all';
+    `);
+    // ── Migrate class_types: remove 'mixto' category (now only jumping/pilates) ──
+    await pool.query(`
+      UPDATE class_types SET category = 'jumping' WHERE category NOT IN ('jumping','pilates');
+    `).catch(() => {});
+    // ── Migrate plans: 'mixto' class_category means both, keep as 'mixto' for logic ──
+    // (mixto plans are still valid — the booking endpoint allows them on both categories)
     `);
     // ── Seed plans: remove old schema_complete.sql plans & ensure only correct ones ──
     // Delete old plans that came from the migration seed (wrong data)
@@ -941,23 +948,42 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
   const { classId } = req.body;
   if (!classId) return res.status(400).json({ message: "classId requerido" });
   try {
-    // Check membership
+    // Check membership (get class_category from the joined plan)
     const memRes = await pool.query(
-      `SELECT id, classes_remaining FROM memberships
-       WHERE user_id = $1 AND status = 'active' AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+      `SELECT m.id, m.classes_remaining, p.class_category
+       FROM memberships m
+       JOIN plans p ON m.plan_id = p.id
+       WHERE m.user_id = $1 AND m.status = 'active' AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
        LIMIT 1`,
       [req.userId]
     );
     if (memRes.rows.length === 0) return res.status(403).json({ message: "No tienes membresía activa" });
     const membership = memRes.rows[0];
-    // Check if class exists and has capacity
+
+    // Check if class exists, has capacity, and get its category
     const classRes = await pool.query(
-      "SELECT id, max_capacity, current_bookings, status FROM classes WHERE id = $1",
+      `SELECT c.id, c.max_capacity, c.current_bookings, c.status, ct.category AS class_category
+       FROM classes c
+       JOIN class_types ct ON c.class_type_id = ct.id
+       WHERE c.id = $1`,
       [classId]
     );
     if (classRes.rows.length === 0) return res.status(404).json({ message: "Clase no encontrada" });
     const cls = classRes.rows[0];
     if (cls.status === "cancelled") return res.status(400).json({ message: "Esta clase fue cancelada" });
+
+    // ── Category validation ────────────────────────────────────────────────
+    // mixto memberships can book any category (jumping or pilates)
+    // jumping memberships can only book jumping classes
+    // pilates memberships can only book pilates classes
+    const memCategory = membership.class_category; // 'jumping' | 'pilates' | 'mixto'
+    const clsCategory = cls.class_category;         // 'jumping' | 'pilates'
+    if (memCategory !== "mixto" && memCategory !== clsCategory) {
+      const label = clsCategory === "jumping" ? "Jumping" : "Pilates";
+      return res.status(403).json({
+        message: `Tu membresía no incluye clases de ${label}. Necesitas una membresía ${label} o Mixta.`,
+      });
+    }
     // Check duplicate
     const dupRes = await pool.query(
       "SELECT id FROM bookings WHERE class_id = $1 AND user_id = $2 AND status != 'cancelled'",
@@ -1931,7 +1957,7 @@ app.get("/api/class-types", async (req, res) => {
 app.post("/api/class-types", adminMiddleware, async (req, res) => {
   const { name, color, category, defaultDuration, maxCapacity, isActive } = req.body;
   if (!name?.trim()) return res.status(400).json({ message: "name requerido" });
-  const validCategories = ["jumping", "pilates", "mixto"];
+  const validCategories = ["jumping", "pilates"];
   const cat = validCategories.includes(category) ? category : "jumping";
   try {
     const r = await pool.query(
@@ -1946,7 +1972,7 @@ app.post("/api/class-types", adminMiddleware, async (req, res) => {
 // PUT /api/class-types/:id — alias CRUD (admin)
 app.put("/api/class-types/:id", adminMiddleware, async (req, res) => {
   const { name, color, category, defaultDuration, maxCapacity, isActive } = req.body;
-  const validCategories = ["jumping", "pilates", "mixto"];
+  const validCategories = ["jumping", "pilates"];
   const cat = validCategories.includes(category) ? category : null;
   try {
     const r = await pool.query(

@@ -57,7 +57,7 @@ interface ClassType {
   id: string;
   name: string;
   color: string;
-  category?: "jumping" | "pilates" | "mixto";
+  category?: "jumping" | "pilates";
   defaultDuration?: number;
   durationMin?: number;
   maxCapacity?: number;
@@ -98,7 +98,7 @@ type ClassFormData = z.infer<typeof classSchema>;
 const typeSchema = z.object({
   name: z.string().min(1),
   color: z.string().default("#CA71E1"),
-  category: z.enum(["jumping", "pilates", "mixto"]).default("jumping"),
+  category: z.enum(["jumping", "pilates"]).default("jumping"),
   defaultDuration: z.coerce.number().min(1),
   maxCapacity: z.coerce.number().min(1),
   isActive: z.boolean().default(true),
@@ -469,7 +469,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
     form.reset({
       name: t.name,
       color: t.color,
-      category: t.category ?? "jumping",
+      category: (t.category === "pilates" ? "pilates" : "jumping") as "jumping" | "pilates",
       defaultDuration: t.defaultDuration ?? t.durationMin ?? 50,
       maxCapacity: t.maxCapacity ?? t.capacity ?? 10,
       isActive: t.isActive ?? true,
@@ -513,7 +513,6 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
                 <TableCell>
                   {t.category === "jumping" && <Badge className="bg-[#E15CB8]/20 text-[#E15CB8] border border-[#E15CB8]/30">Jumping</Badge>}
                   {t.category === "pilates" && <Badge className="bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30">Pilates</Badge>}
-                  {t.category === "mixto"   && <Badge className="bg-[#E7EB6E]/20 text-yellow-400 border border-[#E7EB6E]/40">Mixto</Badge>}
                   {!t.category && <Badge variant="secondary">—</Badge>}
                 </TableCell>
                 <TableCell>{(t.defaultDuration ?? t.durationMin ?? "—") + " min"}</TableCell>
@@ -558,15 +557,14 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
               <Label>Categoría</Label>
               <Select
                 value={form.watch("category")}
-                onValueChange={(v) => form.setValue("category", v as "jumping" | "pilates" | "mixto")}
+                onValueChange={(v) => form.setValue("category", v as "jumping" | "pilates")}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="jumping">🏃 Jumping</SelectItem>
-                  <SelectItem value="pilates">🧘 Pilates</SelectItem>
-                  <SelectItem value="mixto">⚡ Mixto</SelectItem>
+                  <SelectItem value="jumping">Jumping</SelectItem>
+                  <SelectItem value="pilates">Pilates</SelectItem>
                 </SelectContent>
               </Select>
             </div>
