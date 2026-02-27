@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
-import { ClientLayout } from "@/components/layout/ClientLayout";
+import ClientLayout from "@/components/layout/ClientLayout";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
