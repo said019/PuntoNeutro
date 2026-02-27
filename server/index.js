@@ -401,6 +401,15 @@ async function ensureSchema() {
       ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID;
       CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_order ON memberships(order_id) WHERE order_id IS NOT NULL;
     `);
+    // ── memberships: add fallback name/limit override columns ─────────────
+    await pool.query(`
+      ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255);
+      ALTER TABLE memberships ADD COLUMN IF NOT EXISTS class_limit_override INTEGER;
+    `).catch(() => {});
+    // Fix existing 9999 unlimited sentinel values → NULL
+    await pool.query(`
+      UPDATE memberships SET classes_remaining = NULL WHERE classes_remaining >= 9999;
+    `).catch(() => {});
     // ── discount_codes: normalise discount_type values ────────────────────
     await pool.query(`
       ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0;
@@ -818,20 +827,30 @@ app.get("/api/plans", async (req, res) => {
 app.get("/api/memberships/my", authMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT m.*, p.name AS plan_name, p.class_limit, p.duration_days, p.features, p.class_category
+      `SELECT m.*,
+              COALESCE(p.name, m.plan_name_override, 'Plan personalizado') AS plan_name,
+              COALESCE(p.class_limit, m.class_limit_override)              AS class_limit,
+              COALESCE(p.duration_days, 30)                                AS duration_days,
+              p.features,
+              COALESCE(p.class_category, 'all')                           AS class_category
        FROM memberships m
-       JOIN plans p ON m.plan_id = p.id
+       LEFT JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1
        ORDER BY CASE m.status
-         WHEN 'active' THEN 1
-         WHEN 'pending_activation' THEN 2
-         WHEN 'pending_payment' THEN 3
+         WHEN 'active'              THEN 1
+         WHEN 'pending_activation'  THEN 2
+         WHEN 'pending_payment'     THEN 3
          ELSE 4 END,
          m.created_at DESC
        LIMIT 1`,
       [req.userId]
     );
-    return res.json({ data: r.rows[0] ? camelRows([r.rows[0]])[0] : null });
+    if (!r.rows[0]) return res.json({ data: null });
+    const row = camelRows([r.rows[0]])[0];
+    // Treat 9999 or very large numbers as unlimited (null)
+    if (row.classesRemaining >= 9999) row.classesRemaining = null;
+    if (row.classLimit    >= 9999) row.classLimit    = null;
+    return res.json({ data: row });
   } catch (err) {
     console.error("Memberships/my error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -1003,8 +1022,8 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
         "UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1",
         [classId]
       );
-      // Deduct class credit if plan has limit
-      if (membership.classes_remaining !== null) {
+      // Deduct class credit only if membership has a real limit (not null and not 9999+)
+      if (membership.classes_remaining !== null && membership.classes_remaining < 9999) {
         await pool.query(
           "UPDATE memberships SET classes_remaining = classes_remaining - 1 WHERE id = $1",
           [membership.id]
@@ -2876,7 +2895,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const r = await pool.query(
       `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining)
        VALUES ($1,$2,'active',$3,$4,$5,$6) RETURNING *`,
-      [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? 9999]
+      [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
