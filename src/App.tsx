@@ -33,6 +33,7 @@ import ReferFriends from "./pages/client/ReferFriends";
 import VideoLibrary from "./pages/client/VideoLibrary";
 import VideoPlayer from "./pages/client/VideoPlayer";
 import Notifications from "./pages/client/Notifications";
+import Events from "./pages/client/Events";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -59,6 +60,7 @@ import VideoSalesVerification from "./pages/admin/videos/VideoSalesVerification"
 import ReportsPage from "./pages/admin/reports/ReportsPage";
 import AdminReviewsDashboard from "./pages/admin/reviews/AdminReviewsDashboard";
 import SettingsPage from "./pages/admin/settings/SettingsPage";
+import EventsManager from "./pages/admin/events/EventsManager";
 
 // Legal pages
 import Privacidad from "./pages/legal/Privacidad";
@@ -111,6 +113,7 @@ const App = () => (
           <Route path="/app/wallet/rewards" element={<WalletRewards />} />
           <Route path="/app/videos" element={<VideoLibrary />} />
           <Route path="/app/videos/:videoId" element={<VideoPlayer />} />
+          <Route path="/app/events" element={<Events />} />
           <Route path="/app/profile" element={<Profile />} />
           <Route path="/app/profile/edit" element={<ProfileEdit />} />
           <Route path="/app/profile/membership" element={<ProfileMembership />} />
@@ -144,6 +147,7 @@ const App = () => (
           <Route path="/admin/reports" element={<ReportsPage />} />
           <Route path="/admin/reviews" element={<AdminReviewsDashboard />} />
           <Route path="/admin/settings" element={<SettingsPage />} />
+          <Route path="/admin/events" element={<EventsManager />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />

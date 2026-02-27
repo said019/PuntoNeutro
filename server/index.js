@@ -414,6 +414,74 @@ async function ensureSchema() {
         ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
       `);
     } catch { /* video_purchases table may not exist yet */ }
+
+    // ── Módulo de Eventos ────────────────────────────────────────────────
+    await pool.query(`
+      DO $$ BEGIN
+        CREATE TYPE event_type AS ENUM (
+          'masterclass','workshop','retreat','challenge','openhouse','special'
+        );
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS events (
+        id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        type                event_type NOT NULL,
+        title               VARCHAR(200) NOT NULL,
+        description         TEXT NOT NULL,
+        instructor_name     VARCHAR(100) NOT NULL,
+        instructor_photo    TEXT,
+        date                DATE NOT NULL,
+        start_time          TIME NOT NULL,
+        end_time            TIME NOT NULL,
+        location            VARCHAR(200) NOT NULL,
+        capacity            INTEGER NOT NULL DEFAULT 1,
+        registered          INTEGER DEFAULT 0,
+        price               NUMERIC(10,2) NOT NULL DEFAULT 0,
+        currency            VARCHAR(3) DEFAULT 'MXN',
+        early_bird_price    NUMERIC(10,2),
+        early_bird_deadline DATE,
+        member_discount     NUMERIC(5,2) DEFAULT 0,
+        image               TEXT,
+        requirements        VARCHAR(500) DEFAULT '',
+        includes            JSONB DEFAULT '[]',
+        tags                JSONB DEFAULT '[]',
+        status              VARCHAR(20) DEFAULT 'draft',
+        created_by          UUID,
+        created_at          TIMESTAMPTZ DEFAULT NOW(),
+        updated_at          TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS event_registrations (
+        id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        event_id                UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        user_id                 UUID,
+        name                    VARCHAR(100) NOT NULL,
+        email                   VARCHAR(255) NOT NULL,
+        phone                   VARCHAR(20) DEFAULT '',
+        status                  VARCHAR(20) DEFAULT 'pending',
+        amount                  NUMERIC(10,2) DEFAULT 0,
+        payment_method          VARCHAR(20),
+        payment_reference       VARCHAR(200),
+        payment_proof_url       TEXT,
+        payment_proof_file_name VARCHAR(255),
+        transfer_date           DATE,
+        paid_at                 TIMESTAMPTZ,
+        checked_in              BOOLEAN DEFAULT false,
+        checked_in_at           TIMESTAMPTZ,
+        checked_in_by           UUID,
+        waitlist_position       INTEGER,
+        notes                   TEXT,
+        created_at              TIMESTAMPTZ DEFAULT NOW(),
+        updated_at              TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_events_status    ON events(status);
+      CREATE INDEX IF NOT EXISTS idx_events_date       ON events(date);
+      CREATE INDEX IF NOT EXISTS idx_events_type       ON events(type);
+      CREATE INDEX IF NOT EXISTS idx_event_regs_event  ON event_registrations(event_id);
+      CREATE INDEX IF NOT EXISTS idx_event_regs_user   ON event_registrations(user_id);
+      CREATE INDEX IF NOT EXISTS idx_event_regs_status ON event_registrations(status);
+    `);
+
     console.log("✅ Schema ensured");
   } catch (err) {
     console.error("Schema migration warning:", err.message);
@@ -3428,6 +3496,487 @@ app.delete("/api/admin/reviews/:id", adminMiddleware, async (req, res) => {
     await pool.query("DELETE FROM reviews WHERE id = $1", [req.params.id]);
     return res.json({ message: "Reseña eliminada" });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── MÓDULO DE EVENTOS ────────────────────────────────────────────────────────
+
+/** Helper: normalize a DB row to camelCase API shape */
+function mapEventRow(row) {
+  const toYMD = (v) => {
+    if (!v) return null;
+    if (typeof v === "string") return v.slice(0, 10);
+    return new Date(v).toISOString().slice(0, 10);
+  };
+  const toHM = (v) => {
+    if (!v) return null;
+    return String(v).slice(0, 5);
+  };
+  return {
+    id:                 row.id,
+    title:              row.title,
+    description:        row.description,
+    type:               row.type,
+    instructor:         row.instructor_name,
+    instructorPhoto:    row.instructor_photo || null,
+    date:               toYMD(row.date),
+    startTime:          toHM(row.start_time),
+    endTime:            toHM(row.end_time),
+    location:           row.location,
+    capacity:           Number(row.capacity),
+    registered:         Number(row.registered || 0),
+    price:              Number(row.price || 0),
+    currency:           row.currency || "MXN",
+    earlyBirdPrice:     row.early_bird_price != null ? Number(row.early_bird_price) : null,
+    earlyBirdDeadline:  toYMD(row.early_bird_deadline),
+    memberDiscount:     Number(row.member_discount || 0),
+    image:              row.image || null,
+    requirements:       row.requirements || "",
+    includes:           Array.isArray(row.includes) ? row.includes : (row.includes ? JSON.parse(row.includes) : []),
+    tags:               Array.isArray(row.tags) ? row.tags : (row.tags ? JSON.parse(row.tags) : []),
+    status:             row.status,
+    createdAt:          row.created_at,
+    updatedAt:          row.updated_at,
+  };
+}
+
+function mapRegRow(row) {
+  return {
+    id:                   row.id,
+    userId:               row.user_id || null,
+    name:                 row.name,
+    email:                row.email,
+    phone:                row.phone || "",
+    status:               row.status,
+    amount:               Number(row.amount || 0),
+    paymentMethod:        row.payment_method || null,
+    paymentReference:     row.payment_reference || null,
+    hasPaymentProof:      !!row.payment_proof_url,
+    paymentProofFileName: row.payment_proof_file_name || null,
+    transferDate:         row.transfer_date ? String(row.transfer_date).slice(0, 10) : null,
+    paidAt:               row.paid_at || null,
+    checkedIn:            !!row.checked_in,
+    checkedInAt:          row.checked_in_at || null,
+    waitlistPosition:     row.waitlist_position || null,
+    notes:                row.notes || null,
+    createdAt:            row.created_at,
+  };
+}
+
+// ── GET /api/events — Lista pública (solo published) ──────────────────────────
+app.get("/api/events", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    let userId = null;
+    if (token) {
+      try { userId = jwt.verify(token, JWT_SECRET).userId; } catch {}
+    }
+    const { type, upcoming } = req.query;
+    const conditions = ["e.status = 'published'"];
+    const params = [];
+    if (type) { conditions.push(`e.type = $${params.length + 1}`); params.push(type); }
+    if (upcoming === "true") { conditions.push(`e.date >= CURRENT_DATE`); }
+    const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+    const rows = await pool.query(
+      `SELECT * FROM events e ${where} ORDER BY e.date ASC, e.start_time ASC`,
+      params
+    );
+    return res.json(rows.rows.map(mapEventRow));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── GET /api/events/admin/all — Todos los eventos con inscripciones ──────────
+app.get("/api/events/admin/all", adminMiddleware, async (req, res) => {
+  try {
+    const evRows = await pool.query(
+      `SELECT * FROM events ORDER BY date DESC, start_time DESC`
+    );
+    const regRows = await pool.query(
+      `SELECT er.*, u.display_name FROM event_registrations er
+       LEFT JOIN users u ON er.user_id = u.id
+       ORDER BY er.created_at ASC`
+    );
+    const regsByEvent = {};
+    for (const r of regRows.rows) {
+      if (!regsByEvent[r.event_id]) regsByEvent[r.event_id] = [];
+      regsByEvent[r.event_id].push(mapRegRow(r));
+    }
+    const events = evRows.rows.map((e) => ({
+      ...mapEventRow(e),
+      registrations: regsByEvent[e.id] || [],
+    }));
+    return res.json(events);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── GET /api/events/:id — Detalle de evento ───────────────────────────────────
+app.get("/api/events/:id", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    let userId = null;
+    let isAdmin = false;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.userId;
+        isAdmin = decoded.role === "admin" || decoded.role === "super_admin";
+      } catch {}
+    }
+    const evRes = await pool.query("SELECT * FROM events WHERE id = $1", [req.params.id]);
+    if (!evRes.rows.length) return res.status(404).json({ message: "Evento no encontrado" });
+    const ev = evRes.rows[0];
+    if (!isAdmin && ev.status !== "published") return res.status(404).json({ message: "Evento no disponible" });
+    const result = mapEventRow(ev);
+    if (userId) {
+      const regRes = await pool.query(
+        `SELECT * FROM event_registrations WHERE event_id = $1 AND user_id = $2 AND status != 'cancelled' LIMIT 1`,
+        [req.params.id, userId]
+      );
+      result.myRegistration = regRes.rows.length ? mapRegRow(regRes.rows[0]) : null;
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── POST /api/events — Crear evento ──────────────────────────────────────────
+app.post("/api/events", adminMiddleware, async (req, res) => {
+  try {
+    const {
+      type, title, description, instructor_name, instructor_photo,
+      date, start_time, end_time, location, capacity = 12, price = 0,
+      early_bird_price, early_bird_deadline, member_discount = 0,
+      image, requirements = "", includes = [], tags = [],
+      status = "draft",
+    } = req.body;
+    if (!type || !title || !description || !instructor_name || !date || !start_time || !end_time || !location) {
+      return res.status(400).json({ message: "Faltan campos requeridos" });
+    }
+    const r = await pool.query(
+      `INSERT INTO events (type, title, description, instructor_name, instructor_photo,
+        date, start_time, end_time, location, capacity, price, early_bird_price,
+        early_bird_deadline, member_discount, image, requirements, includes, tags,
+        status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+       RETURNING *`,
+      [
+        type, title, description, instructor_name, instructor_photo || null,
+        date, start_time, end_time, location, capacity, price,
+        early_bird_price || null, early_bird_deadline || null, member_discount,
+        image || null, requirements,
+        JSON.stringify(Array.isArray(includes) ? includes.filter(Boolean) : []),
+        JSON.stringify(Array.isArray(tags) ? tags.filter(Boolean) : []),
+        status, req.user.userId,
+      ]
+    );
+    return res.status(201).json(mapEventRow(r.rows[0]));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── PUT /api/events/:id — Actualizar evento ───────────────────────────────────
+app.put("/api/events/:id", adminMiddleware, async (req, res) => {
+  try {
+    const allowed = [
+      "type","title","description","instructor_name","instructor_photo",
+      "date","start_time","end_time","location","capacity","price",
+      "early_bird_price","early_bird_deadline","member_discount","image",
+      "requirements","includes","tags","status",
+    ];
+    const sets = [];
+    const vals = [];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        vals.push(["includes","tags"].includes(key) ? JSON.stringify(req.body[key]) : req.body[key]);
+        sets.push(`${key} = $${vals.length}`);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ message: "Nada que actualizar" });
+    vals.push(req.params.id);
+    sets.push("updated_at = NOW()");
+    const r = await pool.query(
+      `UPDATE events SET ${sets.join(", ")} WHERE id = $${vals.length} RETURNING *`,
+      vals
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Evento no encontrado" });
+    return res.json(mapEventRow(r.rows[0]));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── DELETE /api/events/:id — Eliminar evento ──────────────────────────────────
+app.delete("/api/events/:id", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("DELETE FROM events WHERE id = $1 RETURNING id", [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ message: "Evento no encontrado" });
+    return res.json({ message: "Evento eliminado" });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── POST /api/events/:id/register — Inscribirse ───────────────────────────────
+app.post("/api/events/:id/register", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, email, phone = "", payment_method } = req.body;
+    if (!name || !email) return res.status(400).json({ message: "name y email son requeridos" });
+    const evRes = await pool.query("SELECT * FROM events WHERE id = $1 AND status = 'published'", [req.params.id]);
+    if (!evRes.rows.length) return res.status(404).json({ message: "Evento no disponible" });
+    const ev = evRes.rows[0];
+
+    // Check existing registration
+    const existingRes = await pool.query(
+      "SELECT * FROM event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1",
+      [req.params.id, userId]
+    );
+    const existing = existingRes.rows[0];
+    if (existing && existing.status !== "cancelled") {
+      return res.status(400).json({ message: "Ya estás inscrito en este evento" });
+    }
+
+    // Calculate price
+    let amount = Number(ev.price);
+    const now = new Date();
+    if (ev.early_bird_price != null && ev.early_bird_deadline) {
+      const deadline = new Date(ev.early_bird_deadline);
+      if (now <= deadline) amount = Number(ev.early_bird_price);
+    }
+    if (Number(ev.member_discount) > 0) {
+      const memRes = await pool.query(
+        `SELECT id FROM memberships WHERE user_id = $1 AND status = 'active' AND end_date >= CURRENT_DATE LIMIT 1`,
+        [userId]
+      );
+      if (memRes.rows.length) {
+        amount = Math.round(amount * (1 - Number(ev.member_discount) / 100));
+      }
+    }
+
+    // Determine status
+    const regCount = await pool.query(
+      "SELECT COUNT(*) FROM event_registrations WHERE event_id = $1 AND status = 'confirmed'",
+      [req.params.id]
+    );
+    const confirmedCount = Number(regCount.rows[0].count);
+    let regStatus = "pending";
+    let waitlistPosition = null;
+    let paidAt = null;
+    if (confirmedCount >= Number(ev.capacity)) {
+      regStatus = "waitlist";
+      const wlRes = await pool.query(
+        "SELECT COALESCE(MAX(waitlist_position), 0) + 1 AS pos FROM event_registrations WHERE event_id = $1 AND status = 'waitlist'",
+        [req.params.id]
+      );
+      waitlistPosition = wlRes.rows[0].pos;
+    } else if (amount === 0) {
+      regStatus = "confirmed";
+      paidAt = new Date();
+    }
+
+    let reg;
+    if (existing && existing.status === "cancelled") {
+      const r = await pool.query(
+        `UPDATE event_registrations SET name=$1, email=$2, phone=$3, status=$4, amount=$5,
+         payment_method=$6, payment_reference=NULL, payment_proof_url=NULL,
+         payment_proof_file_name=NULL, transfer_date=NULL,
+         paid_at=$7, waitlist_position=$8, checked_in=false, checked_in_at=NULL, updated_at=NOW()
+         WHERE id=$9 RETURNING *`,
+        [name, email, phone, regStatus, amount, payment_method || null, paidAt, waitlistPosition, existing.id]
+      );
+      reg = r.rows[0];
+    } else {
+      const r = await pool.query(
+        `INSERT INTO event_registrations (event_id, user_id, name, email, phone, status, amount, payment_method, paid_at, waitlist_position)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        [req.params.id, userId, name, email, phone, regStatus, amount, payment_method || null, paidAt, waitlistPosition]
+      );
+      reg = r.rows[0];
+    }
+
+    // Update registered count if confirmed
+    if (regStatus === "confirmed") {
+      await pool.query(
+        "UPDATE events SET registered = (SELECT COUNT(*) FROM event_registrations WHERE event_id=$1 AND status='confirmed') WHERE id=$1",
+        [req.params.id]
+      );
+    }
+
+    let message;
+    if (regStatus === "waitlist") message = `Te agregamos a la lista de espera (posición ${waitlistPosition})`;
+    else if (amount === 0) message = "¡Registro confirmado! Te esperamos en el evento.";
+    else if (payment_method === "cash") message = "Registro pendiente. Puedes pagar en recepción del studio para confirmar tu lugar.";
+    else message = "Registro pendiente de pago. Una vez confirmado tu pago, recibirás la confirmación.";
+
+    return res.status(201).json({
+      id: reg.id,
+      status: reg.status,
+      amount: Number(reg.amount),
+      isFree: amount === 0,
+      waitlistPosition,
+      message,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── DELETE /api/events/:id/register — Cancelar inscripción ───────────────────
+app.delete("/api/events/:id/register", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const regRes = await pool.query(
+      "SELECT * FROM event_registrations WHERE event_id=$1 AND user_id=$2 LIMIT 1",
+      [req.params.id, userId]
+    );
+    if (!regRes.rows.length) return res.status(404).json({ message: "No tienes inscripción en este evento" });
+    const reg = regRes.rows[0];
+    if (!["confirmed","pending","waitlist"].includes(reg.status)) {
+      return res.status(400).json({ message: "No puedes cancelar este registro" });
+    }
+    await pool.query(
+      "UPDATE event_registrations SET status='cancelled', updated_at=NOW() WHERE id=$1",
+      [reg.id]
+    );
+    await pool.query(
+      "UPDATE events SET registered = GREATEST(0, (SELECT COUNT(*) FROM event_registrations WHERE event_id=$1 AND status='confirmed')) WHERE id=$1",
+      [req.params.id]
+    );
+    return res.json({ message: "Registro cancelado exitosamente" });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── GET /api/events/:id/registrations — Inscripciones admin ──────────────────
+app.get("/api/events/:id/registrations", adminMiddleware, async (req, res) => {
+  try {
+    const rows = await pool.query(
+      `SELECT er.*, u.display_name FROM event_registrations er
+       LEFT JOIN users u ON er.user_id = u.id
+       WHERE er.event_id = $1 ORDER BY er.created_at ASC`,
+      [req.params.id]
+    );
+    return res.json(rows.rows.map(mapRegRow));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── PUT /api/events/:eventId/registrations/:regId — Actualizar status ─────────
+app.put("/api/events/:eventId/registrations/:regId", adminMiddleware, async (req, res) => {
+  try {
+    const { status, notes } = req.body;
+    const valid = ["confirmed","pending","waitlist","cancelled","no_show"];
+    if (status && !valid.includes(status)) {
+      return res.status(400).json({ message: "Status inválido" });
+    }
+    const sets = ["updated_at=NOW()"];
+    const vals = [];
+    if (status) {
+      vals.push(status);
+      sets.push(`status=$${vals.length}`);
+      if (status === "confirmed") {
+        sets.push("paid_at = COALESCE(paid_at, NOW())");
+      }
+    }
+    if (notes !== undefined) {
+      vals.push(notes);
+      sets.push(`notes=$${vals.length}`);
+    }
+    vals.push(req.params.regId);
+    const r = await pool.query(
+      `UPDATE event_registrations SET ${sets.join(",")} WHERE id=$${vals.length} AND event_id=$${vals.length + 1} RETURNING *`,
+      [...vals, req.params.eventId]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Inscripción no encontrada" });
+    // Refresh registered count
+    await pool.query(
+      "UPDATE events SET registered = (SELECT COUNT(*) FROM event_registrations WHERE event_id=$1 AND status='confirmed') WHERE id=$1",
+      [req.params.eventId]
+    );
+    return res.json({ message: "Inscripción actualizada", status: r.rows[0].status });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── POST /api/events/:eventId/checkin/:regId — Check-in ───────────────────────
+app.post("/api/events/:eventId/checkin/:regId", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE event_registrations
+       SET checked_in=true, checked_in_at=NOW(), checked_in_by=$1, updated_at=NOW()
+       WHERE id=$2 AND event_id=$3 RETURNING *`,
+      [req.user.userId, req.params.regId, req.params.eventId]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Inscripción no encontrada" });
+    return res.json({ message: "Check-in exitoso", checkedIn: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── PUT /api/events/:id/register/payment — Enviar comprobante ─────────────────
+app.put("/api/events/:id/register/payment", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { payment_method, transfer_reference, transfer_date, file_data, file_name, notes } = req.body;
+    const regRes = await pool.query(
+      "SELECT * FROM event_registrations WHERE event_id=$1 AND user_id=$2 AND status='pending' LIMIT 1",
+      [req.params.id, userId]
+    );
+    if (!regRes.rows.length) return res.status(404).json({ message: "No tienes una inscripción pendiente en este evento" });
+    const reg = regRes.rows[0];
+    if (payment_method === "transfer" && !transfer_reference && !file_data) {
+      return res.status(400).json({ message: "Debes proporcionar una referencia o comprobante de transferencia" });
+    }
+    let sets, vals;
+    if (payment_method === "cash") {
+      sets = "payment_method='cash', payment_reference=NULL, payment_proof_url=NULL, payment_proof_file_name=NULL, transfer_date=NULL, updated_at=NOW()";
+      vals = [reg.id];
+    } else {
+      sets = "payment_method='transfer', payment_reference=$1, transfer_date=$2, payment_proof_url=$3, payment_proof_file_name=$4, updated_at=NOW()";
+      vals = [transfer_reference || null, transfer_date || null, file_data || null, file_name || null, reg.id];
+      sets += ` WHERE id=$${vals.length}`;
+    }
+    let r;
+    if (payment_method === "cash") {
+      r = await pool.query(`UPDATE event_registrations SET ${sets} WHERE id=$1 RETURNING *`, vals);
+    } else {
+      r = await pool.query(`UPDATE event_registrations SET ${sets} RETURNING *`, vals);
+    }
+    return res.json({
+      message: payment_method === "cash"
+        ? "Seleccionado pago en studio. El admin confirmará tu lugar cuando pagues en recepción."
+        : "Comprobante enviado exitosamente. Tu pago será verificado pronto.",
+      registration: {
+        id: r.rows[0].id,
+        status: r.rows[0].status,
+        paymentReference: r.rows[0].payment_reference,
+        paymentProofUrl: !!r.rows[0].payment_proof_url,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
 });
 
 // ─── Serve React SPA (static) ────────────────────────────────────────────────

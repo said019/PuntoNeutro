@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import {
   LayoutDashboard, Calendar, ClipboardList, CreditCard, Package,
   Wallet, Play, User, Bell, LogOut, Menu, X, Settings,
-  ChevronRight, Sparkles,
+  ChevronRight, Sparkles, Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ const NAV_GROUPS = [
       { to: "/app",           label: "Inicio",        icon: LayoutDashboard, activeColor: "#E7EB6E" },
       { to: "/app/classes",   label: "Reservar clase", icon: Calendar,        activeColor: "#E15CB8" },
       { to: "/app/bookings",  label: "Mis reservas",   icon: ClipboardList,   activeColor: "#CA71E1" },
+      { to: "/app/events",    label: "Eventos",         icon: Ticket,          activeColor: "#E7EB6E" },
     ],
   },
   {
@@ -112,7 +113,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
     { to: "/app",          icon: LayoutDashboard, label: "Inicio",    color: "#E7EB6E" },
     { to: "/app/classes",  icon: Calendar,        label: "Clases",    color: "#E15CB8" },
     { to: "/app/bookings", icon: ClipboardList,   label: "Reservas",  color: "#CA71E1" },
-    { to: "/app/wallet",   icon: Wallet,          label: "Club",      color: "#E7EB6E" },
+    { to: "/app/events",   icon: Ticket,          label: "Eventos",   color: "#E7EB6E" },
     { to: "/app/profile",  icon: User,            label: "Perfil",    color: "#E15CB8" },
   ];
 
