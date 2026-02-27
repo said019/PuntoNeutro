@@ -4,9 +4,10 @@ import { useAuthStore } from "@/stores/authStore";
 import {
   LayoutDashboard, Calendar, ClipboardList, CreditCard, Package,
   Wallet, Play, User, Bell, LogOut, Menu, X, Settings,
-  ChevronRight, Sparkles, Ticket,
+  ChevronRight, Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import opheliaLogo from "@/assets/ophelia-logo-full.png";
 
 /* ── Navigation groups ─────────────────────────────────────────────── */
 const NAV_GROUPS = [
@@ -140,14 +141,9 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="pointer-events-none absolute left-[-40px] top-[-40px] h-[180px] w-[180px] rounded-full bg-[#CA71E1]/[0.06] blur-[60px]" />
 
         {/* ── Logo / Brand ── */}
-        <div className="relative flex h-16 items-center justify-between px-5 border-b border-white/[0.06]">
-          <Link to="/" className="flex items-center gap-2.5 no-underline">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] shadow-lg shadow-[#E15CB8]/30">
-              <Sparkles size={14} className="text-white" />
-            </span>
-            <span className="font-gulfs text-[1.15rem] font-semibold tracking-wide text-foreground">
-              Ophelia<span className="text-[#E15CB8]">.</span>
-            </span>
+        <div className="relative flex h-20 items-center justify-between px-5 border-b border-white/[0.06]">
+          <Link to="/" className="flex items-center no-underline">
+            <img src={opheliaLogo} alt="Ophelia Studio" className="h-14 w-auto" />
           </Link>
           <button
             onClick={() => setOpen(false)}
@@ -262,13 +258,8 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
             <Menu size={20} />
           </button>
 
-          <Link to="/" className="flex items-center gap-1.5 no-underline">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-[#E15CB8] to-[#CA71E1]">
-              <Sparkles size={12} className="text-white" />
-            </span>
-            <span className="font-gulfs text-base font-semibold text-foreground">
-              Ophelia<span className="text-[#E15CB8]">.</span>
-            </span>
+          <Link to="/">
+            <img src={opheliaLogo} alt="Ophelia Studio" className="h-10 w-auto" />
           </Link>
 
           <Link to="/app/notifications" className="rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">

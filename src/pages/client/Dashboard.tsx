@@ -30,9 +30,10 @@ const Dashboard = () => {
     queryFn: async () => (await api.get("/bookings/my-bookings")).data,
   });
 
-  const { data: walletData } = useQuery({
+  const { data: walletData, isError: walletError } = useQuery({
     queryKey: ["wallet-pass"],
     queryFn: async () => (await api.get("/wallet/pass")).data,
+    retry: false,
   });
 
   const { data: videosData } = useQuery({
@@ -116,9 +117,9 @@ const Dashboard = () => {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Puntos de lealtad</CardTitle>
               </CardHeader>
               <CardContent>
-                {wallet ? (
+                {(wallet || walletError) ? (
                   <div className="space-y-2">
-                    <p className="text-3xl font-bold">{wallet.points ?? 0}</p>
+                    <p className="text-3xl font-bold">{wallet?.points ?? 0}</p>
                     <p className="text-xs text-muted-foreground">puntos acumulados</p>
                     <Button asChild variant="outline" size="sm"><Link to="/app/wallet">Ver wallet</Link></Button>
                   </div>
