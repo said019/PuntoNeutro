@@ -254,7 +254,7 @@ async function ensureSchema() {
         'Seis Sesiones (24 al Mes)',
         'Siete Sesiones (28 al Mes)'
       );
-    `);
+    `).catch(() => {});
     const plCount = await pool.query("SELECT COUNT(*) FROM plans");
     if (parseInt(plCount.rows[0].count) === 0) {
       await pool.query(`
@@ -384,10 +384,8 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID`).catch(() => {});
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_order ON memberships(order_id) WHERE order_id IS NOT NULL`).catch(() => {});
     // ── memberships: add fallback name/limit override columns ─────────────
-    await pool.query(`
-      ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255);
-      ALTER TABLE memberships ADD COLUMN IF NOT EXISTS class_limit_override INTEGER;
-    `).catch(() => {});
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255)`).catch(() => {});
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS class_limit_override INTEGER`).catch(() => {});
     // Fix existing 9999 unlimited sentinel values → NULL
     await pool.query(`
       UPDATE memberships SET classes_remaining = NULL WHERE classes_remaining >= 9999;
@@ -445,11 +443,9 @@ async function ensureSchema() {
       );
     `);
     // ── Loyalty rewards: add new columns if table already exists ───────────
-    await pool.query(`
-      ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_type  VARCHAR(30) NOT NULL DEFAULT 'custom';
-      ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_value VARCHAR(150);
-      ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS stock        INTEGER;
-    `);
+    await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_type  VARCHAR(30) NOT NULL DEFAULT 'custom'`).catch(() => {});
+    await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_value VARCHAR(150)`).catch(() => {});
+    await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS stock        INTEGER`).catch(() => {});
     // ── Review tags table ──────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS review_tags (
@@ -460,19 +456,11 @@ async function ensureSchema() {
       );
     `);
     // ── Videos: add price column (may fail if videos table not yet created) ─
-    try {
-      await pool.query(`
-        ALTER TABLE videos ADD COLUMN IF NOT EXISTS price DECIMAL(10,2);
-        ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false;
-      `);
-    } catch { /* videos table may not exist yet, that's ok */ }
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS price DECIMAL(10,2)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false`).catch(() => {});
     // ── Video purchases: add admin_notes and verified_at ──────────────────
-    try {
-      await pool.query(`
-        ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT;
-        ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
-      `);
-    } catch { /* video_purchases table may not exist yet */ }
+    await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE`).catch(() => {});
 
     // ── Módulo de Eventos ────────────────────────────────────────────────
     await pool.query(`
@@ -510,6 +498,8 @@ async function ensureSchema() {
         created_at          TIMESTAMPTZ DEFAULT NOW(),
         updated_at          TIMESTAMPTZ DEFAULT NOW()
       );
+    `).catch(() => {});
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS event_registrations (
         id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         event_id                UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -533,13 +523,13 @@ async function ensureSchema() {
         created_at              TIMESTAMPTZ DEFAULT NOW(),
         updated_at              TIMESTAMPTZ DEFAULT NOW()
       );
-      CREATE INDEX IF NOT EXISTS idx_events_status    ON events(status);
-      CREATE INDEX IF NOT EXISTS idx_events_date       ON events(date);
-      CREATE INDEX IF NOT EXISTS idx_events_type       ON events(type);
-      CREATE INDEX IF NOT EXISTS idx_event_regs_event  ON event_registrations(event_id);
-      CREATE INDEX IF NOT EXISTS idx_event_regs_user   ON event_registrations(user_id);
-      CREATE INDEX IF NOT EXISTS idx_event_regs_status ON event_registrations(status);
-    `);
+    `).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_status    ON events(status)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_date       ON events(date)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_type       ON events(type)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_event  ON event_registrations(event_id)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_user   ON event_registrations(user_id)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_status ON event_registrations(status)`).catch(() => {});
 
     console.log("✅ Schema ensured");
   } catch (err) {
