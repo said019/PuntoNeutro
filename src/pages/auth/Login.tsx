@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
 import ophelia31 from "@/assets/ophelia-31.jpg";
 import ophelia50 from "@/assets/ophelia-50.jpg";
+import opheliaLogo from "@/assets/ophelia-logo-full.png";
 
 const schema = z.object({
   email: z.string().email("Email inválido"),
@@ -70,8 +71,8 @@ const Login = () => {
         {/* content over photo */}
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* logo */}
-          <Link to="/" className="font-syne font-extrabold text-2xl text-foreground no-underline">
-            Ophelia<span className="text-primary">.</span>
+          <Link to="/" className="block">
+            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
           </Link>
 
           {/* quote */}
@@ -111,8 +112,8 @@ const Login = () => {
         <div className="relative z-10 w-full max-w-[400px]">
 
           {/* Mobile logo */}
-          <Link to="/" className="lg:hidden block font-syne font-extrabold text-xl text-foreground mb-10 no-underline">
-            Ophelia<span className="text-primary">.</span>
+          <Link to="/" className="lg:hidden block mb-10">
+            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
           </Link>
 
           {/* heading */}

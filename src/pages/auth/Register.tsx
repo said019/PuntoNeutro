@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, Check, ArrowRight } from "lucide-react";
 import ophelia28 from "@/assets/ophelia-28.jpg";
+import opheliaLogo from "@/assets/ophelia-logo-full.png";
 
 const schema = z.object({
   displayName: z.string().min(2, "Mínimo 2 caracteres"),
@@ -93,8 +94,8 @@ const Register = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-transparent to-transparent" />
 
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <Link to="/" className="font-syne font-extrabold text-2xl text-foreground no-underline">
-            Ophelia<span className="text-primary">.</span>
+          <Link to="/" className="block">
+            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
           </Link>
 
           <div>
@@ -140,8 +141,8 @@ const Register = () => {
         <div className="relative z-10 w-full max-w-[420px]">
 
           {/* Mobile logo */}
-          <Link to="/" className="lg:hidden block font-syne font-extrabold text-xl text-foreground mb-8 no-underline">
-            Ophelia<span className="text-primary">.</span>
+          <Link to="/" className="lg:hidden block mb-8">
+            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
           </Link>
 
           {/* heading */}
