@@ -414,6 +414,27 @@ async function ensureSchema() {
     await pool.query(`
       ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0;
     `).catch(() => {});
+    // ── homepage_video_cards: editable 3-card section on landing page ──────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS homepage_video_cards (
+        id          SERIAL PRIMARY KEY,
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        title       VARCHAR(120) NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        emoji       VARCHAR(10)  NOT NULL DEFAULT '🎬',
+        updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+    // seed default cards only when table is empty
+    await pool.query(`
+      INSERT INTO homepage_video_cards (sort_order, title, description, emoji)
+      SELECT * FROM (VALUES
+        (1, 'Jumping Fitness', 'Cardio de alta intensidad en trampolín con música que te hará volar.', '🏋️'),
+        (2, 'Jumping Dance',   'Coreografías sobre el trampolín que combinan ritmo y diversión.',     '💃'),
+        (3, 'Pilates Flow',    'Secuencias fluidas para fortalecer tu core y mejorar postura.',        '🧘')
+      ) AS v(sort_order, title, description, emoji)
+      WHERE NOT EXISTS (SELECT 1 FROM homepage_video_cards LIMIT 1);
+    `).catch(() => {});
     // ── discount_codes: normalise discount_type values ────────────────────
     await pool.query(`
       ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0;
@@ -2817,6 +2838,31 @@ app.delete("/api/videos/:id", adminMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM videos WHERE id=$1", [req.params.id]);
     return res.json({ message: "Video eliminado" });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Homepage Video Cards ────────────────────────────────────────────────────
+// GET /api/homepage-video-cards  (public)
+app.get("/api/homepage-video-cards", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM homepage_video_cards ORDER BY sort_order ASC");
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// PUT /api/homepage-video-cards/:id  (admin)
+app.put("/api/homepage-video-cards/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { title, description, emoji } = req.body;
+    if (!title || !description) return res.status(400).json({ message: "title y description requeridos" });
+    const r = await pool.query(
+      `UPDATE homepage_video_cards
+       SET title=$1, description=$2, emoji=$3, updated_at=NOW()
+       WHERE id=$4 RETURNING *`,
+      [title.trim(), description.trim(), (emoji || "🎬").trim(), req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
+    return res.json({ data: r.rows[0] });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 

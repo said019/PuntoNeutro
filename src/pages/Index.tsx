@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
@@ -89,6 +90,19 @@ const Index = () => {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
+
+  const { data: videoCardsData } = useQuery<{ data: { id: number; title: string; description: string; emoji: string }[] }>({
+    queryKey: ["homepage-video-cards"],
+    queryFn: async () => (await api.get("/homepage-video-cards")).data,
+    staleTime: 1000 * 60 * 5,
+  });
+  const videoCards = videoCardsData?.data?.length
+    ? videoCardsData.data
+    : [
+        { id: 1, title: "Jumping Fitness", description: "Cardio de alta intensidad en trampolín con música que te hará volar.", emoji: "🏋️" },
+        { id: 2, title: "Jumping Dance",   description: "Coreografías sobre el trampolín que combinan ritmo y diversión.",     emoji: "💃" },
+        { id: 3, title: "Pilates Flow",    description: "Secuencias fluidas para fortalecer tu core y mejorar postura.",        emoji: "🧘" },
+      ];
 
   useEffect(() => {
     const handleScroll = () => setNavScrolled(window.scrollY > 50);
@@ -448,12 +462,8 @@ const Index = () => {
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              { title: "Jumping Fitness", desc: "Cardio de alta intensidad en trampolín con música que te hará volar.", placeholder: "🏋️" },
-              { title: "Jumping Dance", desc: "Coreografías sobre el trampolín que combinan ritmo y diversión.", placeholder: "💃" },
-              { title: "Pilates Flow", desc: "Secuencias fluidas para fortalecer tu core y mejorar postura.", placeholder: "🧘" },
-            ].map((v, i) => (
-              <div key={i} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all">
+            {videoCards.map((v) => (
+              <div key={v.id} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all">
                 <div className="relative aspect-video bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center overflow-hidden">
                   {/* decorative glow */}
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary)/0.15)_0%,transparent_65%)]" />
@@ -468,10 +478,10 @@ const Index = () => {
                 </div>
                 <div className="p-5">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xl">{v.placeholder}</span>
+                    <span className="text-xl">{v.emoji}</span>
                     <h3 className="font-syne font-bold text-[1rem] text-foreground">{v.title}</h3>
                   </div>
-                  <p className="text-[0.82rem] text-muted-foreground leading-[1.6]">{v.desc}</p>
+                  <p className="text-[0.82rem] text-muted-foreground leading-[1.6]">{v.description}</p>
                 </div>
               </div>
             ))}
