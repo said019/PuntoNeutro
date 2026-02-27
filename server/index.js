@@ -248,7 +248,6 @@ async function ensureSchema() {
     `).catch(() => {});
     // ── Migrate plans: 'mixto' class_category means both, keep as 'mixto' for logic ──
     // (mixto plans are still valid — the booking endpoint allows them on both categories)
-    `);
     // ── Seed plans: remove old schema_complete.sql plans & ensure only correct ones ──
     // Delete old plans that came from the migration seed (wrong data)
     await pool.query(`
