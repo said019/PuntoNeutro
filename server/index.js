@@ -3968,30 +3968,46 @@ app.put("/api/events/:id/register/payment", authMiddleware, async (req, res) => 
   try {
     const userId = req.user.userId;
     const { payment_method, transfer_reference, transfer_date, file_data, file_name, notes } = req.body;
+
     const regRes = await pool.query(
       "SELECT * FROM event_registrations WHERE event_id=$1 AND user_id=$2 AND status='pending' LIMIT 1",
       [req.params.id, userId]
     );
-    if (!regRes.rows.length) return res.status(404).json({ message: "No tienes una inscripción pendiente en este evento" });
+    if (!regRes.rows.length)
+      return res.status(404).json({ message: "No tienes una inscripción pendiente en este evento" });
     const reg = regRes.rows[0];
+
     if (payment_method === "transfer" && !transfer_reference && !file_data) {
       return res.status(400).json({ message: "Debes proporcionar una referencia o comprobante de transferencia" });
     }
-    let sets, vals;
-    if (payment_method === "cash") {
-      sets = "payment_method='cash', payment_reference=NULL, payment_proof_url=NULL, payment_proof_file_name=NULL, transfer_date=NULL, updated_at=NOW()";
-      vals = [reg.id];
-    } else {
-      sets = "payment_method='transfer', payment_reference=$1, transfer_date=$2, payment_proof_url=$3, payment_proof_file_name=$4, updated_at=NOW()";
-      vals = [transfer_reference || null, transfer_date || null, file_data || null, file_name || null, reg.id];
-      sets += ` WHERE id=$${vals.length}`;
-    }
+
     let r;
     if (payment_method === "cash") {
-      r = await pool.query(`UPDATE event_registrations SET ${sets} WHERE id=$1 RETURNING *`, vals);
+      r = await pool.query(
+        `UPDATE event_registrations
+         SET payment_method='cash',
+             payment_reference=NULL,
+             payment_proof_url=NULL,
+             payment_proof_file_name=NULL,
+             transfer_date=NULL,
+             updated_at=NOW()
+         WHERE id=$1 RETURNING *`,
+        [reg.id]
+      );
     } else {
-      r = await pool.query(`UPDATE event_registrations SET ${sets} RETURNING *`, vals);
+      r = await pool.query(
+        `UPDATE event_registrations
+         SET payment_method='transfer',
+             payment_reference=$1,
+             transfer_date=$2,
+             payment_proof_url=$3,
+             payment_proof_file_name=$4,
+             updated_at=NOW()
+         WHERE id=$5 RETURNING *`,
+        [transfer_reference || null, transfer_date || null, file_data || null, file_name || null, reg.id]
+      );
     }
+
     return res.json({
       message: payment_method === "cash"
         ? "Seleccionado pago en studio. El admin confirmará tu lugar cuando pagues en recepción."
@@ -4000,11 +4016,11 @@ app.put("/api/events/:id/register/payment", authMiddleware, async (req, res) => 
         id: r.rows[0].id,
         status: r.rows[0].status,
         paymentReference: r.rows[0].payment_reference,
-        paymentProofUrl: !!r.rows[0].payment_proof_url,
+        hasPaymentProof: !!r.rows[0].payment_proof_url,
       },
     });
   } catch (err) {
-    console.error(err);
+    console.error("PUT events/register/payment error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
 });
