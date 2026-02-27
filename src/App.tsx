@@ -47,7 +47,6 @@ import GenerateClasses from "./pages/admin/classes/GenerateClasses";
 import WeeklySchedule from "./pages/admin/schedules/WeeklySchedule";
 import BookingsList from "./pages/admin/bookings/BookingsList";
 import Waitlist from "./pages/admin/bookings/Waitlist";
-import InstructorsList from "./pages/admin/staff/InstructorsList";
 import PaymentsPage from "./pages/admin/payments/PaymentsPage";
 import OrdersVerification from "./pages/admin/orders/OrdersVerification";
 import POSPage from "./pages/admin/pos/POSPage";
@@ -134,7 +133,7 @@ const App = () => (
           <Route path="/admin/schedules" element={<WeeklySchedule />} />
           <Route path="/admin/bookings" element={<BookingsList />} />
           <Route path="/admin/bookings/waitlist" element={<Waitlist />} />
-          <Route path="/admin/staff" element={<InstructorsList />} />
+          <Route path="/admin/staff" element={<Navigate to="/admin/classes" replace />} />
           <Route path="/admin/payments" element={<PaymentsPage />} />
           <Route path="/admin/orders" element={<OrdersVerification />} />
           <Route path="/admin/pos" element={<POSPage />} />

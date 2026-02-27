@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,13 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck } from "lucide-react";
 
 /* ── Palette ── */
 const PALETTE_COLORS = [
@@ -75,9 +76,10 @@ const GENERATE_DAYS = [
 ];
 
 const TABS = [
-  { key: "calendar", label: "Calendario", icon: CalendarDays },
-  { key: "types", label: "Tipos de clase", icon: Palette },
-  { key: "generate", label: "Generar semana", icon: Zap },
+  { key: "calendar",     label: "Calendario",    icon: CalendarDays },
+  { key: "types",        label: "Tipos de clase", icon: Palette },
+  { key: "generate",     label: "Generar semana", icon: Zap },
+  { key: "instructors",  label: "Instructoras",   icon: UserCheck },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -112,6 +114,21 @@ const generateSchema = z.object({
   maxCapacity: z.coerce.number().min(1),
 });
 type GenerateFormData = z.infer<typeof generateSchema>;
+
+/* ── Instructor schemas ── */
+const instructorSchema = z.object({
+  displayName: z.string().min(1, "Nombre requerido"),
+  email: z.string().email("Email inválido"),
+  bio: z.string().optional(),
+  specialties: z.string().optional(),
+  isActive: z.boolean().default(true),
+});
+type InstructorFormData = z.infer<typeof instructorSchema>;
+interface Instructor extends Omit<InstructorFormData, "specialties"> {
+  id: string;
+  specialties: string[];
+  photoUrl?: string;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PAGE
@@ -161,6 +178,7 @@ const ClassesCalendar = () => {
           {tab === "calendar" && <CalendarTab types={types} instructors={instructors} toast={toast} qc={qc} />}
           {tab === "types" && <TypesTab types={types} toast={toast} qc={qc} />}
           {tab === "generate" && <GenerateTab types={types} instructors={instructors} toast={toast} />}
+          {tab === "instructors" && <InstructorsTab toast={toast} qc={qc} />}
         </div>
       </AdminLayout>
     </AuthGuard>
@@ -680,6 +698,194 @@ function GenerateTab({
         </form>
       </div>
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAB 4 – INSTRUCTORAS
+   ═══════════════════════════════════════════════════════════════════ */
+function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Instructor | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadTarget, setUploadTarget] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery<{ data: Instructor[] }>({
+    queryKey: ["instructors"],
+    queryFn: async () => (await api.get("/instructors")).data,
+  });
+  const instructors = Array.isArray(data?.data) ? data.data : [];
+
+  const form = useForm<InstructorFormData>({ resolver: zodResolver(instructorSchema), defaultValues: { isActive: true } });
+
+  const createMutation = useMutation({
+    mutationFn: (d: InstructorFormData) =>
+      api.post("/instructors", { ...d, specialties: d.specialties?.split(",").map((s) => s.trim()) ?? [] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora creada" }); setOpen(false); },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...d }: Instructor & { specialties: string }) =>
+      api.put(`/instructors/${id}`, {
+        ...d,
+        specialties: typeof d.specialties === "string"
+          ? d.specialties.split(",").map((s) => s.trim())
+          : d.specialties,
+      }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora actualizada" }); setOpen(false); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/instructors/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora eliminada" }); },
+  });
+
+  const uploadPhotoMutation = useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => {
+      const fd = new FormData();
+      fd.append("photo", file);
+      return api.post(`/instructors/${id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Foto actualizada" }); },
+  });
+
+  const openEdit = (i: Instructor) => {
+    form.reset({ ...i, specialties: i.specialties?.join(", ") ?? "" });
+    setEditing(i);
+    setOpen(true);
+  };
+  const openCreate = () => {
+    form.reset({ isActive: true });
+    setEditing(null);
+    setOpen(true);
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-muted-foreground">{instructors.length} instructora{instructors.length !== 1 ? "s" : ""} registrada{instructors.length !== 1 ? "s" : ""}</p>
+        <Button
+          size="sm"
+          onClick={openCreate}
+          className="bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white"
+        >
+          <Plus size={14} className="mr-1" />Nueva instructora
+        </Button>
+      </div>
+
+      {/* Hidden file input */}
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        ref={fileRef}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f && uploadTarget) uploadPhotoMutation.mutate({ id: uploadTarget, file: f });
+        }}
+      />
+
+      <div className="rounded-xl border border-border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">Foto</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Especialidades</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead className="w-12" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading
+              ? Array(4).fill(0).map((_, i) => (
+                <TableRow key={i}>
+                  {Array(6).fill(0).map((_, j) => (
+                    <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
+                  ))}
+                </TableRow>
+              ))
+              : instructors.map((ins) => (
+                <TableRow key={ins.id}>
+                  <TableCell>
+                    {ins.photoUrl ? (
+                      <img src={ins.photoUrl} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#CA71E1]/30" alt="" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#CA71E1] to-[#E15CB8] flex items-center justify-center text-xs font-bold text-white">
+                        {ins.displayName?.[0]?.toUpperCase()}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium">{ins.displayName}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{ins.email}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{ins.specialties?.join(", ")}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={ins.isActive ? "default" : "secondary"}
+                      className={ins.isActive ? "bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30" : ""}
+                    >
+                      {ins.isActive ? "Activa" : "Inactiva"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setUploadTarget(ins.id); setTimeout(() => fileRef.current?.click(), 50); }}>
+                          Subir foto
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(ins.id)}>
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            }
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* CRUD dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar instructora" : "Nueva instructora"}</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={form.handleSubmit((d) =>
+              editing
+                ? updateMutation.mutate({ ...d, id: editing.id, specialties: d.specialties ?? "" } as any)
+                : createMutation.mutate(d)
+            )}
+            className="space-y-4"
+          >
+            <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("displayName")} /></div>
+            <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
+            <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
+            <div className="space-y-1">
+              <Label>Especialidades (separadas por coma)</Label>
+              <Input {...form.register("specialties")} placeholder="Ej: Jumping, Pilates, Cardio" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
+              <Label>Activa</Label>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button type="submit" className="bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white">
+                {editing ? "Actualizar" : "Crear"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

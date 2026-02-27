@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import opheliaLogo from "@/assets/ophelia-logo-full.png";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
-  Calendar, BookOpen, UserCheck, DollarSign, ShoppingBag,
+  Calendar, BookOpen, DollarSign, ShoppingBag,
   ShoppingCart, Tag, Gift, Video, BarChart2,
   Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, Ticket,
 } from "lucide-react";
@@ -31,7 +31,6 @@ const NAV_GROUPS = [
       { path: "/admin/memberships",    label: "Membresías",   icon: CreditCard },
       { path: "/admin/classes",        label: "Clases",       icon: CalendarDays },
       { path: "/admin/schedules",      label: "Horarios",     icon: Calendar },
-      { path: "/admin/staff",          label: "Instructores", icon: UserCheck },
       { path: "/admin/orders",         label: "Órdenes",      icon: ShoppingBag },
       { path: "/admin/pos",            label: "POS",          icon: ShoppingCart },
       { path: "/admin/discount-codes", label: "Descuentos",   icon: Tag },
