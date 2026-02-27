@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TimePicker } from "@/components/ui/time-picker";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
 const generateSchema = z.object({
   classTypeId: z.string().min(1),
@@ -68,48 +70,111 @@ const GenerateClasses = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="p-6 max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold mb-6">Generar Clases Masivas</h1>
-          <form onSubmit={form.handleSubmit((d) => generateMutation.mutate(d))} className="space-y-5">
-            <div className="space-y-1">
-              <Label>Tipo de clase</Label>
-              <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
-                <SelectContent>
-                  {(Array.isArray(typesData?.data) ? typesData.data : []).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          <div className="mb-7">
+            <h1 className="text-3xl font-bold text-white mb-1">Generar Clases</h1>
+            <p className="text-sm text-white/35">Crea clases en bloque para un rango de fechas</p>
+          </div>
+
+          <form onSubmit={form.handleSubmit((d) => generateMutation.mutate(d))} className="space-y-6">
+            {/* Selects */}
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+              <p className="text-[11px] text-[#CA71E1]/70 font-semibold uppercase tracking-wider">Clase e instructor</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-white/60 text-xs">Tipo de clase</Label>
+                  <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
+                    <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                      <SelectValue placeholder="Seleccionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0f0518] border-white/10">
+                      {(Array.isArray(typesData?.data) ? typesData.data : []).map((t) => (
+                        <SelectItem key={t.id} value={t.id} className="text-white">{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-white/60 text-xs">Instructor</Label>
+                  <Select onValueChange={(v) => form.setValue("instructorId", v)}>
+                    <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                      <SelectValue placeholder="Seleccionar instructor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0f0518] border-white/10">
+                      {(Array.isArray(instructorsData?.data) ? instructorsData.data : []).map((i) => (
+                        <SelectItem key={i.id} value={i.id} className="text-white">{i.displayName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Instructor</Label>
-              <Select onValueChange={(v) => form.setValue("instructorId", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar instructor" /></SelectTrigger>
-                <SelectContent>
-                  {(Array.isArray(instructorsData?.data) ? instructorsData.data : []).map((i) => <SelectItem key={i.id} value={i.id}>{i.displayName}</SelectItem>)}
-                </SelectContent>
-              </Select>
+
+            {/* Date range */}
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+              <p className="text-[11px] text-[#E15CB8]/70 font-semibold uppercase tracking-wider">Rango de fechas</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-white/60 text-xs">Fecha inicio</Label>
+                  <DatePicker
+                    value={form.watch("startDate")}
+                    onChange={(v) => form.setValue("startDate", v)}
+                    placeholder="Fecha inicio"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-white/60 text-xs">Fecha fin</Label>
+                  <DatePicker
+                    value={form.watch("endDate")}
+                    onChange={(v) => form.setValue("endDate", v)}
+                    placeholder="Fecha fin"
+                    min={form.watch("startDate")}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Fecha inicio</Label><Input type="date" {...form.register("startDate")} /></div>
-              <div className="space-y-1"><Label>Fecha fin</Label><Input type="date" {...form.register("endDate")} /></div>
-              <div className="space-y-1"><Label>Hora inicio</Label><Input type="time" {...form.register("startTime")} /></div>
-              <div className="space-y-1"><Label>Hora fin</Label><Input type="time" {...form.register("endTime")} /></div>
+
+            {/* Time range */}
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+              <p className="text-[11px] text-[#E7EB6E]/70 font-semibold uppercase tracking-wider">Horario</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-white/60 text-xs">Hora inicio</Label>
+                  <TimePicker
+                    value={form.watch("startTime")}
+                    onChange={(v) => form.setValue("startTime", v)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-white/60 text-xs">Hora fin</Label>
+                  <TimePicker
+                    value={form.watch("endTime")}
+                    onChange={(v) => form.setValue("endTime", v)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1 max-w-[150px]">
+                <Label className="text-white/60 text-xs">Capacidad máxima</Label>
+                <Input
+                  type="number"
+                  className="bg-white/[0.04] border-white/[0.08] text-white"
+                  {...form.register("maxCapacity")}
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Capacidad máxima</Label>
-              <Input type="number" {...form.register("maxCapacity")} />
-            </div>
-            <div className="space-y-2">
-              <Label>Días de la semana</Label>
+
+            {/* Days of week */}
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-3">
+              <p className="text-[11px] text-[#CA71E1]/70 font-semibold uppercase tracking-wider">Días de la semana</p>
               <div className="flex flex-wrap gap-2">
                 {DAYS.map((d) => (
                   <button
                     key={d.value}
                     type="button"
                     onClick={() => toggleDay(d.value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                       selectedDays.includes(d.value)
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-muted-foreground hover:text-foreground"
+                        ? "bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white shadow-[0_0_10px_rgba(225,92,184,0.3)]"
+                        : "bg-white/[0.04] border border-white/[0.07] text-white/45 hover:text-white/75 hover:border-white/20"
                     }`}
                   >
                     {d.label}
@@ -117,10 +182,17 @@ const GenerateClasses = () => {
                 ))}
               </div>
             </div>
-            <Button type="submit" disabled={generateMutation.isPending} className="w-full">
-              {generateMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
-              Generar clases
-            </Button>
+
+            <button
+              type="submit"
+              disabled={generateMutation.isPending}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {generateMutation.isPending
+                ? <Loader2 className="animate-spin" size={16} />
+                : <Sparkles size={16} />}
+              {generateMutation.isPending ? "Generando…" : "Generar clases"}
+            </button>
           </form>
         </div>
       </AdminLayout>

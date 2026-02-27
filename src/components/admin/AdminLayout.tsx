@@ -7,44 +7,52 @@ import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
   Calendar, BookOpen, UserCheck, DollarSign, ShoppingBag,
   ShoppingCart, Tag, Gift, Video, BarChart2,
-  Settings, ChevronLeft, ChevronRight, LogOut, Globe, Menu,
+  Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu,
 } from "lucide-react";
 
 const NAV_GROUPS = [
   {
     label: "Principal",
+    collapsible: false,
+    accentColor: "#E15CB8",
     items: [
-      { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { path: "/admin/clients", label: "Clientes", icon: Users },
-      { path: "/admin/payments", label: "Pagos", icon: DollarSign },
-      { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
+      { path: "/admin/dashboard", label: "Dashboard",  icon: LayoutDashboard },
+      { path: "/admin/clients",   label: "Clientes",   icon: Users },
+      { path: "/admin/payments",  label: "Pagos",      icon: DollarSign },
+      { path: "/admin/bookings",  label: "Reservas",   icon: BookOpen },
     ],
   },
   {
     label: "Gestión",
+    collapsible: true,
+    accentColor: "#CA71E1",
     items: [
-      { path: "/admin/plans", label: "Planes", icon: Package },
-      { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
-      { path: "/admin/classes", label: "Clases", icon: CalendarDays },
-      { path: "/admin/schedules", label: "Horarios", icon: Calendar },
-      { path: "/admin/staff", label: "Instructores", icon: UserCheck },
+      { path: "/admin/plans",       label: "Planes",       icon: Package },
+      { path: "/admin/memberships", label: "Membresías",   icon: CreditCard },
+      { path: "/admin/classes",     label: "Clases",       icon: CalendarDays },
+      { path: "/admin/schedules",   label: "Horarios",     icon: Calendar },
+      { path: "/admin/staff",       label: "Instructores", icon: UserCheck },
     ],
   },
   {
     label: "Tienda",
+    collapsible: true,
+    accentColor: "#E7EB6E",
     items: [
-      { path: "/admin/orders", label: "Órdenes", icon: ShoppingBag },
-      { path: "/admin/pos", label: "POS", icon: ShoppingCart },
+      { path: "/admin/orders",         label: "Órdenes",    icon: ShoppingBag },
+      { path: "/admin/pos",            label: "POS",        icon: ShoppingCart },
       { path: "/admin/discount-codes", label: "Descuentos", icon: Tag },
-      { path: "/admin/loyalty", label: "Lealtad", icon: Gift },
-      { path: "/admin/videos", label: "Videos", icon: Video },
+      { path: "/admin/loyalty",        label: "Lealtad",    icon: Gift },
+      { path: "/admin/videos",         label: "Videos",     icon: Video },
     ],
   },
   {
     label: "Sistema",
+    collapsible: false,
+    accentColor: "#E15CB8",
     items: [
-      { path: "/admin/reports", label: "Reportes", icon: BarChart2 },
-      { path: "/admin/settings", label: "Configuración", icon: Settings },
+      { path: "/admin/reports",   label: "Reportes",      icon: BarChart2 },
+      { path: "/admin/settings",  label: "Configuración", icon: Settings },
     ],
   },
 ];
@@ -55,6 +63,10 @@ interface AdminLayoutProps {
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    Gestión: true,
+    Tienda: false,
+  });
   const location = useLocation();
   const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
@@ -65,10 +77,19 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     navigate("/auth/login");
   };
 
+  const toggleGroup = (label: string) => {
+    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
   // Current page label
   const allItems = NAV_GROUPS.flatMap((g) => g.items);
   const currentItem = allItems.find(
     (i) => location.pathname === i.path || location.pathname.startsWith(i.path + "/")
+  );
+
+  // Auto-open the group containing the active route
+  const activeGroup = NAV_GROUPS.find((g) =>
+    g.items.some((i) => location.pathname === i.path || location.pathname.startsWith(i.path + "/"))
   );
 
   return (
@@ -78,7 +99,6 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         className={cn(
           "flex flex-col transition-all duration-300 relative z-20 shrink-0",
           "border-r border-white/[0.06]",
-          // subtle purple-to-black gradient
           "bg-gradient-to-b from-[#0f0518] via-[#0a0a0a] to-[#080808]",
           collapsed ? "w-[64px]" : "w-[240px]"
         )}
@@ -106,53 +126,89 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 scrollbar-thin">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label} className="mb-1">
-              {/* Group header */}
-              {!collapsed && (
-                <p className="px-5 py-1.5 text-[10px] font-semibold tracking-widest uppercase text-[#CA71E1]/40">
-                  {group.label}
-                </p>
-              )}
-              {group.items.map(({ path, label, icon: Icon }) => {
-                const active = location.pathname === path || location.pathname.startsWith(path + "/");
-                return (
-                  <Link
-                    key={path}
-                    to={path}
-                    title={collapsed ? label : undefined}
-                    className={cn(
-                      "flex items-center gap-3 mx-2 my-0.5 rounded-xl transition-all duration-200 no-underline group",
-                      collapsed ? "px-0 justify-center py-2.5" : "px-3 py-2.5",
-                      active
-                        ? [
-                            "bg-gradient-to-r from-[#E15CB8]/15 to-[#CA71E1]/10",
-                            "border border-[#E15CB8]/25",
-                            "text-[#E15CB8] font-semibold",
-                            "shadow-[0_0_12px_rgba(225,92,184,0.12)]",
-                          ].join(" ")
-                        : "text-white/40 hover:text-white/80 hover:bg-white/[0.04] border border-transparent"
-                    )}
-                  >
-                    <Icon
-                      size={15}
+          {NAV_GROUPS.map((group) => {
+            const isGroupActive = activeGroup?.label === group.label;
+            const isOpen = group.collapsible ? (openGroups[group.label] ?? isGroupActive) : true;
+
+            return (
+              <div key={group.label} className="mb-1">
+                {/* Group header */}
+                {!collapsed && (
+                  group.collapsible ? (
+                    <button
+                      onClick={() => toggleGroup(group.label)}
+                      className="w-full flex items-center justify-between px-5 py-1.5 group"
+                    >
+                      <span
+                        className="text-[10px] font-semibold tracking-widest uppercase transition-colors"
+                        style={{ color: isGroupActive ? group.accentColor : `${group.accentColor}50` }}
+                      >
+                        {group.label}
+                      </span>
+                      <ChevronDown
+                        size={11}
+                        className={cn(
+                          "transition-all duration-200",
+                          isOpen ? "rotate-0" : "-rotate-90"
+                        )}
+                        style={{ color: `${group.accentColor}50` }}
+                      />
+                    </button>
+                  ) : (
+                    <p
+                      className="px-5 py-1.5 text-[10px] font-semibold tracking-widest uppercase"
+                      style={{ color: `${group.accentColor}50` }}
+                    >
+                      {group.label}
+                    </p>
+                  )
+                )}
+
+                {/* Items */}
+                {(collapsed || isOpen) && group.items.map(({ path, label, icon: Icon }) => {
+                  const active = location.pathname === path || location.pathname.startsWith(path + "/");
+                  const accent = group.accentColor;
+                  return (
+                    <Link
+                      key={path}
+                      to={path}
+                      title={collapsed ? label : undefined}
                       className={cn(
-                        "shrink-0 transition-colors",
-                        active ? "text-[#E15CB8]" : "text-white/30 group-hover:text-white/70"
+                        "flex items-center gap-3 mx-2 my-0.5 rounded-xl transition-all duration-200 no-underline group",
+                        collapsed ? "px-0 justify-center py-2.5" : "px-3 py-2.5",
+                        active
+                          ? "border text-white font-semibold"
+                          : "text-white/50 hover:text-white/85 hover:bg-white/[0.04] border border-transparent"
                       )}
-                    />
-                    {!collapsed && (
-                      <span className="text-[13px] leading-none">{label}</span>
-                    )}
-                    {/* Active dot */}
-                    {active && !collapsed && (
-                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#E15CB8] shadow-[0_0_6px_#E15CB8]" />
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+                      style={active ? {
+                        background: `linear-gradient(to right, ${accent}18, ${accent}08)`,
+                        borderColor: `${accent}30`,
+                        boxShadow: `0 0 12px ${accent}18`,
+                      } : {}}
+                    >
+                      <Icon
+                        size={15}
+                        className={cn("shrink-0 transition-colors")}
+                        style={{ color: active ? accent : undefined }}
+                      />
+                      {!collapsed && (
+                        <span className="text-[13px] leading-none">{label}</span>
+                      )}
+                      {active && !collapsed && (
+                        <span
+                          className="ml-auto w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: accent, boxShadow: `0 0 6px ${accent}` }}
+                        />
+                      )}
+                    </Link>
+                  );
+                })}
+
+                {/* Collapsed separator */}
+                {collapsed && <div className="mx-3 my-1 h-px bg-white/[0.04]" />}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Footer */}
@@ -193,7 +249,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             {currentItem && (
               <>
                 <ChevronRight size={12} className="text-white/20" />
-                <span className="text-white/80 text-sm font-medium">{currentItem.label}</span>
+                <span className="text-white/85 text-sm font-semibold">{currentItem.label}</span>
               </>
             )}
           </div>

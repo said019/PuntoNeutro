@@ -12,33 +12,36 @@ import { cn } from "@/lib/utils";
 const NAV_GROUPS = [
   {
     label: "Principal",
+    labelColor: "#E15CB8",
     items: [
-      { to: "/app",           label: "Inicio",        icon: LayoutDashboard },
-      { to: "/app/classes",   label: "Reservar clase", icon: Calendar },
-      { to: "/app/bookings",  label: "Mis reservas",   icon: ClipboardList },
+      { to: "/app",           label: "Inicio",        icon: LayoutDashboard, activeColor: "#E7EB6E" },
+      { to: "/app/classes",   label: "Reservar clase", icon: Calendar,        activeColor: "#E15CB8" },
+      { to: "/app/bookings",  label: "Mis reservas",   icon: ClipboardList,   activeColor: "#CA71E1" },
     ],
   },
   {
     label: "Cuenta",
+    labelColor: "#CA71E1",
     items: [
-      { to: "/app/checkout",  label: "Membresía",      icon: CreditCard },
-      { to: "/app/wallet",    label: "Club & Wallet",   icon: Wallet },
-      { to: "/app/orders",    label: "Mis órdenes",     icon: Package },
+      { to: "/app/checkout",  label: "Membresía",      icon: CreditCard, activeColor: "#E15CB8" },
+      { to: "/app/wallet",    label: "Club & Wallet",   icon: Wallet,     activeColor: "#E7EB6E" },
+      { to: "/app/orders",    label: "Mis órdenes",     icon: Package,    activeColor: "#CA71E1" },
     ],
   },
   {
     label: "Contenido",
+    labelColor: "#E7EB6E",
     items: [
-      { to: "/app/videos",    label: "Videos",          icon: Play },
+      { to: "/app/videos",    label: "Videos",          icon: Play,       activeColor: "#E7EB6E" },
     ],
   },
 ];
 
 /* ── Single nav item ───────────────────────────────────────────────── */
 const NavItem = ({
-  to, label, icon: Icon, onClick, collapsed,
+  to, label, icon: Icon, onClick, collapsed, activeColor = "#E15CB8",
 }: {
-  to: string; label: string; icon: any; onClick?: () => void; collapsed?: boolean;
+  to: string; label: string; icon: any; onClick?: () => void; collapsed?: boolean; activeColor?: string;
 }) => {
   const { pathname } = useLocation();
   const active = pathname === to || (to !== "/app" && pathname.startsWith(to));
@@ -49,28 +52,37 @@ const NavItem = ({
       onClick={onClick}
       title={collapsed ? label : undefined}
       className={cn(
-        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.82rem] font-medium transition-all duration-200",
+        "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.82rem] font-medium transition-all duration-200 no-underline",
         active
-          ? "bg-gradient-to-r from-[#E15CB8]/20 to-[#CA71E1]/10 text-foreground border border-[#E15CB8]/30"
-          : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+          ? "text-foreground border"
+          : "text-muted-foreground hover:bg-white/5 hover:text-foreground border border-transparent",
         collapsed && "justify-center px-2"
       )}
+      style={active ? {
+        background: `linear-gradient(to right, ${activeColor}20, ${activeColor}08)`,
+        borderColor: `${activeColor}30`,
+      } : {}}
     >
       {/* Active left bar */}
       {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[#E15CB8]" />
+        <span
+          className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full"
+          style={{ backgroundColor: activeColor }}
+        />
       )}
 
-      {/* Icon with glow on active */}
-      <span className={cn(
-        "flex-shrink-0 transition-all",
-        active ? "text-[#E15CB8] drop-shadow-[0_0_6px_#E15CB840]" : "group-hover:text-[#CA71E1]"
-      )}>
+      {/* Icon */}
+      <span
+        className={cn("flex-shrink-0 transition-all", !active && "group-hover:text-[#CA71E1]")}
+        style={active ? { color: activeColor } : {}}
+      >
         <Icon size={17} />
       </span>
 
       {!collapsed && <span className="flex-1 truncate">{label}</span>}
-      {!collapsed && active && <ChevronRight size={13} className="text-[#E15CB8] opacity-70" />}
+      {!collapsed && active && (
+        <ChevronRight size={13} style={{ color: activeColor }} className="opacity-70" />
+      )}
     </Link>
   );
 };
@@ -97,11 +109,11 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
 
   /* ── mobile bottom nav items ── */
   const BOTTOM_NAV = [
-    { to: "/app",          icon: LayoutDashboard, label: "Inicio" },
-    { to: "/app/classes",  icon: Calendar,        label: "Clases" },
-    { to: "/app/bookings", icon: ClipboardList,   label: "Reservas" },
-    { to: "/app/wallet",   icon: Wallet,          label: "Club" },
-    { to: "/app/profile",  icon: User,            label: "Perfil" },
+    { to: "/app",          icon: LayoutDashboard, label: "Inicio",    color: "#E7EB6E" },
+    { to: "/app/classes",  icon: Calendar,        label: "Clases",    color: "#E15CB8" },
+    { to: "/app/bookings", icon: ClipboardList,   label: "Reservas",  color: "#CA71E1" },
+    { to: "/app/wallet",   icon: Wallet,          label: "Club",      color: "#E7EB6E" },
+    { to: "/app/profile",  icon: User,            label: "Perfil",    color: "#E15CB8" },
   ];
 
   return (
@@ -189,12 +201,20 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
           [&::-webkit-scrollbar-thumb:hover]:bg-[#E15CB8]/40">
           {NAV_GROUPS.map((group) => (
             <div key={group.label}>
-              <p className="px-3 mb-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/40">
+              <p
+                className="px-3 mb-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em]"
+                style={{ color: `${group.labelColor}70` }}
+              >
                 {group.label}
               </p>
               <div className="space-y-0.5">
                 {group.items.map((item) => (
-                  <NavItem key={item.to} {...item} onClick={() => setOpen(false)} />
+                  <NavItem
+                    key={item.to}
+                    {...item}
+                    onClick={() => setOpen(false)}
+                    activeColor={item.activeColor}
+                  />
                 ))}
               </div>
             </div>
@@ -264,7 +284,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
         <nav className="fixed bottom-0 inset-x-0 z-30 flex lg:hidden
           border-t border-white/[0.06] bg-[#0a0a0a]/95 backdrop-blur-md
           pb-safe">
-          {BOTTOM_NAV.map(({ to, icon: Icon, label }) => {
+          {BOTTOM_NAV.map(({ to, icon: Icon, label, color }) => {
             const active = pathname === to || (to !== "/app" && pathname.startsWith(to));
             return (
               <Link
@@ -272,18 +292,25 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
                 to={to}
                 className="flex flex-1 flex-col items-center justify-center gap-1 py-3 transition-all"
               >
-                <span className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
-                  active
-                    ? "bg-gradient-to-br from-[#E15CB8]/20 to-[#CA71E1]/10 text-[#E15CB8]"
-                    : "text-muted-foreground"
-                )}>
+                <span
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-xl transition-all",
+                    !active && "text-muted-foreground"
+                  )}
+                  style={active ? {
+                    background: `linear-gradient(135deg, ${color}25, ${color}10)`,
+                    color: color,
+                  } : {}}
+                >
                   <Icon size={18} />
                 </span>
-                <span className={cn(
-                  "text-[0.62rem] font-medium leading-none",
-                  active ? "text-[#E15CB8]" : "text-muted-foreground/60"
-                )}>
+                <span
+                  className={cn(
+                    "text-[0.62rem] font-medium leading-none",
+                    !active && "text-muted-foreground/60"
+                  )}
+                  style={active ? { color } : {}}
+                >
                   {label}
                 </span>
               </Link>
