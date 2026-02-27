@@ -27,24 +27,17 @@ const NAV_GROUPS = [
     collapsible: true,
     accentColor: "#CA71E1",
     items: [
-      { path: "/admin/plans",       label: "Planes",       icon: Package },
-      { path: "/admin/memberships", label: "Membresías",   icon: CreditCard },
-      { path: "/admin/classes",     label: "Clases",       icon: CalendarDays },
-      { path: "/admin/schedules",   label: "Horarios",     icon: Calendar },
-      { path: "/admin/staff",       label: "Instructores", icon: UserCheck },
-      { path: "/admin/events",      label: "Eventos",      icon: Ticket },
-    ],
-  },
-  {
-    label: "Tienda",
-    collapsible: true,
-    accentColor: "#E7EB6E",
-    items: [
-      { path: "/admin/orders",         label: "Órdenes",    icon: ShoppingBag },
-      { path: "/admin/pos",            label: "POS",        icon: ShoppingCart },
-      { path: "/admin/discount-codes", label: "Descuentos", icon: Tag },
-      { path: "/admin/loyalty",        label: "Lealtad",    icon: Gift },
-      { path: "/admin/videos",         label: "Videos",     icon: Video },
+      { path: "/admin/plans",          label: "Planes",       icon: Package },
+      { path: "/admin/memberships",    label: "Membresías",   icon: CreditCard },
+      { path: "/admin/classes",        label: "Clases",       icon: CalendarDays },
+      { path: "/admin/schedules",      label: "Horarios",     icon: Calendar },
+      { path: "/admin/staff",          label: "Instructores", icon: UserCheck },
+      { path: "/admin/orders",         label: "Órdenes",      icon: ShoppingBag },
+      { path: "/admin/pos",            label: "POS",          icon: ShoppingCart },
+      { path: "/admin/discount-codes", label: "Descuentos",   icon: Tag },
+      { path: "/admin/loyalty",        label: "Lealtad",      icon: Gift },
+      { path: "/admin/videos",         label: "Videos",       icon: Video },
+      { path: "/admin/events",         label: "Eventos",      icon: Ticket },
     ],
   },
   {
@@ -66,7 +59,6 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     Gestión: true,
-    Tienda: false,
   });
   const location = useLocation();
   const navigate = useNavigate();
