@@ -655,7 +655,8 @@ async function ensureSchema() {
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
 // ─── Helper: snake_case → camelCase row mapper ──────────────────────────────
 function camelRow(row) {
@@ -1172,7 +1173,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
 });
 
 // POST /api/orders/:id/proof  (multipart)
-app.post("/api/orders/:id/proof", authMiddleware, upload.single("proof"), async (req, res) => {
+app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res) => {
   try {
     const orderRes = await pool.query(
       "SELECT * FROM orders WHERE id = $1 AND user_id = $2",
@@ -1180,12 +1181,14 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.single("proof"), async 
     );
     if (orderRes.rows.length === 0) return res.status(404).json({ message: "Orden no encontrada" });
 
-    // Store file as base64 data-URI (no external storage needed)
+    // Accept any uploaded field name ("proof", "file", etc.)
+    const uploadedFile = req.files?.[0] ?? req.file ?? null;
+
     let fileUrl, fileName, mimeType;
-    if (req.file) {
-      mimeType  = req.file.mimetype;
-      fileName  = req.file.originalname;
-      fileUrl   = `data:${mimeType};base64,${req.file.buffer.toString("base64")}`;
+    if (uploadedFile) {
+      mimeType  = uploadedFile.mimetype;
+      fileName  = uploadedFile.originalname;
+      fileUrl   = `data:${mimeType};base64,${uploadedFile.buffer.toString("base64")}`;
     } else if (req.body.fileUrl) {
       fileUrl  = req.body.fileUrl;
       fileName = req.body.fileName || "comprobante";
@@ -1211,8 +1214,8 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.single("proof"), async 
     );
     return res.json({ message: "Comprobante recibido — estamos verificando tu pago" });
   } catch (err) {
-    console.error("POST orders/proof error:", err);
-    return res.status(500).json({ message: "Error interno" });
+    console.error("POST orders/proof error:", err.message, err.stack);
+    return res.status(500).json({ message: "Error interno", detail: err.message });
   }
 });
 
