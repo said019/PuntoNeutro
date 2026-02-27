@@ -393,13 +393,17 @@ export default function Schedule() {
                   style={{
                     animationDelay: `${idx * 0.07}s`,
                     ["--card-accent" as string]: accent,
+                    background: isPast
+                      ? "linear-gradient(135deg, rgba(30,22,18,0.95) 0%, rgba(20,15,12,0.95) 100%)"
+                      : `linear-gradient(135deg, ${accent}0d 0%, ${accent}05 60%, rgba(14,11,18,0.6) 100%)`,
+                    borderColor: isPast ? "rgba(255,255,255,0.05)" : `${accent}28`,
                   }}
                   className={[
-                    "relative bg-white/[0.04] border border-white/8 rounded-3xl p-7 overflow-hidden",
+                    "relative border rounded-3xl p-7 overflow-hidden",
                     "transition-all duration-300 cursor-pointer group",
-                    "hover:-translate-y-1.5 hover:scale-[1.01] hover:border-white/15",
-                    "hover:shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
-                    isPast ? "opacity-50 pointer-events-none" : "",
+                    isPast ? "" : "hover:-translate-y-1.5 hover:scale-[1.01]",
+                    isPast ? "" : "hover:shadow-[0_20px_60px_rgba(0,0,0,0.5)]",
+                    isPast ? "opacity-60 pointer-events-none" : "",
                     "animate-[fadeSlideUp_0.4s_both]",
                   ].join(" ")}
                 >
@@ -411,7 +415,7 @@ export default function Schedule() {
 
                   {/* Background glow orb */}
                   <div
-                    className="absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-[0.04] group-hover:opacity-[0.08] transition-opacity pointer-events-none"
+                    className="absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] group-hover:opacity-[0.12] transition-opacity pointer-events-none"
                     style={{ background: accent }}
                   />
 
