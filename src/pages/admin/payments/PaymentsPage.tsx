@@ -7,12 +7,72 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, User, Package, CheckCircle2, CreditCard, Banknote, ArrowRight, ChevronLeft, History, Sparkles } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
+import { cn } from "@/lib/utils";
+
+// ── Helpers ──────────────────────────────────────────────
+const PAYMENT_METHODS = [
+  { value: "cash", label: "Efectivo", icon: Banknote },
+  { value: "card", label: "Tarjeta", icon: CreditCard },
+  { value: "transfer", label: "Transferencia", icon: ArrowRight },
+];
+
+const STEP_META = [
+  { label: "Buscar cliente", icon: User },
+  { label: "Elegir plan", icon: Package },
+  { label: "Confirmar", icon: CheckCircle2 },
+];
+
+// ── Category groups for plan display ──────────────────────
+function groupPlans(plans: any[]) {
+  const groups: Record<string, any[]> = { Jumping: [], Pilates: [], Mixto: [], Otro: [] };
+  for (const p of plans) {
+    if (p.name.includes("Jumping")) groups.Jumping.push(p);
+    else if (p.name.includes("Pilates")) groups.Pilates.push(p);
+    else if (p.name.includes("Mixto")) groups.Mixto.push(p);
+    else groups.Otro.push(p);
+  }
+  return groups;
+}
+
+// ── Step indicator ────────────────────────────────────────
+const StepBar = ({ step }: { step: number }) => (
+  <div className="flex items-center gap-0 mb-8">
+    {STEP_META.map((s, i) => {
+      const done = step > i + 1;
+      const active = step === i + 1;
+      return (
+        <div key={i} className="flex items-center gap-0">
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all",
+            done && "bg-[#E15CB8]/20 text-[#E15CB8] border border-[#E15CB8]/30",
+            active && "bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white shadow-[0_0_16px_rgba(225,92,184,0.4)]",
+            !done && !active && "bg-white/5 text-white/25 border border-white/10"
+          )}>
+            <span className={cn(
+              "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
+              done && "bg-[#E15CB8] text-white",
+              active && "bg-white/20 text-white",
+              !done && !active && "bg-white/10 text-white/30"
+            )}>
+              {done ? "✓" : i + 1}
+            </span>
+            {s.label}
+          </div>
+          {i < 2 && (
+            <div className={cn(
+              "w-8 h-px mx-1 transition-all",
+              done ? "bg-[#E15CB8]/50" : "bg-white/10"
+            )} />
+          )}
+        </div>
+      );
+    })}
+  </div>
+);
 
 // ── Cash Assignment Wizard ──────────────────────────────
 const CashAssignment = () => {
@@ -21,7 +81,7 @@ const CashAssignment = () => {
   const [step, setStep] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
-  const [selectedUser, setSelectedUser] = useState<{ id: string; displayName: string } | null>(null);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; displayName: string; email?: string } | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<{ id: string; name: string; price: number } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
@@ -31,107 +91,233 @@ const CashAssignment = () => {
     enabled: !!debouncedSearch,
   });
 
-  const { data: plansData } = useQuery<{ data: { id: string; name: string; price: number }[] }>({
+  const { data: plansData } = useQuery<{ data: { id: string; name: string; price: number; classLimit?: number | null; durationDays?: number }[] }>({
     queryKey: ["plans"],
     queryFn: async () => (await api.get("/plans")).data,
   });
 
   const assignMutation = useMutation({
-    mutationFn: () => api.post("/memberships", { userId: selectedUser?.id, planId: selectedPlan?.id, paymentMethod, startDate: new Date().toISOString().split("T")[0] }),
+    mutationFn: () => api.post("/memberships", {
+      userId: selectedUser?.id,
+      planId: selectedPlan?.id,
+      paymentMethod,
+      startDate: new Date().toISOString().split("T")[0],
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["memberships"] });
-      toast({ title: "Membresía asignada correctamente" });
-      setStep(1); setSelectedUser(null); setSelectedPlan(null);
+      toast({ title: "✅ Membresía activada correctamente" });
+      setStep(1); setSelectedUser(null); setSelectedPlan(null); setSearch("");
     },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al asignar", variant: "destructive" }),
   });
 
+  const plans = Array.isArray(plansData?.data) ? plansData.data : [];
+  const planGroups = groupPlans(plans);
+
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h2 className="text-xl font-bold mb-6">Asignación de pago en efectivo</h2>
+    <div className="max-w-2xl mx-auto">
+      <StepBar step={step} />
 
-      {/* Step indicators */}
-      <div className="flex items-center gap-2 mb-8">
-        {["Buscar cliente", "Elegir plan", "Confirmar pago"].map((s, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${step > i + 1 ? "bg-primary text-primary-foreground" : step === i + 1 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>{i + 1}</div>
-            <span className={`text-sm ${step === i + 1 ? "font-medium" : "text-muted-foreground"}`}>{s}</span>
-            {i < 2 && <div className="w-8 h-px bg-border" />}
-          </div>
-        ))}
-      </div>
-
+      {/* ── Step 1: Buscar cliente ─────────────────────────── */}
       {step === 1 && (
         <div className="space-y-4">
-          <Label>Buscar cliente por nombre o email</Label>
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Escribir para buscar..." />
+          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+            <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Buscar cliente</h3>
+            <div className="relative">
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#CA71E1]/60" />
+              <Input
+                className="pl-9 bg-white/[0.04] border-white/10 focus:border-[#E15CB8]/50 focus:ring-[#E15CB8]/20 text-white placeholder:text-white/25 rounded-xl"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Nombre o email de la clienta…"
+                autoFocus
+              />
+            </div>
           </div>
-          {usersLoading && <Loader2 className="animate-spin" />}
+
+          {usersLoading && (
+            <div className="flex items-center justify-center py-8 text-[#CA71E1]/60">
+              <Loader2 className="animate-spin mr-2" size={16} /> Buscando…
+            </div>
+          )}
+
           <div className="space-y-2">
             {(Array.isArray(usersData?.data) ? usersData.data : []).map((u) => (
-              <div
+              <button
                 key={u.id}
-                className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted cursor-pointer"
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] hover:bg-[#E15CB8]/5 hover:border-[#E15CB8]/25 transition-all group text-left"
                 onClick={() => { setSelectedUser(u); setStep(2); }}
               >
-                <div>
-                  <p className="font-medium text-sm">{u.displayName}</p>
-                  <p className="text-xs text-muted-foreground">{u.email}</p>
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E15CB8]/30 to-[#CA71E1]/20 border border-[#E15CB8]/30 flex items-center justify-center text-sm font-bold text-[#E15CB8] shrink-0">
+                  {u.displayName?.[0]?.toUpperCase() ?? "?"}
                 </div>
-                <Button size="sm" variant="outline">Seleccionar</Button>
-              </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-white/90 truncate">{u.displayName}</p>
+                  <p className="text-xs text-white/35 truncate">{u.email}</p>
+                </div>
+                <ArrowRight size={14} className="text-white/20 group-hover:text-[#E15CB8]/60 transition-colors shrink-0" />
+              </button>
             ))}
+            {debouncedSearch && !usersLoading && (usersData?.data?.length ?? 0) === 0 && (
+              <p className="text-center py-6 text-white/30 text-sm">No se encontraron clientes</p>
+            )}
           </div>
         </div>
       )}
 
+      {/* ── Step 2: Elegir plan ────────────────────────────── */}
       {step === 2 && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">Cliente: <strong>{selectedUser?.displayName}</strong></p>
-          <Label>Elegir plan</Label>
-          <div className="space-y-2">
-            {(Array.isArray(plansData?.data) ? plansData.data : []).map((p) => (
-              <div
-                key={p.id}
-                className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${selectedPlan?.id === p.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted"}`}
-                onClick={() => setSelectedPlan(p)}
-              >
-                <span className="font-medium text-sm">{p.name}</span>
-                <span className="font-bold">${p.price} MXN</span>
-              </div>
-            ))}
+        <div className="space-y-5">
+          {/* Cliente seleccionado */}
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-[#E15CB8]/8 border border-[#E15CB8]/20">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center text-xs font-bold text-white">
+              {selectedUser?.displayName?.[0]?.toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white/90">{selectedUser?.displayName}</p>
+              <p className="text-xs text-white/40">{selectedUser?.email}</p>
+            </div>
+            <Button variant="ghost" size="sm" className="ml-auto text-white/30 hover:text-white/60 text-xs" onClick={() => setStep(1)}>
+              <ChevronLeft size={12} className="mr-1" /> Cambiar
+            </Button>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setStep(1)}>Volver</Button>
-            <Button onClick={() => setStep(3)} disabled={!selectedPlan}>Continuar</Button>
+
+          {/* Plan groups */}
+          {Object.entries(planGroups).map(([group, items]) => {
+            if (!items.length) return null;
+            const groupColors: Record<string, string> = {
+              Jumping: "text-[#E15CB8]",
+              Pilates: "text-[#CA71E1]",
+              Mixto: "text-[#E7EB6E]",
+              Otro: "text-white/50",
+            };
+            return (
+              <div key={group}>
+                <p className={cn("text-[11px] font-semibold uppercase tracking-widest mb-2 px-1", groupColors[group])}>
+                  {group === "Otro" ? "Otros" : `Paquetes ${group}`}
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {items.map((p) => (
+                    <button
+                      key={p.id}
+                      className={cn(
+                        "w-full flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group",
+                        selectedPlan?.id === p.id
+                          ? "border-[#E15CB8]/50 bg-gradient-to-r from-[#E15CB8]/10 to-[#CA71E1]/5 shadow-[0_0_16px_rgba(225,92,184,0.12)]"
+                          : "border-white/[0.07] bg-white/[0.02] hover:border-[#E15CB8]/25 hover:bg-[#E15CB8]/5"
+                      )}
+                      onClick={() => setSelectedPlan(p)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full shrink-0 transition-all",
+                          selectedPlan?.id === p.id
+                            ? "bg-[#E15CB8] shadow-[0_0_8px_#E15CB8]"
+                            : "bg-white/15 group-hover:bg-[#E15CB8]/50"
+                        )} />
+                        <div>
+                          <p className="text-sm font-semibold text-white/85">{p.name}</p>
+                          <p className="text-xs text-white/30">
+                            {p.classLimit === null ? "Ilimitado" : `${p.classLimit} clases`}
+                            {p.durationDays ? ` · ${p.durationDays} días` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={cn(
+                        "text-sm font-bold transition-colors",
+                        selectedPlan?.id === p.id ? "text-[#E15CB8]" : "text-white/60 group-hover:text-white/90"
+                      )}>
+                        ${Number(p.price).toLocaleString()} MXN
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="border-white/10 text-white/50 hover:text-white hover:border-white/20" onClick={() => setStep(1)}>
+              <ChevronLeft size={14} className="mr-1" /> Volver
+            </Button>
+            <Button
+              className="flex-1 bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 text-white font-semibold shadow-[0_0_20px_rgba(225,92,184,0.3)]"
+              disabled={!selectedPlan}
+              onClick={() => setStep(3)}
+            >
+              Continuar <ArrowRight size={14} className="ml-2" />
+            </Button>
           </div>
         </div>
       )}
 
+      {/* ── Step 3: Confirmar ─────────────────────────────── */}
       {step === 3 && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-secondary space-y-2 text-sm">
-            <div className="flex justify-between"><span>Cliente:</span><span className="font-medium">{selectedUser?.displayName}</span></div>
-            <div className="flex justify-between"><span>Plan:</span><span className="font-medium">{selectedPlan?.name}</span></div>
-            <div className="flex justify-between"><span>Total:</span><span className="font-bold">${selectedPlan?.price} MXN</span></div>
+        <div className="space-y-5">
+          {/* Resumen */}
+          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
+            <div className="px-5 py-3 border-b border-white/[0.07] flex items-center gap-2">
+              <Sparkles size={14} className="text-[#E7EB6E]" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Resumen de la membresía</span>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-white/50">Cliente</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center text-[9px] font-bold text-white">
+                    {selectedUser?.displayName?.[0]?.toUpperCase()}
+                  </div>
+                  <span className="text-sm font-semibold text-white/90">{selectedUser?.displayName}</span>
+                </div>
+              </div>
+              <div className="h-px bg-white/[0.05]" />
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-white/50">Plan</span>
+                <span className="text-sm font-semibold text-white/90">{selectedPlan?.name}</span>
+              </div>
+              <div className="h-px bg-white/[0.05]" />
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-white/50">Total</span>
+                <span className="text-lg font-bold text-[#E15CB8]">${Number(selectedPlan?.price).toLocaleString()} MXN</span>
+              </div>
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label>Método de pago</Label>
-            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Efectivo</SelectItem>
-                <SelectItem value="card">Tarjeta</SelectItem>
-                <SelectItem value="transfer">Transferencia</SelectItem>
-              </SelectContent>
-            </Select>
+
+          {/* Método de pago */}
+          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-white/40 mb-3 block">Método de pago</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {PAYMENT_METHODS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  className={cn(
+                    "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
+                    paymentMethod === value
+                      ? "border-[#E15CB8]/50 bg-[#E15CB8]/10 text-[#E15CB8]"
+                      : "border-white/[0.07] bg-white/[0.02] text-white/40 hover:border-white/15 hover:text-white/70"
+                  )}
+                  onClick={() => setPaymentMethod(value)}
+                >
+                  <Icon size={16} />
+                  <span className="text-xs font-medium">{label}</span>
+                </button>
+              ))}
+            </div>
           </div>
+
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setStep(2)}>Volver</Button>
-            <Button onClick={() => assignMutation.mutate()} disabled={assignMutation.isPending}>
-              {assignMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
-              Confirmar y activar membresía
+            <Button variant="outline" className="border-white/10 text-white/50 hover:text-white hover:border-white/20" onClick={() => setStep(2)}>
+              <ChevronLeft size={14} className="mr-1" /> Volver
+            </Button>
+            <Button
+              className="flex-1 bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 text-white font-bold shadow-[0_0_24px_rgba(225,92,184,0.35)] h-11"
+              onClick={() => assignMutation.mutate()}
+              disabled={assignMutation.isPending}
+            >
+              {assignMutation.isPending
+                ? <><Loader2 className="animate-spin mr-2" size={14} /> Activando…</>
+                : <><CheckCircle2 size={15} className="mr-2" /> Confirmar y activar membresía</>
+              }
             </Button>
           </div>
         </div>
@@ -140,51 +326,91 @@ const CashAssignment = () => {
   );
 };
 
-// ── Payments Register ───────────────────────────────────
-const PaymentsRegister = () => {
+// ── Payments History ──────────────────────────────────────
+const PaymentsHistory = () => {
   const { data } = useQuery<{ data: any[] }>({
     queryKey: ["payments"],
     queryFn: async () => (await api.get("/payments")).data,
   });
   const payments = Array.isArray(data?.data) ? data.data : [];
 
+  const methodStyles: Record<string, string> = {
+    cash: "text-[#E7EB6E] border-[#E7EB6E]/30 bg-[#E7EB6E]/5",
+    card: "text-[#CA71E1] border-[#CA71E1]/30 bg-[#CA71E1]/5",
+    transfer: "text-[#E15CB8] border-[#E15CB8]/30 bg-[#E15CB8]/5",
+  };
+  const methodLabels: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
+
+  if (!payments.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <History size={32} className="text-white/10 mb-3" />
+        <p className="text-white/30 text-sm">Sin pagos registrados aún</p>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h2 className="text-lg font-semibold mb-4">Historial de pagos</h2>
-      <Table>
-        <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Monto</TableHead><TableHead>Método</TableHead><TableHead>Fecha</TableHead></TableRow></TableHeader>
-        <TableBody>
-          {payments.map((p: any) => (
-            <TableRow key={p.id}>
-              <TableCell>{p.userName ?? p.userId}</TableCell>
-              <TableCell>${p.total_amount ?? p.amount} MXN</TableCell>
-              <TableCell><Badge variant="outline">{p.method}</Badge></TableCell>
-              <TableCell className="text-sm">{p.createdAt ? new Date(p.createdAt).toLocaleDateString("es-MX") : "—"}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="space-y-2">
+      {payments.map((p: any) => (
+        <div key={p.id} className="flex items-center gap-4 p-4 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#E15CB8]/20 to-[#CA71E1]/10 border border-[#E15CB8]/20 flex items-center justify-center shrink-0">
+            <CreditCard size={13} className="text-[#E15CB8]/70" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white/85 truncate">{p.userName ?? p.userId ?? "—"}</p>
+            <p className="text-xs text-white/30">{p.createdAt ? new Date(p.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={cn("text-[11px] font-semibold px-2.5 py-1 rounded-full border", methodStyles[p.method] ?? "text-white/40 border-white/10 bg-white/5")}>
+              {methodLabels[p.method] ?? p.method ?? "—"}
+            </span>
+            <span className="text-sm font-bold text-white/90">${Number(p.total_amount ?? p.amount ?? 0).toLocaleString()} MXN</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
 
-// ── Main Payments Page ──────────────────────────────────
-const PaymentsPage = () => (
-  <AuthGuard>
-    <AdminLayout>
-      <div className="p-6 max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Pagos</h1>
-        <Tabs defaultValue="cash">
-          <TabsList>
-            <TabsTrigger value="cash">Asignación efectivo</TabsTrigger>
-            <TabsTrigger value="history">Historial</TabsTrigger>
-          </TabsList>
-          <TabsContent value="cash"><CashAssignment /></TabsContent>
-          <TabsContent value="history" className="mt-4"><PaymentsRegister /></TabsContent>
-        </Tabs>
-      </div>
-    </AdminLayout>
-  </AuthGuard>
-);
+// ── Main Payments Page ────────────────────────────────────
+const PaymentsPage = () => {
+  const [activeTab, setActiveTab] = useState<"cash" | "history">("cash");
+
+  return (
+    <AuthGuard>
+      <AdminLayout>
+        <div className="p-6 max-w-3xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-white mb-1">Pagos</h1>
+            <p className="text-sm text-white/35">Asigna membresías en efectivo y consulta el historial</p>
+          </div>
+
+          {/* Tab switcher */}
+          <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] w-fit mb-8">
+            {([["cash", "Asignación efectivo"], ["history", "Historial"]] as const).map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setActiveTab(val)}
+                className={cn(
+                  "px-5 py-2 rounded-lg text-sm font-semibold transition-all",
+                  activeTab === val
+                    ? "bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white shadow-[0_0_14px_rgba(225,92,184,0.3)]"
+                    : "text-white/40 hover:text-white/70"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "cash" && <CashAssignment />}
+          {activeTab === "history" && <PaymentsHistory />}
+        </div>
+      </AdminLayout>
+    </AuthGuard>
+  );
+};
 
 export default PaymentsPage;

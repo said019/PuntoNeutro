@@ -7,26 +7,46 @@ import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
   Calendar, BookOpen, UserCheck, DollarSign, ShoppingBag,
   ShoppingCart, Tag, Gift, Video, BarChart2,
-  Settings, ChevronLeft, ChevronRight, LogOut, Globe,
+  Settings, ChevronLeft, ChevronRight, LogOut, Globe, Menu,
 } from "lucide-react";
 
-const NAV_ITEMS = [
-  { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/admin/plans", label: "Planes", icon: Package },
-  { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
-  { path: "/admin/clients", label: "Clientes", icon: Users },
-  { path: "/admin/classes", label: "Clases", icon: CalendarDays },
-  { path: "/admin/schedules", label: "Horarios", icon: Calendar },
-  { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
-  { path: "/admin/staff", label: "Instructores", icon: UserCheck },
-  { path: "/admin/payments", label: "Pagos", icon: DollarSign },
-  { path: "/admin/orders", label: "Órdenes", icon: ShoppingBag },
-  { path: "/admin/pos", label: "POS", icon: ShoppingCart },
-  { path: "/admin/discount-codes", label: "Descuentos", icon: Tag },
-  { path: "/admin/loyalty", label: "Lealtad", icon: Gift },
-  { path: "/admin/videos", label: "Videos", icon: Video },
-  { path: "/admin/reports", label: "Reportes", icon: BarChart2 },
-  { path: "/admin/settings", label: "Configuración", icon: Settings },
+const NAV_GROUPS = [
+  {
+    label: "Principal",
+    items: [
+      { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { path: "/admin/clients", label: "Clientes", icon: Users },
+      { path: "/admin/payments", label: "Pagos", icon: DollarSign },
+      { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Gestión",
+    items: [
+      { path: "/admin/plans", label: "Planes", icon: Package },
+      { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
+      { path: "/admin/classes", label: "Clases", icon: CalendarDays },
+      { path: "/admin/schedules", label: "Horarios", icon: Calendar },
+      { path: "/admin/staff", label: "Instructores", icon: UserCheck },
+    ],
+  },
+  {
+    label: "Tienda",
+    items: [
+      { path: "/admin/orders", label: "Órdenes", icon: ShoppingBag },
+      { path: "/admin/pos", label: "POS", icon: ShoppingCart },
+      { path: "/admin/discount-codes", label: "Descuentos", icon: Tag },
+      { path: "/admin/loyalty", label: "Lealtad", icon: Gift },
+      { path: "/admin/videos", label: "Videos", icon: Video },
+    ],
+  },
+  {
+    label: "Sistema",
+    items: [
+      { path: "/admin/reports", label: "Reportes", icon: BarChart2 },
+      { path: "/admin/settings", label: "Configuración", icon: Settings },
+    ],
+  },
 ];
 
 interface AdminLayoutProps {
@@ -38,80 +58,168 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
+  const user = useAuthStore((s) => s.user);
 
   const handleLogout = async () => {
     logout();
     navigate("/auth/login");
   };
 
+  // Current page label
+  const allItems = NAV_GROUPS.flatMap((g) => g.items);
+  const currentItem = allItems.find(
+    (i) => location.pathname === i.path || location.pathname.startsWith(i.path + "/")
+  );
+
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      {/* Sidebar */}
+    <div className="flex min-h-screen bg-[#080808] text-foreground">
+      {/* ── Sidebar ─────────────────────────────────────────────── */}
       <aside
         className={cn(
-          "flex flex-col border-r border-border bg-secondary transition-all duration-300",
-          collapsed ? "w-[60px]" : "w-[220px]"
+          "flex flex-col transition-all duration-300 relative z-20 shrink-0",
+          "border-r border-white/[0.06]",
+          // subtle purple-to-black gradient
+          "bg-gradient-to-b from-[#0f0518] via-[#0a0a0a] to-[#080808]",
+          collapsed ? "w-[64px]" : "w-[240px]"
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-4 py-6 border-b border-border">
+        <div
+          className={cn(
+            "flex items-center border-b border-white/[0.06] shrink-0",
+            collapsed ? "justify-center px-3 py-5" : "justify-between px-5 py-4"
+          )}
+        >
           {!collapsed && (
-            <img src={opheliaLogo} alt="Ophelia" className="h-20 w-full object-contain" />
+            <img src={opheliaLogo} alt="Ophelia" className="h-16 w-auto object-contain" />
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className={cn(
+              "flex items-center justify-center w-7 h-7 rounded-lg transition-all",
+              "text-[#CA71E1]/60 hover:text-[#CA71E1] hover:bg-[#CA71E1]/10"
+            )}
           >
-            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            {collapsed ? <Menu size={15} /> : <ChevronLeft size={15} />}
           </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3">
-          {NAV_ITEMS.map(({ path, label, icon: Icon }) => {
-            const active = location.pathname === path || location.pathname.startsWith(path + "/");
-            return (
-              <Link
-                key={path}
-                to={path}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-2.5 text-sm transition-colors no-underline rounded-lg mx-2",
-                  active
-                    ? "bg-gradient-to-r from-[#CA71E1]/20 to-[#E15CB8]/10 text-[#CA71E1] font-medium border border-[#CA71E1]/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-                title={collapsed ? label : undefined}
-              >
-                <Icon size={16} className="shrink-0" />
-                {!collapsed && <span>{label}</span>}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto py-3 scrollbar-thin">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className="mb-1">
+              {/* Group header */}
+              {!collapsed && (
+                <p className="px-5 py-1.5 text-[10px] font-semibold tracking-widest uppercase text-[#CA71E1]/40">
+                  {group.label}
+                </p>
+              )}
+              {group.items.map(({ path, label, icon: Icon }) => {
+                const active = location.pathname === path || location.pathname.startsWith(path + "/");
+                return (
+                  <Link
+                    key={path}
+                    to={path}
+                    title={collapsed ? label : undefined}
+                    className={cn(
+                      "flex items-center gap-3 mx-2 my-0.5 rounded-xl transition-all duration-200 no-underline group",
+                      collapsed ? "px-0 justify-center py-2.5" : "px-3 py-2.5",
+                      active
+                        ? [
+                            "bg-gradient-to-r from-[#E15CB8]/15 to-[#CA71E1]/10",
+                            "border border-[#E15CB8]/25",
+                            "text-[#E15CB8] font-semibold",
+                            "shadow-[0_0_12px_rgba(225,92,184,0.12)]",
+                          ].join(" ")
+                        : "text-white/40 hover:text-white/80 hover:bg-white/[0.04] border border-transparent"
+                    )}
+                  >
+                    <Icon
+                      size={15}
+                      className={cn(
+                        "shrink-0 transition-colors",
+                        active ? "text-[#E15CB8]" : "text-white/30 group-hover:text-white/70"
+                      )}
+                    />
+                    {!collapsed && (
+                      <span className="text-[13px] leading-none">{label}</span>
+                    )}
+                    {/* Active dot */}
+                    {active && !collapsed && (
+                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#E15CB8] shadow-[0_0_6px_#E15CB8]" />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
-        {/* Footer actions */}
-        <div className="border-t border-border py-3">
+        {/* Footer */}
+        <div className="border-t border-white/[0.06] pb-3 pt-2 shrink-0">
           <Link
             to="/"
-            className="flex items-center gap-3 px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors no-underline"
             title={collapsed ? "Ver sitio" : undefined}
+            className={cn(
+              "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 no-underline transition-all",
+              "text-white/30 hover:text-[#E7EB6E] hover:bg-[#E7EB6E]/5 border border-transparent",
+              collapsed && "justify-center px-0"
+            )}
           >
             <Globe size={14} className="shrink-0" />
-            {!collapsed && "Ver sitio"}
+            {!collapsed && <span className="text-xs">Ver sitio</span>}
           </Link>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-2.5 text-xs text-destructive hover:text-destructive/80 transition-colors w-full"
             title={collapsed ? "Salir" : undefined}
+            className={cn(
+              "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 w-[calc(100%-16px)] transition-all",
+              "text-white/30 hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/8 border border-transparent",
+              collapsed && "justify-center px-0 w-[calc(100%-16px)]"
+            )}
           >
             <LogOut size={14} className="shrink-0" />
-            {!collapsed && "Salir"}
+            {!collapsed && <span className="text-xs">Cerrar sesión</span>}
           </button>
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-auto">{children}</main>
+      {/* ── Content area ────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Topbar */}
+        <header className="shrink-0 h-14 flex items-center justify-between px-6 border-b border-white/[0.06] bg-[#080808]/80 backdrop-blur-sm sticky top-0 z-10">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-white/30 text-xs font-medium tracking-wider uppercase">Admin</span>
+            {currentItem && (
+              <>
+                <ChevronRight size={12} className="text-white/20" />
+                <span className="text-white/80 text-sm font-medium">{currentItem.label}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Lime accent dot */}
+            <span className="flex items-center gap-1.5 text-[11px] text-[#E7EB6E]/70 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#E7EB6E] shadow-[0_0_6px_#E7EB6E] animate-pulse" />
+              En línea
+            </span>
+            <div className="w-px h-4 bg-white/10" />
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center text-[11px] font-bold text-white shadow-[0_0_10px_rgba(225,92,184,0.4)]">
+                {(user as any)?.name?.[0]?.toUpperCase() ?? (user as any)?.email?.[0]?.toUpperCase() ?? "A"}
+              </div>
+              {!collapsed && (
+                <span className="text-xs text-white/50 hidden sm:block">
+                  {(user as any)?.name ?? (user as any)?.email ?? "Admin"}
+                </span>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-auto">{children}</main>
+      </div>
     </div>
   );
 };
