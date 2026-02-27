@@ -13,6 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
@@ -24,6 +27,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus } from "lucide-react";
 
+const CATEGORIES = [
+  { value: "jumping", label: "Jumping",       color: "bg-[#E15CB8]/20 text-[#E15CB8] border-[#E15CB8]/30" },
+  { value: "pilates", label: "Pilates",        color: "bg-[#CA71E1]/20 text-[#CA71E1] border-[#CA71E1]/30" },
+  { value: "mixto",   label: "Mixto",          color: "bg-yellow-400/15 text-yellow-400 border-yellow-400/30" },
+  { value: "all",     label: "Todas (sin filtro)", color: "bg-white/10 text-white/60 border-white/15" },
+] as const;
+
+type CategoryValue = (typeof CATEGORIES)[number]["value"];
+
 const planSchema = z.object({
   name: z.string().min(1, "Nombre requerido"),
   description: z.string().optional(),
@@ -31,6 +43,7 @@ const planSchema = z.object({
   currency: z.string().default("MXN"),
   durationDays: z.coerce.number().min(1),
   classLimit: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().nullable()),
+  classCategory: z.enum(["jumping", "pilates", "mixto", "all"]).default("all"),
   features: z.string().optional(),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().default(0),
@@ -44,11 +57,10 @@ interface Plan extends PlanFormData {
 
 const EMPTY: PlanFormData = {
   name: "", description: "", price: 0, currency: "MXN",
-  durationDays: 30, classLimit: null, features: "",
-  isActive: true, sortOrder: 0,
+  durationDays: 30, classLimit: null, classCategory: "all",
+  features: "", isActive: true, sortOrder: 0,
 };
 
-/** Convert comma-string features → array for the API */
 function serializePlan(d: PlanFormData) {
   return {
     ...d,
@@ -58,10 +70,10 @@ function serializePlan(d: PlanFormData) {
   };
 }
 
-/** Normalize a plan from the API so it works in the form */
 function normalizePlan(p: Plan): PlanFormData {
   return {
     ...p,
+    classCategory: ((p as any).classCategory ?? (p as any).class_category ?? "all") as CategoryValue,
     features: Array.isArray(p.features)
       ? (p.features as unknown as string[]).join(", ")
       : (p.features as unknown as string) ?? "",
@@ -123,6 +135,7 @@ const PlansList = () => {
                   <TableHead>Precio</TableHead>
                   <TableHead>Duración</TableHead>
                   <TableHead>Límite clases</TableHead>
+                  <TableHead>Categoría</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead />
                 </TableRow>
@@ -130,7 +143,7 @@ const PlansList = () => {
               <TableBody>
                 {isLoading
                   ? Array(4).fill(0).map((_, i) => (
-                    <TableRow key={i}>{Array(6).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                    <TableRow key={i}>{Array(7).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                   ))
                   : plans.map((p) => (
                     <TableRow key={p.id}>
@@ -138,6 +151,12 @@ const PlansList = () => {
                       <TableCell>${p.price} {p.currency}</TableCell>
                       <TableCell>{p.durationDays} días</TableCell>
                       <TableCell>{p.classLimit == null ? "Ilimitado" : p.classLimit === 0 ? "0" : p.classLimit}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const cat = CATEGORIES.find((c) => c.value === (p.classCategory ?? "all")) ?? CATEGORIES[3];
+                          return <Badge className={`border ${cat.color}`}>{cat.label}</Badge>;
+                        })()}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={p.isActive ? "default" : "secondary"}>
                           {p.isActive ? "Activo" : "Inactivo"}
@@ -172,6 +191,22 @@ const PlansList = () => {
                 <Label>Nombre</Label>
                 <Input {...form.register("name")} />
                 {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
+              </div>
+              <div className="space-y-1">
+                <Label>Categoría de clases</Label>
+                <Select
+                  value={form.watch("classCategory") ?? "all"}
+                  onValueChange={(v) => form.setValue("classCategory", v as CategoryValue)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <Label>Descripción</Label>

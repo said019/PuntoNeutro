@@ -950,9 +950,9 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
   try {
     // Check membership (get class_category from the joined plan)
     const memRes = await pool.query(
-      `SELECT m.id, m.classes_remaining, p.class_category
+      `SELECT m.id, m.classes_remaining, COALESCE(p.class_category, 'all') AS class_category
        FROM memberships m
-       JOIN plans p ON m.plan_id = p.id
+       LEFT JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1 AND m.status = 'active' AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
        LIMIT 1`,
       [req.userId]
@@ -973,12 +973,12 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     if (cls.status === "cancelled") return res.status(400).json({ message: "Esta clase fue cancelada" });
 
     // ── Category validation ────────────────────────────────────────────────
-    // mixto memberships can book any category (jumping or pilates)
+    // mixto/all memberships can book any category (jumping or pilates)
     // jumping memberships can only book jumping classes
     // pilates memberships can only book pilates classes
-    const memCategory = membership.class_category; // 'jumping' | 'pilates' | 'mixto'
-    const clsCategory = cls.class_category;         // 'jumping' | 'pilates'
-    if (memCategory !== "mixto" && memCategory !== clsCategory) {
+    const memCategory = membership.class_category ?? "all"; // 'jumping' | 'pilates' | 'mixto' | 'all'
+    const clsCategory = cls.class_category;                  // 'jumping' | 'pilates' | null
+    if (clsCategory && memCategory !== "mixto" && memCategory !== "all" && memCategory !== clsCategory) {
       const label = clsCategory === "jumping" ? "Jumping" : "Pilates";
       return res.status(403).json({
         message: `Tu membresía no incluye clases de ${label}. Necesitas una membresía ${label} o Mixta.`,
@@ -2941,7 +2941,9 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
 // PUT /api/plans/:id
 app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
   try {
-    const { name, description, price, currency, durationDays, classLimit, features, isActive, sortOrder } = req.body;
+    const { name, description, price, currency, durationDays, classLimit, classCategory, features, isActive, sortOrder } = req.body;
+    const validCats = ["jumping", "pilates", "mixto", "all"];
+    const cat = validCats.includes(classCategory) ? classCategory : null;
     // features can be array or comma-string — always store as jsonb array
     const featuresArr = Array.isArray(features)
       ? features
@@ -2950,9 +2952,10 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
         : [];
     const r = await pool.query(
       `UPDATE plans SET name=$1, description=$2, price=$3, currency=$4, duration_days=$5,
-       class_limit=$6, features=$7, is_active=$8, sort_order=$9, updated_at=NOW()
-       WHERE id=$10 RETURNING *`,
-      [name, description || null, price, currency || "MXN", durationDays || 30, classLimit ?? null, JSON.stringify(featuresArr), isActive !== false, sortOrder || 0, req.params.id]
+       class_limit=$6, features=$7, is_active=$8, sort_order=$9,
+       class_category=COALESCE($10, class_category), updated_at=NOW()
+       WHERE id=$11 RETURNING *`,
+      [name, description || null, price, currency || "MXN", durationDays || 30, classLimit ?? null, JSON.stringify(featuresArr), isActive !== false, sortOrder || 0, cat, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     return res.json({ data: camelRow(r.rows[0]) });
@@ -2986,17 +2989,19 @@ app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
 // POST /api/plans
 app.post("/api/plans", adminMiddleware, async (req, res) => {
   try {
-    const { name, description, price, currency = "MXN", durationDays = 30, classLimit, features, isActive = true, sortOrder = 0 } = req.body;
+    const { name, description, price, currency = "MXN", durationDays = 30, classLimit, classCategory, features, isActive = true, sortOrder = 0 } = req.body;
     if (!name) return res.status(400).json({ message: "Nombre requerido" });
+    const validCats = ["jumping", "pilates", "mixto", "all"];
+    const cat = validCats.includes(classCategory) ? classCategory : "all";
     const featuresArr = Array.isArray(features)
       ? features
       : typeof features === "string" && features.trim()
         ? features.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
     const r = await pool.query(
-      `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, features, is_active, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [name, description || null, price || 0, currency, durationDays, classLimit ?? null, JSON.stringify(featuresArr), isActive, sortOrder]
+      `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [name, description || null, price || 0, currency, durationDays, classLimit ?? null, cat, JSON.stringify(featuresArr), isActive, sortOrder]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) {
