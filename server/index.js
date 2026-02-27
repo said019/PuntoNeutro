@@ -528,7 +528,111 @@ async function ensureSchema() {
     console.error("Schema migration warning:", err.message);
   }
 
-  // ── Admin user — always upsert (separate try/catch so it always runs) ──
+  // ── Seed demo classes for the next 4 weeks (only if classes table is empty) ──
+  try {
+    // First ensure at least one instructor exists
+    const instCount = await pool.query("SELECT COUNT(*) FROM instructors");
+    if (parseInt(instCount.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO instructors (display_name, email, bio, specialties, is_active) VALUES
+          ('Valeria Mendoza',  'valeria@opheliajumping.mx',  'Instructora certificada de Jumping Fitness con 5 años de experiencia.', 'Jumping Fitness,Jumping Dance,Strong Jump', true),
+          ('Daniela Reyes',    'daniela@opheliajumping.mx',  'Especialista en Pilates y movimiento consciente.', 'Hot Pilates,Flow Pilates,Pilates Mat,Mindful Jump', true),
+          ('Sofía Torres',     'sofia@opheliajumping.mx',    'Instructora de Jump & Tone y entrenamientos funcionales.', 'Jump & Tone,Strong Jump,Jumping Fitness', true),
+          ('Camila Vargas',    'camila@opheliajumping.mx',   'Certificada en Pilates mat y reformer.', 'Pilates Mat,Flow Pilates,Hot Pilates', true)
+        ON CONFLICT DO NOTHING;
+      `);
+      console.log("✅ Seeded 4 demo instructors");
+    }
+
+    const classCount = await pool.query("SELECT COUNT(*) FROM classes");
+    if (parseInt(classCount.rows[0].count) === 0) {
+      // Fetch real class_type ids and instructor ids from DB
+      const typesRes = await pool.query(
+        "SELECT id, name FROM class_types WHERE is_active = true ORDER BY sort_order ASC LIMIT 8"
+      );
+      const instRes = await pool.query(
+        "SELECT id FROM instructors WHERE is_active = true ORDER BY created_at ASC LIMIT 4"
+      );
+
+      if (typesRes.rows.length > 0 && instRes.rows.length > 0) {
+        const types = typesRes.rows;       // [{id, name}, ...]
+        const insts = instRes.rows;        // [{id}, ...]
+        const getType = (i) => types[i % types.length].id;
+        const getInst = (i) => insts[i % insts.length].id;
+
+        // Build classes for Mon–Sat for the next 4 weeks
+        const today = new Date();
+        // Find Monday of current week
+        const dayOfWeek = today.getDay(); // 0=Sun
+        const diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + diffToMon);
+
+        // Time slots: morning + evening
+        const SLOTS = [
+          { hour: 7,  min: 0,  dur: 55 },
+          { hour: 9,  min: 0,  dur: 55 },
+          { hour: 11, min: 0,  dur: 60 },
+          { hour: 18, min: 0,  dur: 55 },
+          { hour: 19, min: 30, dur: 55 },
+        ];
+        // Days: Mon(1)–Sat(6), no Sunday
+        const DAYS = [0, 1, 2, 3, 4, 5]; // offset from monday
+
+        let typeIdx = 0;
+        let instIdx = 0;
+        const inserts = [];
+
+        for (let week = 0; week < 4; week++) {
+          for (const dayOffset of DAYS) {
+            const date = new Date(monday);
+            date.setDate(monday.getDate() + week * 7 + dayOffset);
+            const dateStr = date.toISOString().slice(0, 10); // YYYY-MM-DD
+
+            // Not every slot on every day — skip some to feel realistic
+            const slotsToday = SLOTS.filter((_, si) => {
+              // Weekends (Sat = offset 5) only morning slots
+              if (dayOffset === 5 && si > 2) return false;
+              // Some variety: skip slot if typeIdx+dayOffset+si is divisible by 7
+              if ((typeIdx + dayOffset + si) % 7 === 0) return false;
+              return true;
+            });
+
+            for (const slot of slotsToday) {
+              const startH = String(slot.hour).padStart(2, "0");
+              const startM = String(slot.min).padStart(2, "0");
+              const totalMin = slot.hour * 60 + slot.min + slot.dur;
+              const endH = String(Math.floor(totalMin / 60)).padStart(2, "0");
+              const endM = String(totalMin % 60).padStart(2, "0");
+              inserts.push({
+                classTypeId: getType(typeIdx),
+                instructorId: getInst(instIdx),
+                date: dateStr,
+                startTime: `${startH}:${startM}`,
+                endTime: `${endH}:${endM}`,
+                maxCapacity: 10,
+              });
+              typeIdx++;
+              instIdx++;
+            }
+          }
+        }
+
+        for (const c of inserts) {
+          await pool.query(
+            `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, status)
+             VALUES ($1,$2,$3,$4,$5,$6,'scheduled') ON CONFLICT DO NOTHING`,
+            [c.classTypeId, c.instructorId, c.date, c.startTime, c.endTime, c.maxCapacity]
+          );
+        }
+        console.log(`✅ Seeded ${inserts.length} demo classes for the next 4 weeks`);
+      }
+    }
+  } catch (err) {
+    console.error("Demo classes seed warning:", err.message);
+  }
+
+
   try {
     const adminHash = await bcrypt.hash("Ophelia2026!", 12);
     await pool.query(
