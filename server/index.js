@@ -27,7 +27,49 @@ const evolutionApi = axios.create({
 // ─── File upload (memory storage, max 10 MB) ────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// ─── Database ───────────────────────────────────────────────────────────────
+// ─── File upload for videos (memory storage, max 600 MB) ────────────────────
+const uploadVideo = multer({ storage: multer.memoryStorage(), limits: { fileSize: 600 * 1024 * 1024 } });
+
+// ─── Google Drive helpers ────────────────────────────────────────────────────
+async function getGoogleDriveAccessToken() {
+  const resp = await axios.post("https://oauth2.googleapis.com/token", new URLSearchParams({
+    client_id:     process.env.GOOGLE_CLIENT_ID     || "",
+    client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN || "",
+    grant_type:    "refresh_token",
+  }), { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+  return resp.data.access_token;
+}
+
+async function makeGoogleDriveFilePublic(fileId, accessToken) {
+  await axios.post(
+    `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,
+    { role: "reader", type: "anyone" },
+    { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
+  ).catch(() => {}); // best-effort
+}
+
+async function uploadBufferToDrive(buffer, fileName, mimeType, accessToken) {
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || "";
+  const metadata = { name: fileName, ...(folderId ? { parents: [folderId] } : {}) };
+  // Build multipart body manually
+  const boundary = "ophelia_boundary_" + Date.now();
+  const metaPart = Buffer.from(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`
+  );
+  const filePart = Buffer.from(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+  const endPart  = Buffer.from(`\r\n--${boundary}--`);
+  const body = Buffer.concat([metaPart, filePart, buffer, endPart]);
+
+  const resp = await axios.post(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
+    body,
+    { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": `multipart/related; boundary="${boundary}"` }, maxBodyLength: Infinity, maxContentLength: Infinity }
+  );
+  return resp.data; // { id, webViewLink }
+}
+
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes("railway") ? { rejectUnauthorized: false } : false,
@@ -458,6 +500,19 @@ async function ensureSchema() {
     // ── Videos: add price column (may fail if videos table not yet created) ─
     await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS price DECIMAL(10,2)`).catch(() => {});
     await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS drive_file_id VARCHAR(500)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS cloudinary_id VARCHAR(500)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail_drive_id VARCHAR(500)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS duration_seconds INTEGER DEFAULT 0`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS subtitle VARCHAR(255)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS tagline VARCHAR(255)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS days VARCHAR(100)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS brand_color VARCHAR(7)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_enabled BOOLEAN DEFAULT false`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_unlocks_video BOOLEAN DEFAULT false`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_price_mxn DECIMAL(10,2)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_class_credits INTEGER`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_cta_text VARCHAR(100)`).catch(() => {});
     // ── Video purchases: add admin_notes and verified_at ──────────────────
     await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT`).catch(() => {});
     await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE`).catch(() => {});
@@ -2774,32 +2829,145 @@ app.post("/api/videos/purchases/:id/reject", adminMiddleware, async (req, res) =
 });
 
 // Admin Videos — also available at /api/videos (CRUD) for admin use
+
+// POST /api/videos/upload  — upload video file (+ optional thumbnail) to Google Drive
+app.post("/api/videos/upload", adminMiddleware, uploadVideo.fields([{ name: "video", maxCount: 1 }, { name: "thumbnail", maxCount: 1 }]), async (req, res) => {
+  try {
+    const videoFile     = req.files?.video?.[0];
+    const thumbnailFile = req.files?.thumbnail?.[0];
+    if (!videoFile) return res.status(400).json({ message: "Se requiere el archivo de video" });
+
+    const isDriveConfigured = Boolean(
+      process.env.GOOGLE_CLIENT_ID &&
+      process.env.GOOGLE_CLIENT_SECRET &&
+      process.env.GOOGLE_REFRESH_TOKEN
+    );
+    if (!isDriveConfigured) {
+      return res.status(503).json({ message: "Google Drive no configurado. Define GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN en Railway." });
+    }
+
+    const accessToken = await getGoogleDriveAccessToken();
+
+    // Upload video
+    const videoResult = await uploadBufferToDrive(
+      videoFile.buffer,
+      videoFile.originalname,
+      videoFile.mimetype,
+      accessToken
+    );
+    await makeGoogleDriveFilePublic(videoResult.id, accessToken);
+
+    // Upload thumbnail (optional)
+    let thumbnailUrl = `https://drive.google.com/thumbnail?id=${videoResult.id}&sz=w640`;
+    let thumbnailDriveId = "";
+    if (thumbnailFile) {
+      const thumbResult = await uploadBufferToDrive(
+        thumbnailFile.buffer,
+        thumbnailFile.originalname,
+        thumbnailFile.mimetype,
+        accessToken
+      );
+      await makeGoogleDriveFilePublic(thumbResult.id, accessToken);
+      thumbnailUrl     = `https://drive.google.com/thumbnail?id=${thumbResult.id}&sz=w640`;
+      thumbnailDriveId = thumbResult.id;
+    }
+
+    return res.json({
+      drive_file_id:    videoResult.id,
+      cloudinary_id:    videoResult.id,           // same value for compat
+      thumbnail_url:    thumbnailUrl,
+      thumbnail_drive_id: thumbnailDriveId,
+      secure_url:       `https://drive.google.com/file/d/${videoResult.id}/view`,
+      embed_url:        `https://drive.google.com/file/d/${videoResult.id}/preview`,
+      duration_seconds: 0,
+    });
+  } catch (err) {
+    console.error("Video upload error:", err?.response?.data || err.message);
+    return res.status(500).json({ message: "Error al subir video: " + (err?.response?.data?.error?.message || err.message) });
+  }
+});
+
 app.post("/api/videos", adminMiddleware, async (req, res) => {
   try {
-    const { title, description, videoUrl, thumbnailUrl, classTypeId, instructorId, durationMinutes, accessType = "membership", isPublished = false, isFeatured = false, sortOrder = 0, price } = req.body;
-    if (!title || !videoUrl) return res.status(400).json({ message: "title y videoUrl requeridos" });
+    const {
+      title, description, subtitle, tagline, days, brand_color,
+      drive_file_id, cloudinary_id, thumbnail_url, thumbnail_drive_id,
+      class_type_id, instructor_id, duration_seconds,
+      access_type = "free", is_published = false, is_featured = false, sort_order = 0,
+      sales_enabled = false, sales_unlocks_video = false, sales_price_mxn, sales_class_credits, sales_cta_text,
+      category_id,
+    } = req.body;
+    if (!title) return res.status(400).json({ message: "title es requerido" });
     const r = await pool.query(
-      `INSERT INTO videos (title, description, video_url, thumbnail_url, class_type_id, instructor_id, duration_minutes, access_type, is_published, is_featured, sort_order, price)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [title, description || null, videoUrl, thumbnailUrl || null, classTypeId || null, instructorId || null, durationMinutes || null, accessType, isPublished, isFeatured, sortOrder, price || null]
+      `INSERT INTO videos (
+         title, description, subtitle, tagline, days, brand_color,
+         drive_file_id, cloudinary_id, thumbnail_url, thumbnail_drive_id,
+         class_type_id, instructor_id, duration_seconds,
+         access_type, is_published, is_featured, sort_order,
+         sales_enabled, sales_unlocks_video, sales_price_mxn, sales_class_credits, sales_cta_text
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+       RETURNING *`,
+      [
+        title, description || null, subtitle || null, tagline || null, days || null, brand_color || null,
+        drive_file_id || null, cloudinary_id || drive_file_id || null, thumbnail_url || null, thumbnail_drive_id || null,
+        class_type_id || category_id || null, instructor_id || null, duration_seconds || 0,
+        access_type, is_published, is_featured, sort_order,
+        sales_enabled, sales_unlocks_video, sales_price_mxn || null, sales_class_credits || null, sales_cta_text || null,
+      ]
     );
     return res.status(201).json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+  } catch (err) {
+    console.error("POST /videos error:", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
 });
 
 app.put("/api/videos/:id", adminMiddleware, async (req, res) => {
   try {
-    const { title, description, videoUrl, thumbnailUrl, classTypeId, instructorId, durationMinutes, accessType, isPublished, isFeatured, sortOrder, price } = req.body;
+    const {
+      title, description, subtitle, tagline, days, brand_color,
+      drive_file_id, cloudinary_id, thumbnail_url, thumbnail_drive_id,
+      class_type_id, instructor_id, duration_seconds,
+      access_type, is_published, is_featured, sort_order,
+      sales_enabled, sales_unlocks_video, sales_price_mxn, sales_class_credits, sales_cta_text,
+      category_id,
+    } = req.body;
     const r = await pool.query(
-      `UPDATE videos SET title=$1, description=$2, video_url=$3, thumbnail_url=$4, class_type_id=$5,
-       instructor_id=$6, duration_minutes=$7, access_type=$8, is_published=$9, is_featured=$10,
-       sort_order=$11, price=$12, updated_at=NOW()
-       WHERE id=$13 RETURNING *`,
-      [title, description || null, videoUrl, thumbnailUrl || null, classTypeId || null, instructorId || null, durationMinutes || null, accessType || "membership", isPublished !== false, isFeatured === true, sortOrder || 0, price || null, req.params.id]
+      `UPDATE videos SET
+         title=$1, description=$2, subtitle=$3, tagline=$4, days=$5, brand_color=$6,
+         drive_file_id=COALESCE($7, drive_file_id),
+         cloudinary_id=COALESCE($8, cloudinary_id),
+         thumbnail_url=COALESCE($9, thumbnail_url),
+         thumbnail_drive_id=COALESCE($10, thumbnail_drive_id),
+         class_type_id=$11, instructor_id=$12,
+         duration_seconds=COALESCE($13, duration_seconds),
+         access_type=COALESCE($14, access_type),
+         is_published=COALESCE($15, is_published),
+         is_featured=COALESCE($16, is_featured),
+         sort_order=COALESCE($17, sort_order),
+         sales_enabled=COALESCE($18, sales_enabled),
+         sales_unlocks_video=COALESCE($19, sales_unlocks_video),
+         sales_price_mxn=$20, sales_class_credits=$21, sales_cta_text=$22,
+         updated_at=NOW()
+       WHERE id=$23 RETURNING *`,
+      [
+        title, description || null, subtitle || null, tagline || null, days || null, brand_color || null,
+        drive_file_id || null, cloudinary_id || drive_file_id || null,
+        thumbnail_url || null, thumbnail_drive_id || null,
+        class_type_id || category_id || null, instructor_id || null,
+        duration_seconds ?? null,
+        access_type || null, is_published ?? null, is_featured ?? null, sort_order ?? null,
+        sales_enabled ?? null, sales_unlocks_video ?? null,
+        sales_price_mxn ?? null, sales_class_credits ?? null, sales_cta_text ?? null,
+        req.params.id,
+      ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Video no encontrado" });
     return res.json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+  } catch (err) {
+    console.error("PUT /videos/:id error:", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
 });
 
 app.delete("/api/videos/:id", adminMiddleware, async (req, res) => {
