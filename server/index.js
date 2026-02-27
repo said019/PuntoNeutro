@@ -2697,6 +2697,126 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
   }
 });
 
+// PUT /api/bookings/:id/no-show
+app.put("/api/bookings/:id/no-show", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "UPDATE bookings SET status = 'no_show' WHERE id = $1 AND status NOT IN ('cancelled','no_show') RETURNING *",
+      [req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Reserva no encontrada o ya procesada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/classes/:id/roster — lista de alumnos reservados en una clase
+app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT b.id AS booking_id, b.status, b.checked_in_at,
+              u.id AS user_id, u.display_name, u.email, u.phone,
+              m.plan_id, p.name AS plan_name, m.classes_remaining
+       FROM bookings b
+       JOIN users u ON b.user_id = u.id
+       LEFT JOIN memberships m ON b.membership_id = m.id
+       LEFT JOIN plans p ON m.plan_id = p.id
+       WHERE b.class_id = $1 AND b.status != 'cancelled'
+       ORDER BY CASE b.status
+         WHEN 'confirmed'  THEN 1
+         WHEN 'checked_in' THEN 2
+         WHEN 'waitlist'   THEN 3
+         WHEN 'no_show'    THEN 4
+         ELSE 5 END,
+         u.display_name ASC`,
+      [req.params.id]
+    );
+    // Also get class info
+    const cls = await pool.query(
+      `SELECT c.*, ct.name AS class_type_name, ct.color,
+              i.display_name AS instructor_name,
+              (c.date || 'T' || c.start_time) AS starts_at
+       FROM classes c
+       JOIN class_types ct ON c.class_type_id = ct.id
+       JOIN instructors i ON c.instructor_id = i.id
+       WHERE c.id = $1`,
+      [req.params.id]
+    );
+    return res.json({ data: { class: camelRow(cls.rows[0] ?? {}), roster: r.rows.map(camelRow) } });
+  } catch (err) {
+    console.error("[GET /classes/:id/roster]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/clients/manual — crea clienta + membresía en un solo paso (sin que use la app)
+app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const {
+      displayName, email, phone, dateOfBirth,
+      emergencyContactName, emergencyContactPhone, healthNotes,
+      planId, paymentMethod = "cash", startDate,
+      notes,
+    } = req.body;
+    if (!displayName || !email) return res.status(400).json({ message: "Nombre y email son requeridos" });
+
+    await client.query("BEGIN");
+
+    // 1. Create user (random password — they can reset later)
+    const tempPassword = Math.random().toString(36).slice(2, 10) + "Op1!";
+    const hash = await bcrypt.hash(tempPassword, 10);
+    const userRes = await client.query(
+      `INSERT INTO users (display_name, email, phone, date_of_birth, emergency_contact_name,
+        emergency_contact_phone, health_notes, role, password_hash, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'client',$8,true)
+       ON CONFLICT (email) DO UPDATE SET
+         display_name = EXCLUDED.display_name,
+         phone = EXCLUDED.phone,
+         updated_at = NOW()
+       RETURNING id, display_name, email`,
+      [displayName, email.toLowerCase().trim(), phone || null, dateOfBirth || null,
+       emergencyContactName || null, emergencyContactPhone || null, healthNotes || null, hash]
+    );
+    const user = userRes.rows[0];
+
+    // 2. Assign membership if plan selected
+    let membership = null;
+    if (planId) {
+      const planRes = await client.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
+      if (!planRes.rows.length) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Plan no encontrado" }); }
+      const plan = planRes.rows[0];
+      const start = startDate ? new Date(startDate) : new Date();
+      const end = new Date(start);
+      end.setDate(end.getDate() + plan.duration_days);
+      const memRes = await client.query(
+        `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date,
+          classes_remaining, notes)
+         VALUES ($1,$2,'active',$3,$4,$5,$6,$7) RETURNING *`,
+        [user.id, plan.id, paymentMethod, start.toISOString().split("T")[0],
+         end.toISOString().split("T")[0],
+         plan.class_limit === 0 ? null : plan.class_limit,
+         notes || `Alta manual por admin`]
+      );
+      membership = camelRow(memRes.rows[0]);
+    }
+
+    await client.query("COMMIT");
+    return res.status(201).json({
+      data: { user: camelRow(user), membership, tempPassword: planId ? undefined : tempPassword },
+      message: planId ? "Clienta registrada y membresía activada" : "Clienta registrada",
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[POST /admin/clients/manual]", err.message);
+    if (err.code === "23505") return res.status(409).json({ message: "Ya existe una clienta con ese email" });
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /api/orders/pending
 app.get("/api/orders/pending", adminMiddleware, async (req, res) => {
   try {
