@@ -1825,13 +1825,15 @@ app.get("/api/class-types", async (req, res) => {
 
 // POST /api/class-types — alias CRUD (admin)
 app.post("/api/class-types", adminMiddleware, async (req, res) => {
-  const { name, color, defaultDuration, maxCapacity, isActive } = req.body;
+  const { name, color, category, defaultDuration, maxCapacity, isActive } = req.body;
   if (!name?.trim()) return res.status(400).json({ message: "name requerido" });
+  const validCategories = ["jumping", "pilates", "mixto"];
+  const cat = validCategories.includes(category) ? category : "jumping";
   try {
     const r = await pool.query(
-      `INSERT INTO class_types (name, color, duration_min, capacity, is_active, sort_order)
-       VALUES ($1,$2,$3,$4,$5,0) RETURNING *`,
-      [name.trim(), color || "#c026d3", defaultDuration || 60, maxCapacity || 20, isActive !== false]
+      `INSERT INTO class_types (name, color, category, duration_min, capacity, is_active, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,0) RETURNING *`,
+      [name.trim(), color || "#c026d3", cat, defaultDuration || 60, maxCapacity || 20, isActive !== false]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
@@ -1839,13 +1841,16 @@ app.post("/api/class-types", adminMiddleware, async (req, res) => {
 
 // PUT /api/class-types/:id — alias CRUD (admin)
 app.put("/api/class-types/:id", adminMiddleware, async (req, res) => {
-  const { name, color, defaultDuration, maxCapacity, isActive } = req.body;
+  const { name, color, category, defaultDuration, maxCapacity, isActive } = req.body;
+  const validCategories = ["jumping", "pilates", "mixto"];
+  const cat = validCategories.includes(category) ? category : null;
   try {
     const r = await pool.query(
       `UPDATE class_types SET name=COALESCE($1,name), color=COALESCE($2,color),
-       duration_min=COALESCE($3,duration_min), capacity=COALESCE($4,capacity),
-       is_active=COALESCE($5,is_active), updated_at=NOW() WHERE id=$6 RETURNING *`,
-      [name || null, color || null, defaultDuration || null, maxCapacity || null, isActive ?? null, req.params.id]
+       category=COALESCE($3,category),
+       duration_min=COALESCE($4,duration_min), capacity=COALESCE($5,capacity),
+       is_active=COALESCE($6,is_active), updated_at=NOW() WHERE id=$7 RETURNING *`,
+      [name || null, color || null, cat, defaultDuration || null, maxCapacity || null, isActive ?? null, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "No encontrado" });
     return res.json({ data: camelRow(r.rows[0]) });

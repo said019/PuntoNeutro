@@ -57,6 +57,7 @@ interface ClassType {
   id: string;
   name: string;
   color: string;
+  category?: "jumping" | "pilates" | "mixto";
   defaultDuration?: number;
   durationMin?: number;
   maxCapacity?: number;
@@ -97,6 +98,7 @@ type ClassFormData = z.infer<typeof classSchema>;
 const typeSchema = z.object({
   name: z.string().min(1),
   color: z.string().default("#CA71E1"),
+  category: z.enum(["jumping", "pilates", "mixto"]).default("jumping"),
   defaultDuration: z.coerce.number().min(1),
   maxCapacity: z.coerce.number().min(1),
   isActive: z.boolean().default(true),
@@ -436,7 +438,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
   const [editing, setEditing] = useState<ClassType | null>(null);
   const form = useForm<TypeFormData>({
     resolver: zodResolver(typeSchema),
-    defaultValues: { color: "#CA71E1", defaultDuration: 50, maxCapacity: 10, isActive: true },
+    defaultValues: { color: "#CA71E1", category: "jumping", defaultDuration: 50, maxCapacity: 10, isActive: true },
   });
 
   const createMutation = useMutation({
@@ -467,6 +469,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
     form.reset({
       name: t.name,
       color: t.color,
+      category: t.category ?? "jumping",
       defaultDuration: t.defaultDuration ?? t.durationMin ?? 50,
       maxCapacity: t.maxCapacity ?? t.capacity ?? 10,
       isActive: t.isActive ?? true,
@@ -475,7 +478,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
     setOpen(true);
   };
   const openCreate = () => {
-    form.reset({ color: "#CA71E1", defaultDuration: 50, maxCapacity: 10, isActive: true });
+    form.reset({ color: "#CA71E1", category: "jumping", defaultDuration: 50, maxCapacity: 10, isActive: true });
     setEditing(null);
     setOpen(true);
   };
@@ -495,6 +498,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
             <TableRow>
               <TableHead className="w-16">Color</TableHead>
               <TableHead>Nombre</TableHead>
+              <TableHead>Categoría</TableHead>
               <TableHead>Duración</TableHead>
               <TableHead>Capacidad</TableHead>
               <TableHead>Estado</TableHead>
@@ -506,6 +510,12 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
               <TableRow key={t.id}>
                 <TableCell><div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: t.color }} /></TableCell>
                 <TableCell className="font-medium">{t.name}</TableCell>
+                <TableCell>
+                  {t.category === "jumping" && <Badge className="bg-[#E15CB8]/20 text-[#E15CB8] border border-[#E15CB8]/30">Jumping</Badge>}
+                  {t.category === "pilates" && <Badge className="bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30">Pilates</Badge>}
+                  {t.category === "mixto"   && <Badge className="bg-[#E7EB6E]/20 text-yellow-400 border border-[#E7EB6E]/40">Mixto</Badge>}
+                  {!t.category && <Badge variant="secondary">—</Badge>}
+                </TableCell>
                 <TableCell>{(t.defaultDuration ?? t.durationMin ?? "—") + " min"}</TableCell>
                 <TableCell>{t.maxCapacity ?? t.capacity ?? "—"}</TableCell>
                 <TableCell>
@@ -544,6 +554,22 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
             className="space-y-4"
           >
             <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("name")} /></div>
+            <div className="space-y-1">
+              <Label>Categoría</Label>
+              <Select
+                value={form.watch("category")}
+                onValueChange={(v) => form.setValue("category", v as "jumping" | "pilates" | "mixto")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="jumping">🏃 Jumping</SelectItem>
+                  <SelectItem value="pilates">🧘 Pilates</SelectItem>
+                  <SelectItem value="mixto">⚡ Mixto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Color</Label>
               <div className="flex flex-wrap gap-2">
