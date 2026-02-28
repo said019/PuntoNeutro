@@ -31,6 +31,8 @@ const BookClassConfirm = () => {
     onSuccess: (res) => {
       const data = res.data;
       qc.invalidateQueries({ queryKey: ["my-bookings"] });
+      qc.invalidateQueries({ queryKey: ["my-membership"] });
+      qc.invalidateQueries({ queryKey: ["public-classes"] });
       if (data?.booking?.status === "waitlist") {
         toast({ title: "En lista de espera", description: "Te avisaremos si se libera un lugar" });
       } else {

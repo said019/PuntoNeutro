@@ -103,9 +103,17 @@ const MyBookings = () => {
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/bookings/${id}`),
-    onSuccess: () => {
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["my-bookings"] });
-      toast({ title: "Reserva cancelada" });
+      qc.invalidateQueries({ queryKey: ["my-membership"] });
+      qc.invalidateQueries({ queryKey: ["public-classes"] });
+      const creditRestored = res?.data?.creditRestored;
+      toast({
+        title: "Reserva cancelada",
+        description: creditRestored
+          ? "La clase fue devuelta a tu paquete."
+          : "La clase NO fue devuelta (cancelación tardía o límite alcanzado).",
+      });
       setCancelId(null);
     },
   });

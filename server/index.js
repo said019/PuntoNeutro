@@ -1140,6 +1140,18 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
         message: `Tu membresía no incluye clases de ${label}. Necesitas una membresía ${label} o Mixta.`,
       });
     }
+
+    // ── Check classes remaining (skip for unlimited plans where remaining is null or >= 9999) ──
+    if (
+      membership.classes_remaining !== null &&
+      membership.classes_remaining < 9999 &&
+      membership.classes_remaining <= 0
+    ) {
+      return res.status(403).json({
+        message: "Ya no tienes clases disponibles en tu paquete. Renueva o adquiere un nuevo plan.",
+      });
+    }
+
     // Check duplicate
     const dupRes = await pool.query(
       "SELECT id FROM bookings WHERE class_id = $1 AND user_id = $2 AND status != 'cancelled'",
@@ -1246,11 +1258,21 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
     }
 
     // ── Check 2-hour advance notice window ─────────────────────────────────
-    const dateStr = booking.date?.toISOString?.()?.split("T")[0] ?? String(booking.date).split("T")[0];
-    const timeStr = String(booking.start_time).slice(0, 5);           // "HH:MM"
-    const classStart = new Date(`${dateStr}T${timeStr}:00`);
+    // Classes are in Mexico City time; use the DB's start_time timestamp directly
+    // booking.date comes from the classes table (type DATE) and start_time is TIMESTAMPTZ
+    // We read the class start as Mexico City local time to compare correctly
+    const classStartRes = await pool.query(
+      `SELECT (c.date + c.start_time::time) AT TIME ZONE 'America/Mexico_City' AS class_start_utc
+       FROM classes c WHERE c.id = $1`,
+      [booking.class_id]
+    );
+    const classStartUTC = classStartRes.rows[0]?.class_start_utc
+      ? new Date(classStartRes.rows[0].class_start_utc)
+      : null;
     const now = new Date();
-    const minutesUntilClass = (classStart.getTime() - now.getTime()) / 60_000;
+    const minutesUntilClass = classStartUTC
+      ? (classStartUTC.getTime() - now.getTime()) / 60_000
+      : 999; // if we can't determine, assume on-time
     const isLate = minutesUntilClass < 120; // less than 2 hours
 
     // Cancel the booking

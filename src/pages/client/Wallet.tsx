@@ -5,6 +5,7 @@ import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { History, Gift, QrCode } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { cn } from "@/lib/utils";
 import opheliaLogo from "@/assets/ophelia-logo-full.png";
 
@@ -51,7 +52,7 @@ const Wallet = () => {
                 {/* QR Code section */}
                 {wallet?.qr_code && (
                   <div className="relative w-full max-w-[200px] aspect-square mx-auto mt-4 p-4 rounded-3xl bg-white shadow-xl flex items-center justify-center ring-4 ring-white/10 group-hover:ring-[#CA71E1]/30 transition-all duration-500">
-                    <img src={wallet.qr_code} alt="QR check-in" className="w-full h-full object-contain" />
+                    <QRCodeSVG value={wallet.qr_code} size={150} className="w-full h-full" />
                     <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full border-2 border-[#1a0b26] bg-[#E15CB8] flex items-center justify-center shadow-lg">
                       <QrCode size={16} className="text-white" />
                     </div>
@@ -75,10 +76,13 @@ const Wallet = () => {
             </Link>
             <Link
               to="/app/wallet/rewards"
-              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] shadow-lg shadow-[#E15CB8]/20 hover:opacity-90 text-sm font-bold text-white transition-all"
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] shadow-lg shadow-[#E15CB8]/20 hover:opacity-90 text-sm font-bold text-white transition-all"
             >
-              <Gift size={16} />
-              Canjear
+              <div className="flex items-center gap-1.5">
+                <Gift size={16} />
+                <span>Canjear</span>
+              </div>
+              <span className="text-[10px] font-medium text-white/80">premios con puntos</span>
             </Link>
           </div>
         </div>
