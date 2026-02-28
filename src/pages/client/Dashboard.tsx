@@ -46,17 +46,23 @@ const Dashboard = () => {
   const wallet = walletData?.data ?? walletData ?? null;
   const videos = Array.isArray(videosData?.data) ? videosData.data : Array.isArray(videosData) ? videosData : [];
 
+  // Support both camelCase (server response) and snake_case (legacy)
+  const planName = membership?.planName ?? membership?.plan_name ?? "Membresía";
+  const classLimit = membership?.classLimit ?? membership?.class_limit ?? null;
+  const classesRemaining = membership?.classesRemaining ?? membership?.classes_remaining ?? null;
+  const endDate = membership?.endDate ?? membership?.end_date ?? null;
+
   const upcomingBookings = bookings
     .filter((b) => b.status === "confirmed" || b.status === "waitlist")
     .slice(0, 2);
 
-  const daysRemaining = membership?.end_date
-    ? Math.max(differenceInCalendarDays(safeParse(membership.end_date), new Date()), 0)
+  const daysRemaining = endDate
+    ? Math.max(differenceInCalendarDays(safeParse(endDate), new Date()), 0)
     : null;
 
   const classesProgress =
-    membership?.class_limit && membership.classes_remaining !== null
-      ? (membership.classes_remaining / membership.class_limit) * 100
+    classLimit && classesRemaining !== null
+      ? (classesRemaining / classLimit) * 100
       : null;
 
   return (
@@ -87,7 +93,7 @@ const Dashboard = () => {
                 ) : membership ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold">{membership.plan_name ?? "Membresía"}</span>
+                      <span className="font-semibold">{planName}</span>
                       <Badge variant={membership.status === "active" ? "default" : "secondary"}>
                         {membership.status === "active" ? "Activa" : membership.status}
                       </Badge>
@@ -96,15 +102,15 @@ const Dashboard = () => {
                       <p className="text-sm text-muted-foreground">{daysRemaining} días restantes</p>
                     )}
                     {/* Unlimited plan */}
-                    {membership.class_limit === null && membership.classes_remaining === null && (
+                    {classLimit === null && classesRemaining === null && (
                       <p className="text-sm font-medium text-primary">♾ Clases ilimitadas</p>
                     )}
                     {/* Limited plan with remaining count */}
-                    {classesProgress !== null && membership.classes_remaining !== null && (
+                    {classesProgress !== null && classesRemaining !== null && (
                       <>
                         <Progress value={classesProgress} className="h-2" />
                         <p className="text-xs text-muted-foreground">
-                          {membership.classes_remaining} de {membership.class_limit} clases restantes
+                          {classesRemaining} de {classLimit} clases restantes
                         </p>
                       </>
                     )}

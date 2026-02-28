@@ -874,13 +874,27 @@ app.get("/api/plans", async (req, res) => {
 // GET /api/memberships/my
 app.get("/api/memberships/my", authMiddleware, async (req, res) => {
   try {
+    // Ensure optional columns exist (idempotent, safe to run on every request)
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255)`).catch(() => {});
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS class_limit_override INTEGER`).catch(() => {});
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0`).catch(() => {});
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID`).catch(() => {});
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_category VARCHAR(20) DEFAULT 'all'`).catch(() => {});
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_limit INTEGER`).catch(() => {});
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS duration_days INTEGER NOT NULL DEFAULT 30`).catch(() => {});
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb`).catch(() => {});
+
     const r = await pool.query(
-      `SELECT m.*,
-              COALESCE(p.name, m.plan_name_override, 'Plan personalizado') AS plan_name,
-              COALESCE(p.class_limit, m.class_limit_override)              AS class_limit,
-              COALESCE(p.duration_days, 30)                                AS duration_days,
+      `SELECT m.id, m.user_id, m.plan_id, m.status, m.start_date, m.end_date,
+              m.classes_remaining, m.payment_method, m.created_at, m.updated_at,
+              m.order_id, m.cancellations_used,
+              COALESCE(m.plan_name_override, '') AS plan_name_override,
+              m.class_limit_override,
+              COALESCE(p.name, m.plan_name_override, 'Membresía') AS plan_name,
+              COALESCE(p.class_limit, m.class_limit_override)      AS class_limit,
+              COALESCE(p.duration_days, 30)                        AS duration_days,
               p.features,
-              COALESCE(p.class_category, 'all')                           AS class_category
+              COALESCE(p.class_category, 'all')                    AS class_category
        FROM memberships m
        LEFT JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1
