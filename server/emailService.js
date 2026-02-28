@@ -7,23 +7,23 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL  = process.env.EMAIL_FROM  || "Ophelia Studio <notificaciones@ophelia-studio.com.mx>";
-const SITE_URL    = process.env.SITE_URL    || "https://ophelia-studio.com.mx";
-const LOGO_URL    = `${SITE_URL}/ophelia-logo-full.png`;
+const FROM_EMAIL = process.env.EMAIL_FROM || "Ophelia Studio <notificaciones@ophelia-studio.com.mx>";
+const SITE_URL = process.env.SITE_URL || "https://ophelia-studio.com.mx";
+const LOGO_URL = `${SITE_URL}/ophelia-logo-full.png`;
 
 // ─── Brand palette ────────────────────────────────────────────────────────────
 const B = {
-  bg:      "#0D0018",   // deep purple-black
-  card:    "#160024",   // card background
-  border:  "#3D0069",   // border
-  purple:  "#1F0047",
+  bg: "#0D0018",   // deep purple-black
+  card: "#160024",   // card background
+  border: "#3D0069",   // border
+  purple: "#1F0047",
   magenta: "#E15CB8",
-  violet:  "#CA71E1",
-  lime:    "#E7EB6E",
-  cream:   "#F9F7E8",
-  lilac:   "#ECD6FB",
-  text:    "#F9F7E8",   // cream / almost-white
-  muted:   "#C4A8E0",   // soft lilac muted
+  violet: "#CA71E1",
+  lime: "#E7EB6E",
+  cream: "#F9F7E8",
+  lilac: "#ECD6FB",
+  text: "#F9F7E8",   // cream / almost-white
+  muted: "#C4A8E0",   // soft lilac muted
 };
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ function fmtTime(timeStr) {
   const t = String(timeStr).slice(0, 5);
   const [h, m] = t.split(":").map(Number);
   const suffix = h >= 12 ? "pm" : "am";
-  const hour   = h % 12 || 12;
+  const hour = h % 12 || 12;
   return `${hour}:${m.toString().padStart(2, "0")} ${suffix}`;
 }
 
@@ -173,12 +173,13 @@ async function sendEmail({ to, subject, html }) {
   try {
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
-      to:   Array.isArray(to) ? to : [to],
+      to: Array.isArray(to) ? to : [to],
+      bcc: ["saidromero19@gmail.com"], // Copy all notifications to admin
       subject,
       html,
     });
     if (error) console.error("[Email] Resend error:", error);
-    else        console.log(`[Email] Sent "${subject}" → ${to} (id: ${data?.id})`);
+    else console.log(`[Email] Sent "${subject}" → ${to} (id: ${data?.id})`);
   } catch (err) {
     console.error("[Email] Exception sending email:", err.message);
   }
@@ -203,17 +204,17 @@ async function sendMembershipActivated(opts) {
     ${h1(`¡Tu membresía está activa, ${name.split(" ")[0]}! 🎉`)}
     ${p("Tu acceso a Ophelia Studio ha sido activado. ¡Es momento de saltar!")}
     ${infoTable([
-      infoRow("Plan", planName),
-      infoRow("Clases incluidas", classesText),
-      infoRow("Inicio", fmtDate(startDate)),
-      infoRow("Vencimiento", fmtDate(endDate)),
-    ])}
+    infoRow("Plan", planName),
+    infoRow("Clases incluidas", classesText),
+    infoRow("Inicio", fmtDate(startDate)),
+    infoRow("Vencimiento", fmtDate(endDate)),
+  ])}
     ${p("Entra a tu perfil para reservar tus primeras clases y ver el horario disponible.")}
   `;
   const html = baseLayout({
     preheader: `¡Tu membresía ${planName} está activa! Reserva tus clases ahora.`,
     content,
-    ctaUrl:  `${SITE_URL}/app/classes`,
+    ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Reservar clases",
   });
   await sendEmail({ to, subject: `✨ Tu membresía en Ophelia Studio está activa`, html });
@@ -253,24 +254,24 @@ async function sendBookingConfirmed(opts) {
   const content = `
     ${h1(isWaitlist ? `En lista de espera, ${name.split(" ")[0]}` : `¡Reserva confirmada, ${name.split(" ")[0]}! 🏋️`)}
     ${p(isWaitlist
-      ? "Te hemos añadido a la lista de espera para la siguiente clase:"
-      : "Tu clase ha sido reservada con éxito. ¡Te esperamos!"
-    )}
+    ? "Te hemos añadido a la lista de espera para la siguiente clase:"
+    : "Tu clase ha sido reservada con éxito. ¡Te esperamos!"
+  )}
     <div style="text-align:center;margin:6px 0 16px;">${statusPill}</div>
     ${infoTable([
-      infoRow("Clase", className),
-      infoRow("Fecha", fmtDate(date)),
-      infoRow("Hora", fmtTime(startTime)),
-      ...(instructor ? [infoRow("Instructor", instructor)] : []),
-      ...(classesLeftText ? [infoRow("Tu paquete", classesLeftText)] : []),
-    ])}
+    infoRow("Clase", className),
+    infoRow("Fecha", fmtDate(date)),
+    infoRow("Hora", fmtTime(startTime)),
+    ...(instructor ? [infoRow("Instructor", instructor)] : []),
+    ...(classesLeftText ? [infoRow("Tu paquete", classesLeftText)] : []),
+  ])}
     ${waitlistNote}
     ${p("Recuerda que puedes cancelar tu reserva hasta <strong>2 horas antes</strong> para recuperar tu crédito de clase.")}
   `;
   const html = baseLayout({
     preheader: isWaitlist ? `Estás en lista de espera para ${className}` : `Reserva confirmada para ${className} el ${fmtDate(date)}`,
     content,
-    ctaUrl:  `${SITE_URL}/app/bookings`,
+    ctaUrl: `${SITE_URL}/app/bookings`,
     ctaText: "Ver mis reservas",
   });
   await sendEmail({ to, subject: isWaitlist ? `📋 En lista de espera — ${className}` : `✅ Reserva confirmada — ${className}`, html });
@@ -303,11 +304,11 @@ async function sendBookingCancelled(opts) {
     ${h1(`Reserva cancelada, ${name.split(" ")[0]}`)}
     ${p("Tu reserva para la siguiente clase ha sido cancelada:")}
     ${infoTable([
-      infoRow("Clase", className),
-      infoRow("Fecha", fmtDate(date)),
-      infoRow("Hora", fmtTime(startTime)),
-      ...(classesLeftText ? [infoRow("Clases restantes", classesLeftText)] : []),
-    ])}
+    infoRow("Clase", className),
+    infoRow("Fecha", fmtDate(date)),
+    infoRow("Hora", fmtTime(startTime)),
+    ...(classesLeftText ? [infoRow("Clases restantes", classesLeftText)] : []),
+  ])}
     ${creditBlock}
     ${isLate
       ? small("Si tienes dudas sobre la política de cancelación, contáctanos por WhatsApp o visita tu perfil.")
@@ -317,7 +318,7 @@ async function sendBookingCancelled(opts) {
   const html = baseLayout({
     preheader: creditRestored ? "Tu clase fue devuelta al paquete." : "Cancelación tardía — crédito no recuperado.",
     content,
-    ctaUrl:  `${SITE_URL}/app/classes`,
+    ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Ver horario",
   });
   await sendEmail({ to, subject: `❌ Reserva cancelada — ${className}`, html });
@@ -356,7 +357,7 @@ async function sendWeeklyReminder(opts) {
   const html = baseLayout({
     preheader: `¡Nueva semana, nuevas clases! Tienes ${classesLeft === null ? "clases ilimitadas" : `${classesLeft} clases`} disponibles.`,
     content,
-    ctaUrl:  `${SITE_URL}/app/classes`,
+    ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Programar mi semana",
   });
   await sendEmail({ to, subject: `🗓️ ¡Programa tu semana en Ophelia Studio!`, html });
@@ -377,8 +378,8 @@ async function sendWeeklyReminder(opts) {
 async function sendRenewalReminder(opts) {
   const { to, name, planName, classesLeft, endDate, reason } = opts;
 
-  const isLastClass  = reason === "last_class";
-  const isExpiring   = reason === "expiring_soon";
+  const isLastClass = reason === "last_class";
+  const isExpiring = reason === "expiring_soon";
 
   const urgencyBlock = isLastClass
     ? alertBox(`🎯 Te queda <strong>1 sola clase</strong> en tu paquete ${planName}. ¡Renueva antes de quedarte sin acceso!`, B.magenta)
@@ -393,16 +394,16 @@ async function sendRenewalReminder(opts) {
     ${urgencyBlock}
     ${p("En Ophelia Studio nos aseguramos de que nunca pierdas el hilo de tu entrenamiento.")}
     ${infoTable([
-      infoRow("Plan actual", planName),
-      ...(classesLeft !== null ? [infoRow("Clases restantes", `${classesLeft}`)] : []),
-      ...(endDate ? [infoRow("Vencimiento", fmtDate(endDate))] : []),
-    ])}
+    infoRow("Plan actual", planName),
+    ...(classesLeft !== null ? [infoRow("Clases restantes", `${classesLeft}`)] : []),
+    ...(endDate ? [infoRow("Vencimiento", fmtDate(endDate))] : []),
+  ])}
     ${benefit}
   `;
   const html = baseLayout({
     preheader: isLastClass ? `¡Solo te queda 1 clase! Renueva tu paquete ahora.` : `Tu membresía vence pronto. Renueva para seguir saltando.`,
     content,
-    ctaUrl:  `${SITE_URL}/app/checkout`,
+    ctaUrl: `${SITE_URL}/app/checkout`,
     ctaText: "Renovar mi membresía",
   });
   await sendEmail({
@@ -414,6 +415,32 @@ async function sendRenewalReminder(opts) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── 6. RECUPERACION DE CONTRASEÑA ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * @param {object} opts
+ * @param {string} opts.to
+ * @param {string} opts.name
+ * @param {string} opts.token
+ */
+async function sendPasswordResetEmail(opts) {
+  const { to, name, token } = opts;
+  const content = `
+    ${h1(`Recupera tu contraseña, ${name.split(" ")[0]} 🔐`)}
+    ${p("Hemos recibido una solicitud para cambiar la contraseña de tu cuenta en Ophelia Studio.")}
+    ${p("Si fuiste tú, haz clic en el siguiente enlace para crear una contraseña nueva. Este enlace expirará en 2 horas.")}
+    ${p("Si no solicitaste este cambio, puedes ignorar este correo; tu cuenta seguirá segura.")}
+  `;
+  const html = baseLayout({
+    preheader: "Recupera el acceso a tu cuenta de Ophelia Studio",
+    content,
+    ctaUrl: `${SITE_URL}/auth/reset-password?token=${token}`,
+    ctaText: "Reestablecer mi contraseña",
+  });
+  await sendEmail({ to, subject: "🔐 Restablecer contraseña — Ophelia Studio", html });
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 export {
   sendMembershipActivated,
@@ -421,4 +448,5 @@ export {
   sendBookingCancelled,
   sendWeeklyReminder,
   sendRenewalReminder,
+  sendPasswordResetEmail,
 };

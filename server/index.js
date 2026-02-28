@@ -8,12 +8,14 @@ import path from "path";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import axios from "axios";
+import crypto from "crypto";
 import {
   sendMembershipActivated,
   sendBookingConfirmed,
   sendBookingCancelled,
   sendWeeklyReminder,
   sendRenewalReminder,
+  sendPasswordResetEmail,
 } from "./emailService.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -858,6 +860,72 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Me error:", err);
     return res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// POST /api/auth/forgot-password
+app.post("/api/auth/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: "Email es requerido" });
+
+  try {
+    const user = await pool.query("SELECT id, display_name FROM users WHERE email = $1", [email]);
+    if (user.rows.length === 0) {
+      // Return 200 to prevent user enumeration
+      return res.json({ message: "Si el correo existe, recibirás un enlace de recuperación." });
+    }
+
+    const token = crypto.randomUUID();
+    // Expiration set to 2 hours from now
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 2);
+
+    await pool.query(
+      `INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
+      [user.rows[0].id, token, expiresAt]
+    );
+
+    await sendPasswordResetEmail({
+      to: email,
+      name: user.rows[0].display_name,
+      token,
+    });
+
+    return res.json({ message: "Si el correo existe, recibirás un enlace de recuperación." });
+  } catch (err) {
+    console.error("Auth /forgot-password error:", err);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// POST /api/auth/reset-password
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ message: "Datos incompletos" });
+
+  try {
+    // Check token validity
+    const t = await pool.query(
+      `SELECT user_id, expires_at, used FROM password_reset_tokens WHERE token = $1`,
+      [token]
+    );
+    if (t.rows.length === 0) return res.status(400).json({ message: "El enlace es inválido o ha expirado." });
+
+    const dbToken = t.rows[0];
+    if (dbToken.used) return res.status(400).json({ message: "Este enlace ya fue utilizado. Solicita uno nuevo." });
+    if (new Date() > new Date(dbToken.expires_at)) return res.status(400).json({ message: "Este enlace ha expirado." });
+
+    // Hash new password and update
+    const hash = await bcrypt.hash(password, 10);
+    await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [hash, dbToken.user_id]);
+
+    // Mark token as used
+    await pool.query(`UPDATE password_reset_tokens SET used = true WHERE token = $1`, [token]);
+
+    return res.json({ message: "Contraseña restablecida con éxito." });
+  } catch (err) {
+    console.error("Auth /reset-password error:", err);
+    return res.status(500).json({ message: "Error al actualizar la contraseña." });
   }
 });
 
