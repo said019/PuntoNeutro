@@ -4448,7 +4448,7 @@ app.delete("/api/events/:id", adminMiddleware, async (req, res) => {
 // ── POST /api/events/:id/register — Inscribirse ───────────────────────────────
 app.post("/api/events/:id/register", authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.userId;
     const { name, email, phone = "", payment_method } = req.body;
     if (!name || !email) return res.status(400).json({ message: "name y email son requeridos" });
     const evRes = await pool.query("SELECT * FROM events WHERE id = $1 AND status = 'published'", [req.params.id]);
@@ -4554,7 +4554,7 @@ app.post("/api/events/:id/register", authMiddleware, async (req, res) => {
 // ── DELETE /api/events/:id/register — Cancelar inscripción ───────────────────
 app.delete("/api/events/:id/register", authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.userId;
     const regRes = await pool.query(
       "SELECT * FROM event_registrations WHERE event_id=$1 AND user_id=$2 LIMIT 1",
       [req.params.id, userId]
@@ -4641,7 +4641,7 @@ app.post("/api/events/:eventId/checkin/:regId", adminMiddleware, async (req, res
       `UPDATE event_registrations
        SET checked_in=true, checked_in_at=NOW(), checked_in_by=$1, updated_at=NOW()
        WHERE id=$2 AND event_id=$3 RETURNING *`,
-      [req.user.userId, req.params.regId, req.params.eventId]
+      [req.userId, req.params.regId, req.params.eventId]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Inscripción no encontrada" });
     return res.json({ message: "Check-in exitoso", checkedIn: true });
@@ -4654,7 +4654,7 @@ app.post("/api/events/:eventId/checkin/:regId", adminMiddleware, async (req, res
 // ── PUT /api/events/:id/register/payment — Enviar comprobante ─────────────────
 app.put("/api/events/:id/register/payment", authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.userId;
     const { payment_method, transfer_reference, transfer_date, file_data, file_name, notes } = req.body;
 
     const regRes = await pool.query(

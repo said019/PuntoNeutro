@@ -15,26 +15,26 @@ const NAV_GROUPS = [
     label: "Principal",
     labelColor: "#E15CB8",
     items: [
-      { to: "/app",           label: "Inicio",        icon: LayoutDashboard, activeColor: "#E7EB6E" },
-      { to: "/app/classes",   label: "Reservar clase", icon: Calendar,        activeColor: "#E15CB8" },
-      { to: "/app/bookings",  label: "Mis reservas",   icon: ClipboardList,   activeColor: "#CA71E1" },
-      { to: "/app/events",    label: "Eventos",         icon: Ticket,          activeColor: "#E7EB6E" },
+      { to: "/app", label: "Inicio", icon: LayoutDashboard, activeColor: "#E7EB6E" },
+      { to: "/app/classes", label: "Reservar clase", icon: Calendar, activeColor: "#E15CB8" },
+      { to: "/app/bookings", label: "Mis reservas", icon: ClipboardList, activeColor: "#CA71E1" },
+      { to: "/app/events", label: "Eventos", icon: Ticket, activeColor: "#E7EB6E" },
     ],
   },
   {
     label: "Cuenta",
     labelColor: "#CA71E1",
     items: [
-      { to: "/app/checkout",  label: "Membresía",      icon: CreditCard, activeColor: "#E15CB8" },
-      { to: "/app/wallet",    label: "Club & Wallet",   icon: Wallet,     activeColor: "#E7EB6E" },
-      { to: "/app/orders",    label: "Mis órdenes",     icon: Package,    activeColor: "#CA71E1" },
+      { to: "/app/checkout", label: "Membresía", icon: CreditCard, activeColor: "#E15CB8" },
+      { to: "/app/wallet", label: "Club & Wallet", icon: Wallet, activeColor: "#E7EB6E" },
+      { to: "/app/orders", label: "Mis órdenes", icon: Package, activeColor: "#CA71E1" },
     ],
   },
   {
     label: "Contenido",
     labelColor: "#E7EB6E",
     items: [
-      { to: "/app/videos",    label: "Videos",          icon: Play,       activeColor: "#E7EB6E" },
+      { to: "/app/videos", label: "Videos", icon: Play, activeColor: "#E7EB6E" },
     ],
   },
 ];
@@ -111,11 +111,11 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
 
   /* ── mobile bottom nav items ── */
   const BOTTOM_NAV = [
-    { to: "/app",          icon: LayoutDashboard, label: "Inicio",    color: "#E7EB6E" },
-    { to: "/app/classes",  icon: Calendar,        label: "Clases",    color: "#E15CB8" },
-    { to: "/app/bookings", icon: ClipboardList,   label: "Reservas",  color: "#CA71E1" },
-    { to: "/app/events",   icon: Ticket,          label: "Eventos",   color: "#E7EB6E" },
-    { to: "/app/profile",  icon: User,            label: "Perfil",    color: "#E15CB8" },
+    { to: "/app", icon: LayoutDashboard, label: "Inicio", color: "#E7EB6E" },
+    { to: "/app/classes", icon: Calendar, label: "Clases", color: "#E15CB8" },
+    { to: "/app/bookings", icon: ClipboardList, label: "Reservas", color: "#CA71E1" },
+    { to: "/app/events", icon: Ticket, label: "Eventos", color: "#E7EB6E" },
+    { to: "/app/profile", icon: User, label: "Perfil", color: "#E15CB8" },
   ];
 
   return (
@@ -143,7 +143,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
         {/* ── Logo / Brand ── */}
         <div className="relative flex h-20 items-center justify-between px-5 border-b border-white/[0.06]">
           <Link to="/" className="flex items-center no-underline">
-            <img src={opheliaLogo} alt="Ophelia Studio" className="h-14 w-auto" />
+            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
           </Link>
           <button
             onClick={() => setOpen(false)}
@@ -259,7 +259,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
           </button>
 
           <Link to="/">
-            <img src={opheliaLogo} alt="Ophelia Studio" className="h-10 w-auto" />
+            <img src={opheliaLogo} alt="Ophelia Studio" className="h-12 w-auto" />
           </Link>
 
           <Link to="/app/notifications" className="rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">

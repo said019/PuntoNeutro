@@ -3,10 +3,10 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { History, Gift } from "lucide-react";
+import { History, Gift, QrCode } from "lucide-react";
+import { cn } from "@/lib/utils";
+import opheliaLogo from "@/assets/ophelia-logo-full.png";
 
 const Wallet = () => {
   const { data, isLoading } = useQuery({
@@ -18,36 +18,68 @@ const Wallet = () => {
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
       <ClientLayout>
-        <div className="max-w-md space-y-6">
+        <div className="max-w-md mx-auto space-y-6">
           <h1 className="text-xl font-bold">Club / Wallet</h1>
+
           {isLoading ? (
-            <Skeleton className="h-48 w-full rounded-xl" />
+            <Skeleton className="h-96 w-full rounded-3xl" />
           ) : (
-            <Card className="text-center">
-              <CardHeader>
-                <CardTitle className="text-muted-foreground text-sm font-medium">Puntos acumulados</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-6xl font-bold">{wallet?.points ?? 0}</p>
+            <div className="relative overflow-hidden rounded-3xl border border-[#CA71E1]/30 bg-gradient-to-b from-[#1a0b26] to-[#0a0a0a] shadow-2xl shadow-[#E15CB8]/10 group">
+              {/* Decorative background glows */}
+              <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-[#E15CB8] opacity-10 blur-[80px]" />
+              <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-[#CA71E1] opacity-10 blur-[80px]" />
+
+              <div className="relative p-8 flex flex-col items-center text-center space-y-6">
+                {/* Logo */}
+                <img src={opheliaLogo} alt="Ophelia Studio" className="h-10 w-auto opacity-90" />
+
+                {/* Points & Level */}
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-[#CA71E1]">Ophelia Club</p>
+                  <p className="text-6xl font-black bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-transparent bg-clip-text drop-shadow-sm">
+                    {wallet?.points ?? 0}
+                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Puntos acumulados</p>
+                </div>
+
                 {wallet?.level && (
-                  <p className="text-sm font-medium text-primary">{wallet.level}</p>
-                )}
-                {wallet?.qr_code && (
-                  <div className="flex justify-center">
-                    <img src={wallet.qr_code} alt="QR check-in" className="h-40 w-40 rounded-xl border" />
+                  <div className="px-5 py-1.5 rounded-full border border-[#E7EB6E]/30 bg-[#E7EB6E]/10 text-[#E7EB6E] text-sm font-bold tracking-wide">
+                    Nivel {wallet.level}
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">Muestra este QR al instructor para hacer check-in</p>
-              </CardContent>
-            </Card>
+
+                {/* QR Code section */}
+                {wallet?.qr_code && (
+                  <div className="relative w-full max-w-[200px] aspect-square mx-auto mt-4 p-4 rounded-3xl bg-white shadow-xl flex items-center justify-center ring-4 ring-white/10 group-hover:ring-[#CA71E1]/30 transition-all duration-500">
+                    <img src={wallet.qr_code} alt="QR check-in" className="w-full h-full object-contain" />
+                    <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full border-2 border-[#1a0b26] bg-[#E15CB8] flex items-center justify-center shadow-lg">
+                      <QrCode size={16} className="text-white" />
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-white/40 max-w-[200px] mx-auto leading-relaxed">
+                  Muestra este código QR en recepción al llegar al estudio
+                </p>
+              </div>
+            </div>
           )}
-          <div className="flex gap-3">
-            <Button asChild variant="outline" className="flex-1">
-              <Link to="/app/wallet/history"><History size={16} className="mr-2" />Historial</Link>
-            </Button>
-            <Button asChild className="flex-1">
-              <Link to="/app/wallet/rewards"><Gift size={16} className="mr-2" />Canjear</Link>
-            </Button>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
+            <Link
+              to="/app/wallet/history"
+              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-sm font-medium text-white transition-all"
+            >
+              <History size={16} className="text-[#CA71E1]" />
+              Historial
+            </Link>
+            <Link
+              to="/app/wallet/rewards"
+              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] shadow-lg shadow-[#E15CB8]/20 hover:opacity-90 text-sm font-bold text-white transition-all"
+            >
+              <Gift size={16} />
+              Canjear
+            </Link>
           </div>
         </div>
       </ClientLayout>

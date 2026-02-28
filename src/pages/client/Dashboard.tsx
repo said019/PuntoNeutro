@@ -114,9 +114,7 @@ const Dashboard = () => {
                         </p>
                       </>
                     )}
-                    <Button asChild variant="outline" size="sm">
-                      <Link to="/app/membership">Ver membresía</Link>
-                    </Button>
+                    {/* Removed "Ver membresía" button */}
                   </div>
                 ) : (
                   <div className="space-y-2">
