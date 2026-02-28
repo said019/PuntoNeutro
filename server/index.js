@@ -40,10 +40,10 @@ const uploadVideo = multer({ storage: multer.memoryStorage(), limits: { fileSize
 // ─── Google Drive helpers ────────────────────────────────────────────────────
 async function getGoogleDriveAccessToken() {
   const resp = await axios.post("https://oauth2.googleapis.com/token", new URLSearchParams({
-    client_id:     process.env.GOOGLE_CLIENT_ID     || "",
+    client_id: process.env.GOOGLE_CLIENT_ID || "",
     client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
     refresh_token: process.env.GOOGLE_REFRESH_TOKEN || "",
-    grant_type:    "refresh_token",
+    grant_type: "refresh_token",
   }), { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
   return resp.data.access_token;
 }
@@ -53,7 +53,7 @@ async function makeGoogleDriveFilePublic(fileId, accessToken) {
     `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,
     { role: "reader", type: "anyone" },
     { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
-  ).catch(() => {}); // best-effort
+  ).catch(() => { }); // best-effort
 }
 
 async function uploadBufferToDrive(buffer, fileName, mimeType, accessToken) {
@@ -65,7 +65,7 @@ async function uploadBufferToDrive(buffer, fileName, mimeType, accessToken) {
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`
   );
   const filePart = Buffer.from(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
-  const endPart  = Buffer.from(`\r\n--${boundary}--`);
+  const endPart = Buffer.from(`\r\n--${boundary}--`);
   const body = Buffer.concat([metaPart, filePart, buffer, endPart]);
 
   const resp = await axios.post(
@@ -86,20 +86,20 @@ const pool = new Pool({
 async function ensureSchema() {
   try {
     // ── Ensure all users columns the app needs ────────────────────────────
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS accepts_terms BOOLEAN DEFAULT false`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS accepts_communications BOOLEAN DEFAULT false`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(255)`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_name VARCHAR(255)`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_phone VARCHAR(20)`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS health_notes TEXT`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_reminders BOOLEAN DEFAULT true`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_promotions BOOLEAN DEFAULT false`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_weekly_summary BOOLEAN DEFAULT false`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => {});
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10)`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS accepts_terms BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS accepts_communications BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_name VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS emergency_contact_phone VARCHAR(20)`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS health_notes TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_reminders BOOLEAN DEFAULT true`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_promotions BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_weekly_summary BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10)`).catch(() => { });
     // Ensure referrals table exists
     await pool.query(`
       CREATE TABLE IF NOT EXISTS referral_codes (
@@ -111,8 +111,8 @@ async function ensureSchema() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_referral_codes_user ON referral_codes(user_id)`).catch(() => {});
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_referral_codes_user ON referral_codes(user_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code)`).catch(() => { });
     // Ensure discount_codes table exists
     await pool.query(`
       CREATE TABLE IF NOT EXISTS discount_codes (
@@ -147,17 +147,17 @@ async function ensureSchema() {
         updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS subtitle VARCHAR(150)`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'jumping'`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS intensity VARCHAR(20) DEFAULT 'media'`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS level VARCHAR(50) DEFAULT 'Todos los niveles'`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS duration_min INTEGER DEFAULT 50`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS color VARCHAR(50) DEFAULT '#c026d3'`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS emoji VARCHAR(10) DEFAULT '🏃'`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`).catch(() => {});
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS subtitle VARCHAR(150)`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'jumping'`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS intensity VARCHAR(20) DEFAULT 'media'`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS level VARCHAR(50) DEFAULT 'Todos los niveles'`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS duration_min INTEGER DEFAULT 50`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS color VARCHAR(50) DEFAULT '#c026d3'`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS emoji VARCHAR(10) DEFAULT '🏃'`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => { });
     // ── schedule_slots (horario semanal editable desde admin) ───────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS schedule_slots (
@@ -171,12 +171,12 @@ async function ensureSchema() {
         created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_schedule_slots_day ON schedule_slots(day_of_week)`).catch(() => {});
-    await pool.query(`ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS class_type_id UUID`).catch(() => {});
-    await pool.query(`ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS class_type_name VARCHAR(100)`).catch(() => {});
-    await pool.query(`ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS instructor_name VARCHAR(100)`).catch(() => {});
-    await pool.query(`ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => {});
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_slots_slot ON schedule_slots(time_slot, day_of_week) WHERE is_active = true`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_schedule_slots_day ON schedule_slots(day_of_week)`).catch(() => { });
+    await pool.query(`ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS class_type_id UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS class_type_name VARCHAR(100)`).catch(() => { });
+    await pool.query(`ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS instructor_name VARCHAR(100)`).catch(() => { });
+    await pool.query(`ALTER TABLE schedule_slots ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => { });
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_slots_slot ON schedule_slots(time_slot, day_of_week) WHERE is_active = true`).catch(() => { });
     // ── schedule_templates (plantilla simple con class_label) ───────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS schedule_templates (
@@ -206,7 +206,7 @@ async function ensureSchema() {
         updated_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_packages_category ON packages(category)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_packages_category ON packages(category)`).catch(() => { });
     // ── Seed packages si la tabla está vacía ──────────────────────────────
     const pkgCount = await pool.query("SELECT COUNT(*) FROM packages");
     if (parseInt(pkgCount.rows[0].count) === 0) {
@@ -236,7 +236,7 @@ async function ensureSchema() {
     const hasOpheliaTypes = await pool.query("SELECT 1 FROM class_types WHERE name = 'Jumping Fitness' LIMIT 1");
     if (hasOpheliaTypes.rows.length === 0) {
       // Remove any old / placeholder class types
-      const opheliaNames = ['Jumping Fitness','Jumping Dance','Jump & Tone','Strong Jump','Mindful Jump','Hot Pilates','Flow Pilates','Pilates Mat'];
+      const opheliaNames = ['Jumping Fitness', 'Jumping Dance', 'Jump & Tone', 'Strong Jump', 'Mindful Jump', 'Hot Pilates', 'Flow Pilates', 'Pilates Mat'];
       await pool.query("DELETE FROM class_types WHERE name != ALL($1::text[])", [opheliaNames]);
       await pool.query(`
         INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order, is_active) VALUES
@@ -274,18 +274,18 @@ async function ensureSchema() {
       `);
     }
     // ── Ensure plans columns exist ───────────────────────────────────────
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS description TEXT`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS currency VARCHAR(3) DEFAULT 'MXN'`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_limit INTEGER`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_category VARCHAR(20) DEFAULT 'all'`).catch(() => {});
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS description TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS currency VARCHAR(3) DEFAULT 'MXN'`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_limit INTEGER`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_category VARCHAR(20) DEFAULT 'all'`).catch(() => { });
     // ── Migrate class_types: remove 'mixto' category (now only jumping/pilates) ──
     await pool.query(`
       UPDATE class_types SET category = 'jumping' WHERE category NOT IN ('jumping','pilates');
-    `).catch(() => {});
+    `).catch(() => { });
     // ── Migrate plans: 'mixto' class_category means both, keep as 'mixto' for logic ──
     // (mixto plans are still valid — the booking endpoint allows them on both categories)
     // ── Seed plans: remove old schema_complete.sql plans & ensure only correct ones ──
@@ -303,7 +303,7 @@ async function ensureSchema() {
         'Seis Sesiones (24 al Mes)',
         'Siete Sesiones (28 al Mes)'
       );
-    `).catch(() => {});
+    `).catch(() => { });
     const plCount = await pool.query("SELECT COUNT(*) FROM plans");
     if (parseInt(plCount.rows[0].count) === 0) {
       await pool.query(`
@@ -323,9 +323,9 @@ async function ensureSchema() {
       `);
     }
     // ── Backfill class_category on existing plans that have no category set ──
-    await pool.query(`UPDATE plans SET class_category = 'jumping' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%jumping%' OR name ILIKE '%jump%' OR name ILIKE '%strong%' OR name ILIKE '%dance%' OR name ILIKE '%tone%' OR name ILIKE '%mindful jump%')`).catch(() => {});
-    await pool.query(`UPDATE plans SET class_category = 'pilates' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%pilates%' OR name ILIKE '%mat%' OR name ILIKE '%flow%' OR name ILIKE '%hot%')`).catch(() => {});
-    await pool.query(`UPDATE plans SET class_category = 'mixto'   WHERE (class_category IS NULL OR class_category = 'all') AND name ILIKE '%mixto%'`).catch(() => {});
+    await pool.query(`UPDATE plans SET class_category = 'jumping' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%jumping%' OR name ILIKE '%jump%' OR name ILIKE '%strong%' OR name ILIKE '%dance%' OR name ILIKE '%tone%' OR name ILIKE '%mindful jump%')`).catch(() => { });
+    await pool.query(`UPDATE plans SET class_category = 'pilates' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%pilates%' OR name ILIKE '%mat%' OR name ILIKE '%flow%' OR name ILIKE '%hot%')`).catch(() => { });
+    await pool.query(`UPDATE plans SET class_category = 'mixto'   WHERE (class_category IS NULL OR class_category = 'all') AND name ILIKE '%mixto%'`).catch(() => { });
     // ── Products table ─────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
@@ -407,7 +407,7 @@ async function ensureSchema() {
         created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_loyalty_tx_user ON loyalty_transactions(user_id)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_loyalty_tx_user ON loyalty_transactions(user_id)`).catch(() => { });
     // ── referrals table (tracks which users were referred) ─────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS referrals (
@@ -418,31 +418,31 @@ async function ensureSchema() {
         created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(referral_code_id)`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(referral_code_id)`).catch(() => { });
     // ── orders: add missing columns if needed ─────────────────────────────
-    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0`).catch(() => {});
-    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS channel VARCHAR(30) DEFAULT 'web'`).catch(() => {});
-    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS plan_id UUID`).catch(() => {});
-    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE`).catch(() => {});
-    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_by UUID`).catch(() => {});
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS channel VARCHAR(30) DEFAULT 'web'`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS plan_id UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_by UUID`).catch(() => { });
     // Make plan_id nullable (POS orders don't always have a plan)
-    await pool.query(`ALTER TABLE orders ALTER COLUMN plan_id DROP NOT NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE orders ALTER COLUMN plan_id DROP NOT NULL`).catch(() => { });
     // Make user_id nullable (walk-in POS sales may not have a user)
-    await pool.query(`ALTER TABLE orders ALTER COLUMN user_id DROP NOT NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE orders ALTER COLUMN user_id DROP NOT NULL`).catch(() => { });
     // ── memberships: add order_id column ─────────────────────────────────
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID`).catch(() => {});
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_order ON memberships(order_id) WHERE order_id IS NOT NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID`).catch(() => { });
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_order ON memberships(order_id) WHERE order_id IS NOT NULL`).catch(() => { });
     // ── memberships: add fallback name/limit override columns ─────────────
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255)`).catch(() => {});
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS class_limit_override INTEGER`).catch(() => {});
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS class_limit_override INTEGER`).catch(() => { });
     // Fix existing 9999 unlimited sentinel values → NULL
     await pool.query(`
       UPDATE memberships SET classes_remaining = NULL WHERE classes_remaining >= 9999;
-    `).catch(() => {});
+    `).catch(() => { });
     // ── memberships: track how many times a user has cancelled ────────────
     await pool.query(`
       ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0;
-    `).catch(() => {});
+    `).catch(() => { });
     // ── homepage_video_cards: editable 3-card section on landing page ──────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS homepage_video_cards (
@@ -453,7 +453,7 @@ async function ensureSchema() {
         emoji       VARCHAR(10)  NOT NULL DEFAULT '🎬',
         updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
-    `).catch(() => {});
+    `).catch(() => { });
     // seed default cards only when table is empty
     await pool.query(`
       INSERT INTO homepage_video_cards (sort_order, title, description, emoji)
@@ -463,12 +463,12 @@ async function ensureSchema() {
         (3, 'Pilates Flow',    'Secuencias fluidas para fortalecer tu core y mejorar postura.',        '🧘')
       ) AS v(sort_order, title, description, emoji)
       WHERE NOT EXISTS (SELECT 1 FROM homepage_video_cards LIMIT 1);
-    `).catch(() => {});
+    `).catch(() => { });
     // ── discount_codes: normalise discount_type values ────────────────────
-    await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0`).catch(() => {});
-    await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+    await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => { });
     // ── bookings: add checked_in_at column ────────────────────────────────
-    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE`).catch(() => {});
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
     // ── Settings table ─────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS settings (
@@ -492,9 +492,9 @@ async function ensureSchema() {
       );
     `);
     // ── Loyalty rewards: add new columns if table already exists ───────────
-    await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_type  VARCHAR(30) NOT NULL DEFAULT 'custom'`).catch(() => {});
-    await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_value VARCHAR(150)`).catch(() => {});
-    await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS stock        INTEGER`).catch(() => {});
+    await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_type  VARCHAR(30) NOT NULL DEFAULT 'custom'`).catch(() => { });
+    await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_value VARCHAR(150)`).catch(() => { });
+    await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS stock        INTEGER`).catch(() => { });
     // ── Review tags table ──────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS review_tags (
@@ -505,24 +505,24 @@ async function ensureSchema() {
       );
     `);
     // ── Videos: add price column (may fail if videos table not yet created) ─
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS price DECIMAL(10,2)`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS drive_file_id VARCHAR(500)`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS cloudinary_id VARCHAR(500)`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail_drive_id VARCHAR(500)`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS duration_seconds INTEGER DEFAULT 0`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS subtitle VARCHAR(255)`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS tagline VARCHAR(255)`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS days VARCHAR(100)`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS brand_color VARCHAR(7)`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_enabled BOOLEAN DEFAULT false`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_unlocks_video BOOLEAN DEFAULT false`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_price_mxn DECIMAL(10,2)`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_class_credits INTEGER`).catch(() => {});
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_cta_text VARCHAR(100)`).catch(() => {});
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS price DECIMAL(10,2)`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS drive_file_id VARCHAR(500)`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS cloudinary_id VARCHAR(500)`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail_drive_id VARCHAR(500)`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS duration_seconds INTEGER DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS subtitle VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS tagline VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS days VARCHAR(100)`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS brand_color VARCHAR(7)`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_enabled BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_unlocks_video BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_price_mxn DECIMAL(10,2)`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_class_credits INTEGER`).catch(() => { });
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_cta_text VARCHAR(100)`).catch(() => { });
     // ── Video purchases: add admin_notes and verified_at ──────────────────
-    await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT`).catch(() => {});
-    await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE`).catch(() => {});
+    await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
 
     // ── Módulo de Eventos ────────────────────────────────────────────────
     await pool.query(`
@@ -560,7 +560,7 @@ async function ensureSchema() {
         created_at          TIMESTAMPTZ DEFAULT NOW(),
         updated_at          TIMESTAMPTZ DEFAULT NOW()
       );
-    `).catch(() => {});
+    `).catch(() => { });
     await pool.query(`
       CREATE TABLE IF NOT EXISTS event_registrations (
         id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -585,13 +585,13 @@ async function ensureSchema() {
         created_at              TIMESTAMPTZ DEFAULT NOW(),
         updated_at              TIMESTAMPTZ DEFAULT NOW()
       );
-    `).catch(() => {});
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_status    ON events(status)`).catch(() => {});
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_date       ON events(date)`).catch(() => {});
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_type       ON events(type)`).catch(() => {});
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_event  ON event_registrations(event_id)`).catch(() => {});
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_user   ON event_registrations(user_id)`).catch(() => {});
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_status ON event_registrations(status)`).catch(() => {});
+    `).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_status    ON events(status)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_date       ON events(date)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_events_type       ON events(type)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_event  ON event_registrations(event_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_user   ON event_registrations(user_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_status ON event_registrations(status)`).catch(() => { });
 
     console.log("✅ Schema ensured");
   } catch (err) {
@@ -640,10 +640,10 @@ async function ensureSchema() {
 
         // Time slots: morning + evening
         const SLOTS = [
-          { hour: 7,  min: 0,  dur: 55 },
-          { hour: 9,  min: 0,  dur: 55 },
-          { hour: 11, min: 0,  dur: 60 },
-          { hour: 18, min: 0,  dur: 55 },
+          { hour: 7, min: 0, dur: 55 },
+          { hour: 9, min: 0, dur: 55 },
+          { hour: 11, min: 0, dur: 60 },
+          { hour: 18, min: 0, dur: 55 },
           { hour: 19, min: 30, dur: 55 },
         ];
         // Days: Mon(1)–Sat(6), no Sunday
@@ -882,14 +882,14 @@ app.get("/api/plans", async (req, res) => {
 app.get("/api/memberships/my", authMiddleware, async (req, res) => {
   try {
     // Ensure optional columns exist (idempotent, safe to run on every request)
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255)`).catch(() => {});
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS class_limit_override INTEGER`).catch(() => {});
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0`).catch(() => {});
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_category VARCHAR(20) DEFAULT 'all'`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_limit INTEGER`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS duration_days INTEGER NOT NULL DEFAULT 30`).catch(() => {});
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb`).catch(() => {});
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS class_limit_override INTEGER`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_category VARCHAR(20) DEFAULT 'all'`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_limit INTEGER`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS duration_days INTEGER NOT NULL DEFAULT 30`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb`).catch(() => { });
 
     const r = await pool.query(
       `SELECT m.id, m.user_id, m.plan_id, m.status, m.start_date, m.end_date,
@@ -918,7 +918,7 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
     const row = camelRows([r.rows[0]])[0];
     // Treat 9999 or very large numbers as unlimited (null)
     if (row.classesRemaining >= 9999) row.classesRemaining = null;
-    if (row.classLimit    >= 9999) row.classLimit    = null;
+    if (row.classLimit >= 9999) row.classLimit = null;
     return res.json({ data: row });
   } catch (err) {
     console.error("Memberships/my error:", err);
@@ -952,15 +952,15 @@ app.get("/api/classes", async (req, res) => {
     `;
     const params = [];
     if (start) { params.push(start); query += ` AND c.date >= $${params.length}`; }
-    if (end)   { params.push(end);   query += ` AND c.date <= $${params.length}`; }
+    if (end) { params.push(end); query += ` AND c.date <= $${params.length}`; }
     query += " ORDER BY c.date ASC, c.start_time ASC";
     if (limit) { params.push(parseInt(limit)); query += ` LIMIT $${params.length}`; }
     const r = await pool.query(query, params);
     // Normalise: expose start_time / end_time as full ISO strings for front-end consumers
     const rows = r.rows.map((row) => ({
       ...row,
-      start_time:     row.start_time_full ?? row.start_time,
-      end_time:       row.end_time_full   ?? row.end_time,
+      start_time: row.start_time_full ?? row.start_time,
+      end_time: row.end_time_full ?? row.end_time,
     }));
     return res.json({ data: rows });
   } catch (err) {
@@ -1120,12 +1120,12 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
         const u = userRes.rows[0];
         const cl = classFullRes.rows[0];
         sendBookingConfirmed({
-          to:          u.email,
-          name:        u.full_name || u.display_name || "Alumna",
-          className:   cl.class_type_name,
-          date:        cl.date,
-          startTime:   cl.start_time,
-          instructor:  cl.instructor_name,
+          to: u.email,
+          name: u.full_name || u.display_name || "Alumna",
+          className: cl.class_type_name,
+          date: cl.date,
+          startTime: cl.start_time,
+          instructor: cl.instructor_name,
           classesLeft,
           isWaitlist,
         }).catch((e) => console.error("[Email] booking confirmed:", e.message));
@@ -1178,12 +1178,12 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
     }
 
     // ── Check 2-hour advance notice window ─────────────────────────────────
-    const dateStr  = booking.date?.toISOString?.()?.split("T")[0] ?? String(booking.date).split("T")[0];
-    const timeStr  = String(booking.start_time).slice(0, 5);           // "HH:MM"
+    const dateStr = booking.date?.toISOString?.()?.split("T")[0] ?? String(booking.date).split("T")[0];
+    const timeStr = String(booking.start_time).slice(0, 5);           // "HH:MM"
     const classStart = new Date(`${dateStr}T${timeStr}:00`);
-    const now        = new Date();
+    const now = new Date();
     const minutesUntilClass = (classStart.getTime() - now.getTime()) / 60_000;
-    const isLate     = minutesUntilClass < 120; // less than 2 hours
+    const isLate = minutesUntilClass < 120; // less than 2 hours
 
     // Cancel the booking
     await pool.query(
@@ -1405,28 +1405,31 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res)
 
     let fileUrl, fileName, mimeType;
     if (uploadedFile) {
-      mimeType  = uploadedFile.mimetype;
-      fileName  = uploadedFile.originalname;
-      fileUrl   = `data:${mimeType};base64,${uploadedFile.buffer.toString("base64")}`;
+      mimeType = uploadedFile.mimetype;
+      fileName = uploadedFile.originalname;
+      fileUrl = `data:${mimeType};base64,${uploadedFile.buffer.toString("base64")}`;
     } else if (req.body.fileUrl) {
-      fileUrl  = req.body.fileUrl;
+      fileUrl = req.body.fileUrl;
       fileName = req.body.fileName || "comprobante";
       mimeType = req.body.mimeType || "application/octet-stream";
     } else {
       return res.status(400).json({ message: "No se recibió ningún archivo" });
     }
 
-    await pool.query(
-      `INSERT INTO payment_proofs (order_id, file_url, file_name, mime_type, status)
-       VALUES ($1, $2, $3, $4, 'pending')
-       ON CONFLICT (order_id) DO UPDATE
-         SET file_url    = EXCLUDED.file_url,
-             file_name   = EXCLUDED.file_name,
-             mime_type   = EXCLUDED.mime_type,
-             status      = 'pending',
-             uploaded_at = NOW()`,
+    const updateRes = await pool.query(
+      `UPDATE payment_proofs 
+       SET file_url = $2, file_name = $3, mime_type = $4, status = 'pending', uploaded_at = NOW()
+       WHERE order_id = $1 RETURNING id`,
       [req.params.id, fileUrl, fileName, mimeType]
     );
+
+    if (updateRes.rowCount === 0) {
+      await pool.query(
+        `INSERT INTO payment_proofs (order_id, file_url, file_name, mime_type, status)
+         VALUES ($1, $2, $3, $4, 'pending')`,
+        [req.params.id, fileUrl, fileName, mimeType]
+      );
+    }
     await pool.query(
       "UPDATE orders SET status = 'pending_verification', paid_at = COALESCE(paid_at, NOW()) WHERE id = $1",
       [req.params.id]
@@ -1804,9 +1807,9 @@ app.post("/api/admin/class-types", async (req, res) => {
       `INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [name.trim(), subtitle || null, description || null,
-       category || "jumping", intensity || "media",
-       level || "Todos los niveles", duration_min || 50, capacity || 15,
-       color || "#c026d3", emoji || "🏃", sort_order ?? 0]
+      category || "jumping", intensity || "media",
+      level || "Todos los niveles", duration_min || 50, capacity || 15,
+      color || "#c026d3", emoji || "🏃", sort_order ?? 0]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
@@ -1836,10 +1839,10 @@ app.put("/api/admin/class-types/:id", async (req, res) => {
          updated_at   = NOW()
        WHERE id = $13 RETURNING *`,
       [name || null, subtitle || null, description || null,
-       category || null, intensity || null, level || null,
-       duration_min || null, capacity || null, color || null,
-       emoji || null, is_active ?? null, sort_order ?? null,
-       req.params.id]
+      category || null, intensity || null, level || null,
+      duration_min || null, capacity || null, color || null,
+      emoji || null, is_active ?? null, sort_order ?? null,
+      req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
     return res.json({ data: r.rows[0] });
@@ -1926,7 +1929,7 @@ app.put("/api/admin/schedule-slots/:id", async (req, res) => {
          is_active       = COALESCE($6, is_active)
        WHERE id = $7 RETURNING *`,
       [time_slot || null, day_of_week ? parseInt(day_of_week) : null,
-       class_type_id || null, ctName, instructor_name || null, is_active ?? null, req.params.id]
+      class_type_id || null, ctName, instructor_name || null, is_active ?? null, req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
     return res.json({ data: r.rows[0] });
@@ -1958,8 +1961,8 @@ app.post("/api/admin/plans", async (req, res) => {
       `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, features, is_active, sort_order)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [name.trim(), description || null, price, currency || "MXN",
-       duration_days || 30, class_limit || null,
-       JSON.stringify(features || []), is_active ?? true, sort_order ?? 0]
+      duration_days || 30, class_limit || null,
+      JSON.stringify(features || []), is_active ?? true, sort_order ?? 0]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
@@ -1986,9 +1989,9 @@ app.put("/api/admin/plans/:id", async (req, res) => {
          updated_at    = NOW()
        WHERE id = $10 RETURNING *`,
       [name || null, description || null, price ?? null, currency || null,
-       duration_days || null, class_limit ?? null,
-       features ? JSON.stringify(features) : null,
-       is_active ?? null, sort_order ?? null, req.params.id]
+      duration_days || null, class_limit ?? null,
+      features ? JSON.stringify(features) : null,
+      is_active ?? null, sort_order ?? null, req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
     return res.json({ data: r.rows[0] });
@@ -2060,8 +2063,8 @@ app.put("/api/admin/schedule/:id", async (req, res) => {
          updated_at  = NOW()
        WHERE id = $6 RETURNING *`,
       [time_slot || null, day_of_week ? Number(day_of_week) : null,
-       class_label ? class_label.toUpperCase() : null,
-       shift || null, is_active ?? null, req.params.id]
+      class_label ? class_label.toUpperCase() : null,
+      shift || null, is_active ?? null, req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
     return res.json({ data: r.rows[0] });
@@ -2132,9 +2135,9 @@ app.put("/api/admin/packages/:id", async (req, res) => {
          updated_at    = NOW()
        WHERE id = $8 RETURNING *`,
       [name || null, num_classes || null,
-       price !== undefined ? Number(price) : null,
-       category || null, validity_days ?? null,
-       is_active ?? null, sort_order ?? null, req.params.id]
+      price !== undefined ? Number(price) : null,
+      category || null, validity_days ?? null,
+      is_active ?? null, sort_order ?? null, req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
     return res.json({ data: r.rows[0] });
@@ -2228,7 +2231,7 @@ app.post("/api/classes", adminMiddleware, async (req, res) => {
     let dateStr, startTimeStr, endTimeStr;
     if (startTime && startTime.includes("T")) {
       const [d, t] = startTime.split("T");
-      dateStr     = d;
+      dateStr = d;
       startTimeStr = t.slice(0, 5); // "HH:mm"
     } else {
       return res.status(400).json({ message: "startTime debe ser datetime (YYYY-MM-DDTHH:mm)" });
@@ -2391,7 +2394,7 @@ app.put("/api/orders/:id/verify", adminMiddleware, async (req, res) => {
            VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)
            ON CONFLICT (order_id) DO UPDATE SET status='active'`,
           [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
-        ).catch(() => {});
+        ).catch(() => { });
 
         // ── Email: membership activated via order ────────────────────────
         if (order.user_id) {
@@ -2555,12 +2558,14 @@ app.get("/api/reports/overview", adminMiddleware, async (req, res) => {
       pool.query("SELECT COUNT(*) FROM bookings WHERE created_at>=$1", [monthStart]),
       pool.query("SELECT COUNT(*) FROM classes WHERE status='scheduled' AND date>=$1", [monthStart]),
     ]);
-    return res.json({ data: {
-      activeMembers: parseInt(members.rows[0].count),
-      monthlyRevenue: parseFloat(revenue.rows[0].total),
-      monthlyBookings: parseInt(bookings.rows[0].count),
-      upcomingClasses: parseInt(classes.rows[0].count),
-    }});
+    return res.json({
+      data: {
+        activeMembers: parseInt(members.rows[0].count),
+        monthlyRevenue: parseFloat(revenue.rows[0].total),
+        monthlyBookings: parseInt(bookings.rows[0].count),
+        upcomingClasses: parseInt(classes.rows[0].count),
+      }
+    });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
@@ -2668,7 +2673,7 @@ app.put("/api/review-tags/:id", adminMiddleware, async (req, res) => {
 
 app.delete("/api/review-tags/:id", adminMiddleware, async (req, res) => {
   try {
-    await pool.query("DELETE FROM review_tags WHERE id=$1", [req.params.id]).catch(() => {});
+    await pool.query("DELETE FROM review_tags WHERE id=$1", [req.params.id]).catch(() => { });
     return res.json({ message: "Tag eliminado" });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
@@ -2780,7 +2785,7 @@ app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
       try {
         const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
         qrCode = qrRes.data?.code || qrRes.data?.qrcode?.base64 || null;
-      } catch (_) {}
+      } catch (_) { }
     }
 
     return res.json({
@@ -2953,7 +2958,7 @@ app.post("/api/videos/purchases/:id/reject", adminMiddleware, async (req, res) =
 // POST /api/videos/upload  — upload video file (+ optional thumbnail) to Google Drive
 app.post("/api/videos/upload", adminMiddleware, uploadVideo.fields([{ name: "video", maxCount: 1 }, { name: "thumbnail", maxCount: 1 }]), async (req, res) => {
   try {
-    const videoFile     = req.files?.video?.[0];
+    const videoFile = req.files?.video?.[0];
     const thumbnailFile = req.files?.thumbnail?.[0];
     if (!videoFile) return res.status(400).json({ message: "Se requiere el archivo de video" });
 
@@ -2988,17 +2993,17 @@ app.post("/api/videos/upload", adminMiddleware, uploadVideo.fields([{ name: "vid
         accessToken
       );
       await makeGoogleDriveFilePublic(thumbResult.id, accessToken);
-      thumbnailUrl     = `https://drive.google.com/thumbnail?id=${thumbResult.id}&sz=w640`;
+      thumbnailUrl = `https://drive.google.com/thumbnail?id=${thumbResult.id}&sz=w640`;
       thumbnailDriveId = thumbResult.id;
     }
 
     return res.json({
-      drive_file_id:    videoResult.id,
-      cloudinary_id:    videoResult.id,           // same value for compat
-      thumbnail_url:    thumbnailUrl,
+      drive_file_id: videoResult.id,
+      cloudinary_id: videoResult.id,           // same value for compat
+      thumbnail_url: thumbnailUrl,
       thumbnail_drive_id: thumbnailDriveId,
-      secure_url:       `https://drive.google.com/file/d/${videoResult.id}/view`,
-      embed_url:        `https://drive.google.com/file/d/${videoResult.id}/preview`,
+      secure_url: `https://drive.google.com/file/d/${videoResult.id}/view`,
+      embed_url: `https://drive.google.com/file/d/${videoResult.id}/preview`,
       duration_seconds: 0,
     });
   } catch (err) {
@@ -3563,7 +3568,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
          updated_at = NOW()
        RETURNING id, display_name, email`,
       [displayName, email.toLowerCase().trim(), phone || null, dateOfBirth || null,
-       emergencyContactName || null, emergencyContactPhone || null, healthNotes || null, hash]
+        emergencyContactName || null, emergencyContactPhone || null, healthNotes || null, hash]
     );
     const user = userRes.rows[0];
 
@@ -3581,9 +3586,9 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
           classes_remaining, notes)
          VALUES ($1,$2,'active',$3,$4,$5,$6,$7) RETURNING *`,
         [user.id, plan.id, paymentMethod, start.toISOString().split("T")[0],
-         end.toISOString().split("T")[0],
-         plan.class_limit === 0 ? null : plan.class_limit,
-         notes || `Alta manual por admin`]
+        end.toISOString().split("T")[0],
+        plan.class_limit === 0 ? null : plan.class_limit,
+        notes || `Alta manual por admin`]
       );
       membership = camelRow(memRes.rows[0]);
     }
@@ -4230,53 +4235,53 @@ function mapEventRow(row) {
     return String(v).slice(0, 5);
   };
   return {
-    id:                 row.id,
-    title:              row.title,
-    description:        row.description,
-    type:               row.type,
-    instructor:         row.instructor_name,
-    instructorPhoto:    row.instructor_photo || null,
-    date:               toYMD(row.date),
-    startTime:          toHM(row.start_time),
-    endTime:            toHM(row.end_time),
-    location:           row.location,
-    capacity:           Number(row.capacity),
-    registered:         Number(row.registered || 0),
-    price:              Number(row.price || 0),
-    currency:           row.currency || "MXN",
-    earlyBirdPrice:     row.early_bird_price != null ? Number(row.early_bird_price) : null,
-    earlyBirdDeadline:  toYMD(row.early_bird_deadline),
-    memberDiscount:     Number(row.member_discount || 0),
-    image:              row.image || null,
-    requirements:       row.requirements || "",
-    includes:           Array.isArray(row.includes) ? row.includes : (row.includes ? JSON.parse(row.includes) : []),
-    tags:               Array.isArray(row.tags) ? row.tags : (row.tags ? JSON.parse(row.tags) : []),
-    status:             row.status,
-    createdAt:          row.created_at,
-    updatedAt:          row.updated_at,
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    type: row.type,
+    instructor: row.instructor_name,
+    instructorPhoto: row.instructor_photo || null,
+    date: toYMD(row.date),
+    startTime: toHM(row.start_time),
+    endTime: toHM(row.end_time),
+    location: row.location,
+    capacity: Number(row.capacity),
+    registered: Number(row.registered || 0),
+    price: Number(row.price || 0),
+    currency: row.currency || "MXN",
+    earlyBirdPrice: row.early_bird_price != null ? Number(row.early_bird_price) : null,
+    earlyBirdDeadline: toYMD(row.early_bird_deadline),
+    memberDiscount: Number(row.member_discount || 0),
+    image: row.image || null,
+    requirements: row.requirements || "",
+    includes: Array.isArray(row.includes) ? row.includes : (row.includes ? JSON.parse(row.includes) : []),
+    tags: Array.isArray(row.tags) ? row.tags : (row.tags ? JSON.parse(row.tags) : []),
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
 function mapRegRow(row) {
   return {
-    id:                   row.id,
-    userId:               row.user_id || null,
-    name:                 row.name,
-    email:                row.email,
-    phone:                row.phone || "",
-    status:               row.status,
-    amount:               Number(row.amount || 0),
-    paymentMethod:        row.payment_method || null,
-    paymentReference:     row.payment_reference || null,
-    hasPaymentProof:      !!row.payment_proof_url,
+    id: row.id,
+    userId: row.user_id || null,
+    name: row.name,
+    email: row.email,
+    phone: row.phone || "",
+    status: row.status,
+    amount: Number(row.amount || 0),
+    paymentMethod: row.payment_method || null,
+    paymentReference: row.payment_reference || null,
+    hasPaymentProof: !!row.payment_proof_url,
     paymentProofFileName: row.payment_proof_file_name || null,
-    transferDate:         row.transfer_date ? String(row.transfer_date).slice(0, 10) : null,
-    paidAt:               row.paid_at || null,
-    checkedIn:            !!row.checked_in,
-    checkedInAt:          row.checked_in_at || null,
-    waitlistPosition:     row.waitlist_position || null,
-    notes:                row.notes || null,
-    createdAt:            row.created_at,
+    transferDate: row.transfer_date ? String(row.transfer_date).slice(0, 10) : null,
+    paidAt: row.paid_at || null,
+    checkedIn: !!row.checked_in,
+    checkedInAt: row.checked_in_at || null,
+    waitlistPosition: row.waitlist_position || null,
+    notes: row.notes || null,
+    createdAt: row.created_at,
   };
 }
 
@@ -4286,7 +4291,7 @@ app.get("/api/events", async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
     let userId = null;
     if (token) {
-      try { userId = jwt.verify(token, JWT_SECRET).userId; } catch {}
+      try { userId = jwt.verify(token, JWT_SECRET).userId; } catch { }
     }
     const { type, upcoming } = req.query;
     const conditions = ["e.status = 'published'"];
@@ -4343,7 +4348,7 @@ app.get("/api/events/:id", async (req, res) => {
         const decoded = jwt.verify(token, JWT_SECRET);
         userId = decoded.userId;
         isAdmin = decoded.role === "admin" || decoded.role === "super_admin";
-      } catch {}
+      } catch { }
     }
     const evRes = await pool.query("SELECT * FROM events WHERE id = $1", [req.params.id]);
     if (!evRes.rows.length) return res.status(404).json({ message: "Evento no encontrado" });
@@ -4405,16 +4410,16 @@ app.post("/api/events", adminMiddleware, async (req, res) => {
 app.put("/api/events/:id", adminMiddleware, async (req, res) => {
   try {
     const allowed = [
-      "type","title","description","instructor_name","instructor_photo",
-      "date","start_time","end_time","location","capacity","price",
-      "early_bird_price","early_bird_deadline","member_discount","image",
-      "requirements","includes","tags","status",
+      "type", "title", "description", "instructor_name", "instructor_photo",
+      "date", "start_time", "end_time", "location", "capacity", "price",
+      "early_bird_price", "early_bird_deadline", "member_discount", "image",
+      "requirements", "includes", "tags", "status",
     ];
     const sets = [];
     const vals = [];
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
-        vals.push(["includes","tags"].includes(key) ? JSON.stringify(req.body[key]) : req.body[key]);
+        vals.push(["includes", "tags"].includes(key) ? JSON.stringify(req.body[key]) : req.body[key]);
         sets.push(`${key} = $${vals.length}`);
       }
     }
@@ -4561,7 +4566,7 @@ app.delete("/api/events/:id/register", authMiddleware, async (req, res) => {
     );
     if (!regRes.rows.length) return res.status(404).json({ message: "No tienes inscripción en este evento" });
     const reg = regRes.rows[0];
-    if (!["confirmed","pending","waitlist"].includes(reg.status)) {
+    if (!["confirmed", "pending", "waitlist"].includes(reg.status)) {
       return res.status(400).json({ message: "No puedes cancelar este registro" });
     }
     await pool.query(
@@ -4599,7 +4604,7 @@ app.get("/api/events/:id/registrations", adminMiddleware, async (req, res) => {
 app.put("/api/events/:eventId/registrations/:regId", adminMiddleware, async (req, res) => {
   try {
     const { status, notes } = req.body;
-    const valid = ["confirmed","pending","waitlist","cancelled","no_show"];
+    const valid = ["confirmed", "pending", "waitlist", "cancelled", "no_show"];
     if (status && !valid.includes(status)) {
       return res.status(400).json({ message: "Status inválido" });
     }
@@ -4739,10 +4744,10 @@ async function runWeeklyReminderCron() {
     console.log(`[Cron] Weekly reminder — ${res.rows.length} members`);
     for (const row of res.rows) {
       await sendWeeklyReminder({
-        to:          row.email,
-        name:        row.name,
+        to: row.email,
+        name: row.name,
         classesLeft: row.classes_remaining,
-        endDate:     row.end_date,
+        endDate: row.end_date,
       }).catch((e) => console.error("[Email] weekly cron:", e.message));
       // Small delay to avoid rate limits
       await new Promise((r) => setTimeout(r, 200));
@@ -4776,11 +4781,11 @@ async function runRenewalReminderCron() {
     for (const row of res.rows) {
       const reason = row.classes_remaining === 1 ? "last_class" : "expiring_soon";
       await sendRenewalReminder({
-        to:          row.email,
-        name:        row.name,
-        planName:    row.plan_name,
+        to: row.email,
+        name: row.name,
+        planName: row.plan_name,
         classesLeft: row.classes_remaining,
-        endDate:     row.end_date,
+        endDate: row.end_date,
         reason,
       }).catch((e) => console.error("[Email] renewal cron:", e.message));
       await new Promise((r) => setTimeout(r, 200));
@@ -4795,8 +4800,8 @@ function scheduleEmailCrons() {
   setInterval(async () => {
     const now = new Date();
     // Mexico City = UTC-6 (adjust for daylight saving if needed)
-    const mexicoHour   = (now.getUTCHours() - 6 + 24) % 24;
-    const dayOfWeek    = now.getUTCDay(); // 0 = Sunday
+    const mexicoHour = (now.getUTCHours() - 6 + 24) % 24;
+    const dayOfWeek = now.getUTCDay(); // 0 = Sunday
 
     // Weekly reminder: every Sunday at 8:00 AM Mexico time
     if (dayOfWeek === 0 && mexicoHour === 8 && now.getUTCMinutes() < 60) {
