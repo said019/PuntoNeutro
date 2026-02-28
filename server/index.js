@@ -290,10 +290,11 @@ async function ensureSchema() {
     `).catch(() => { });
     // ── Migrate plans: 'mixto' class_category means both, keep as 'mixto' for logic ──
     // (mixto plans are still valid — the booking endpoint allows them on both categories)
-    // ── Seed plans: remove old schema_complete.sql plans & ensure only correct ones ──
-    // Delete old plans that came from the migration seed (wrong data)
+    // ── Seed plans: deactivate old schema_complete.sql plans & ensure only correct ones ──
+    // Soft-delete (deactivate) old plans that came from the migration seed (wrong data)
+    // Using UPDATE instead of DELETE to avoid FK constraint from orders table
     await pool.query(`
-      DELETE FROM plans WHERE name IN (
+      UPDATE plans SET is_active = false WHERE name IN (
         'Inscripción (Pago Anual)',
         'Sesión Muestra o Individual',
         'Sesión Extra (Socias o Inscritas)',
@@ -306,7 +307,7 @@ async function ensureSchema() {
         'Siete Sesiones (28 al Mes)'
       );
     `).catch(() => { });
-    const plCount = await pool.query("SELECT COUNT(*) FROM plans");
+    const plCount = await pool.query("SELECT COUNT(*) FROM plans WHERE is_active = true");
     if (parseInt(plCount.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO plans (name, price, currency, duration_days, class_limit, class_category, is_active, sort_order) VALUES
@@ -4813,91 +4814,37 @@ app.post("/api/admin/test-emails", adminMiddleware, async (req, res) => {
   const testTo = req.body.to || "saidromero19@gmail.com";
   const testName = "Said (Test)";
   const results = [];
+  const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  try {
-    // 1. Membresía activada
-    await sendMembershipActivated({
-      to: testTo, name: testName, planName: "Jumping — 4 Clases",
-      startDate: new Date().toISOString(),
-      endDate: new Date(Date.now() + 30 * 86400000).toISOString(),
-      classLimit: 4,
-    });
-    results.push("✅ Membresía activada");
-  } catch (e) { results.push(`❌ Membresía activada: ${e.message}`); }
+  const jobs = [
+    { label: "Membresía activada", fn: () => sendMembershipActivated({ to: testTo, name: testName, planName: "Jumping — 4 Clases", startDate: new Date().toISOString(), endDate: new Date(Date.now() + 30 * 86400000).toISOString(), classLimit: 4 }) },
+    { label: "Reserva confirmada", fn: () => sendBookingConfirmed({ to: testTo, name: testName, className: "Jumping Fitness", date: new Date().toISOString(), startTime: "09:00", instructor: "Instructora Diana", classesLeft: 3, isWaitlist: false }) },
+    { label: "Reserva cancelada (a tiempo)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Jumping Dance", date: new Date().toISOString(), startTime: "11:00", creditRestored: true, isLate: false, classesLeft: 4 }) },
+    { label: "Reserva cancelada (tardía)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Strong Jump", date: new Date().toISOString(), startTime: "18:00", creditRestored: false, isLate: true, classesLeft: 3 }) },
+    { label: "Recordatorio semanal", fn: () => sendWeeklyReminder({ to: testTo, name: testName, classesLeft: 2, endDate: new Date(Date.now() + 15 * 86400000).toISOString() }) },
+    { label: "Renovación (última clase)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "Jumping — 4 Clases", classesLeft: 1, endDate: new Date(Date.now() + 5 * 86400000).toISOString(), reason: "last_class" }) },
+    { label: "Renovación (por vencer)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "Pilates — Mensual Ilimitado", classesLeft: null, endDate: new Date(Date.now() + 3 * 86400000).toISOString(), reason: "expiring_soon" }) },
+    { label: "Reset de contraseña", fn: () => sendPasswordResetEmail({ to: testTo, name: testName, token: "test-token-123456" }) },
+  ];
 
-  try {
-    // 2. Reserva confirmada
-    await sendBookingConfirmed({
-      to: testTo, name: testName, className: "Jumping Fitness",
-      date: new Date().toISOString(), startTime: "09:00",
-      instructor: "Instructora Diana", classesLeft: 3, isWaitlist: false,
-    });
-    results.push("✅ Reserva confirmada");
-  } catch (e) { results.push(`❌ Reserva confirmada: ${e.message}`); }
-
-  try {
-    // 3. Reserva cancelada (a tiempo)
-    await sendBookingCancelled({
-      to: testTo, name: testName, className: "Jumping Dance",
-      date: new Date().toISOString(), startTime: "11:00",
-      creditRestored: true, isLate: false, classesLeft: 4,
-    });
-    results.push("✅ Reserva cancelada (a tiempo)");
-  } catch (e) { results.push(`❌ Reserva cancelada: ${e.message}`); }
-
-  try {
-    // 4. Reserva cancelada (tardía)
-    await sendBookingCancelled({
-      to: testTo, name: testName, className: "Strong Jump",
-      date: new Date().toISOString(), startTime: "18:00",
-      creditRestored: false, isLate: true, classesLeft: 3,
-    });
-    results.push("✅ Reserva cancelada (tardía)");
-  } catch (e) { results.push(`❌ Reserva cancelada tardía: ${e.message}`); }
-
-  try {
-    // 5. Recordatorio semanal
-    await sendWeeklyReminder({
-      to: testTo, name: testName, classesLeft: 2,
-      endDate: new Date(Date.now() + 15 * 86400000).toISOString(),
-    });
-    results.push("✅ Recordatorio semanal");
-  } catch (e) { results.push(`❌ Recordatorio semanal: ${e.message}`); }
-
-  try {
-    // 6. Recordatorio de renovación (última clase)
-    await sendRenewalReminder({
-      to: testTo, name: testName, planName: "Jumping — 4 Clases",
-      classesLeft: 1, endDate: new Date(Date.now() + 5 * 86400000).toISOString(),
-      reason: "last_class",
-    });
-    results.push("✅ Renovación (última clase)");
-  } catch (e) { results.push(`❌ Renovación: ${e.message}`); }
-
-  try {
-    // 7. Recordatorio de renovación (por vencer)
-    await sendRenewalReminder({
-      to: testTo, name: testName, planName: "Pilates — Mensual Ilimitado",
-      classesLeft: null, endDate: new Date(Date.now() + 3 * 86400000).toISOString(),
-      reason: "expiring_soon",
-    });
-    results.push("✅ Renovación (por vencer)");
-  } catch (e) { results.push(`❌ Renovación por vencer: ${e.message}`); }
-
-  try {
-    // 8. Reset de contraseña
-    await sendPasswordResetEmail({
-      to: testTo, name: testName, token: "test-token-123456",
-    });
-    results.push("✅ Reset de contraseña");
-  } catch (e) { results.push(`❌ Reset contraseña: ${e.message}`); }
+  // Send one at a time with 700ms delay to respect Resend's 2 req/s limit
+  for (const job of jobs) {
+    try {
+      await job.fn();
+      results.push(`✅ ${job.label}`);
+    } catch (e) {
+      results.push(`❌ ${job.label}: ${e.message}`);
+    }
+    await delay(700);
+  }
 
   const hasResendKey = !!process.env.RESEND_API_KEY;
   return res.json({
     message: hasResendKey
       ? `Se enviaron ${results.filter(r => r.startsWith("✅")).length} emails de prueba a ${testTo}`
-      : "⚠️ RESEND_API_KEY no está configurada en las variables de entorno. Los emails NO se enviaron.",
+      : "⚠️ RESEND_API_KEY no está configurada. Los emails NO se enviaron.",
     resendKeySet: hasResendKey,
+    fromEmail: process.env.EMAIL_FROM || "onboarding@resend.dev (default)",
     results,
   });
 });
