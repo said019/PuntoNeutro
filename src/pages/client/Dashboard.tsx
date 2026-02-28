@@ -87,7 +87,7 @@ const Dashboard = () => {
                 ) : membership ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold">{membership.plan_name}</span>
+                      <span className="font-semibold">{membership.plan_name ?? "Membresía"}</span>
                       <Badge variant={membership.status === "active" ? "default" : "secondary"}>
                         {membership.status === "active" ? "Activa" : membership.status}
                       </Badge>
@@ -95,12 +95,22 @@ const Dashboard = () => {
                     {daysRemaining !== null && (
                       <p className="text-sm text-muted-foreground">{daysRemaining} días restantes</p>
                     )}
+                    {/* Unlimited plan */}
+                    {membership.class_limit === null && membership.classes_remaining === null && (
+                      <p className="text-sm font-medium text-primary">♾ Clases ilimitadas</p>
+                    )}
+                    {/* Limited plan with remaining count */}
                     {classesProgress !== null && membership.classes_remaining !== null && (
                       <>
                         <Progress value={classesProgress} className="h-2" />
-                        <p className="text-xs text-muted-foreground">{membership.classes_remaining} clases restantes</p>
+                        <p className="text-xs text-muted-foreground">
+                          {membership.classes_remaining} de {membership.class_limit} clases restantes
+                        </p>
                       </>
                     )}
+                    <Button asChild variant="outline" size="sm">
+                      <Link to="/app/membership">Ver membresía</Link>
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-2">
