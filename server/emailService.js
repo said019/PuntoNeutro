@@ -7,7 +7,9 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = process.env.EMAIL_FROM || "Ophelia Studio <onboarding@resend.dev>";
+// IMPORTANT: Use onboarding@resend.dev until ophelia-studio.com.mx is verified in Resend dashboard
+// Once verified, change this back to: process.env.EMAIL_FROM || "Ophelia Studio <notificaciones@ophelia-studio.com.mx>"
+const FROM_EMAIL = "Ophelia Studio <onboarding@resend.dev>";
 const SITE_URL = process.env.SITE_URL || "https://ophelia-studio.com.mx";
 const LOGO_URL = `${SITE_URL}/ophelia-logo-full.png`;
 
