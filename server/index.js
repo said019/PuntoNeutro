@@ -8,6 +8,13 @@ import path from "path";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import axios from "axios";
+import {
+  sendMembershipActivated,
+  sendBookingConfirmed,
+  sendBookingCancelled,
+  sendWeeklyReminder,
+  sendRenewalReminder,
+} from "./emailService.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -1092,6 +1099,41 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
         );
       }
     }
+
+    // ── Email: booking confirmed / waitlist ────────────────────────────────
+    try {
+      const userRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+      const classFullRes = await pool.query(
+        `SELECT c.date, c.start_time, ct.name AS class_type_name,
+                COALESCE(i.full_name, i.display_name) AS instructor_name
+         FROM classes c
+         JOIN class_types ct ON c.class_type_id = ct.id
+         LEFT JOIN instructors i ON c.instructor_id = i.id
+         WHERE c.id = $1`,
+        [classId]
+      );
+      // Recalculate remaining after deduction
+      const memAfter = await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id]);
+      const classesLeft = memAfter.rows[0]?.classes_remaining ?? null;
+
+      if (userRes.rows[0] && classFullRes.rows[0]) {
+        const u = userRes.rows[0];
+        const cl = classFullRes.rows[0];
+        sendBookingConfirmed({
+          to:          u.email,
+          name:        u.full_name || u.display_name || "Alumna",
+          className:   cl.class_type_name,
+          date:        cl.date,
+          startTime:   cl.start_time,
+          instructor:  cl.instructor_name,
+          classesLeft,
+          isWaitlist,
+        }).catch((e) => console.error("[Email] booking confirmed:", e.message));
+      }
+    } catch (emailErr) {
+      console.error("[Email] booking confirmed query error:", emailErr.message);
+    }
+
     const msg = isWaitlist ? "Añadido a lista de espera" : "Reserva confirmada";
     return res.status(201).json({ message: msg, booking: result.rows[0] });
   } catch (err) {
@@ -1105,9 +1147,10 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
   try {
     // Load booking
     const r = await pool.query(
-      `SELECT b.*, c.date, c.start_time
+      `SELECT b.*, c.date, c.start_time, ct.name AS class_type_name
        FROM bookings b
        JOIN classes c ON b.class_id = c.id
+       JOIN class_types ct ON c.class_type_id = ct.id
        WHERE b.id = $1 AND b.user_id = $2`,
       [req.params.id, req.userId]
     );
@@ -1164,6 +1207,26 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
 
         if (isLate) {
           // Late cancellation: credit is LOST — do not restore
+          // Email: cancelled, no credit restored
+          try {
+            const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+            const memAfter = await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id]);
+            if (uRes.rows[0]) {
+              const u = uRes.rows[0];
+              sendBookingCancelled({
+                to: u.email,
+                name: u.full_name || u.display_name || "Alumna",
+                className: booking.class_type_name || "tu clase",
+                date: booking.date,
+                startTime: booking.start_time,
+                creditRestored: false,
+                isLate: true,
+                classesLeft: memAfter.rows[0]?.classes_remaining ?? null,
+              }).catch((e) => console.error("[Email] booking cancelled late:", e.message));
+            }
+          } catch (emailErr) {
+            console.error("[Email] cancelled late query:", emailErr.message);
+          }
           return res.json({
             message: "Reserva cancelada. Por ser con menos de 2 horas de anticipación, la clase NO se devuelve a tu paquete.",
             creditRestored: false,
@@ -1178,6 +1241,29 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
           );
         }
       }
+    }
+
+    // ── Email: booking cancelled ───────────────────────────────────────────
+    try {
+      const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+      const memAfter = membership
+        ? await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id])
+        : null;
+      if (uRes.rows[0]) {
+        const u = uRes.rows[0];
+        sendBookingCancelled({
+          to: u.email,
+          name: u.full_name || u.display_name || "Alumna",
+          className: booking.class_type_name || "tu clase",
+          date: booking.date,
+          startTime: booking.start_time,
+          creditRestored: !isLate,
+          isLate,
+          classesLeft: memAfter?.rows[0]?.classes_remaining ?? null,
+        }).catch((e) => console.error("[Email] booking cancelled:", e.message));
+      }
+    } catch (emailErr) {
+      console.error("[Email] cancelled query:", emailErr.message);
     }
 
     return res.json({
@@ -2306,6 +2392,26 @@ app.put("/api/orders/:id/verify", adminMiddleware, async (req, res) => {
            ON CONFLICT (order_id) DO UPDATE SET status='active'`,
           [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
         ).catch(() => {});
+
+        // ── Email: membership activated via order ────────────────────────
+        if (order.user_id) {
+          try {
+            const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [order.user_id]);
+            if (uRes.rows[0]) {
+              const u = uRes.rows[0];
+              sendMembershipActivated({
+                to: u.email,
+                name: u.full_name || u.display_name || "Alumna",
+                planName: plan.name,
+                startDate: new Date().toISOString(),
+                endDate: end.toISOString(),
+                classLimit: plan.class_limit ?? null,
+              }).catch((e) => console.error("[Email] order verify membership:", e.message));
+            }
+          } catch (emailErr) {
+            console.error("[Email] order verify query:", emailErr.message);
+          }
+        }
       }
     }
     // Award loyalty points for purchase (points_per_peso)
@@ -3149,6 +3255,25 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
        VALUES ($1,$2,'active',$3,$4,$5,$6) RETURNING *`,
       [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null]
     );
+
+    // ── Email: membership activated ──────────────────────────────────────
+    try {
+      const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [userId]);
+      if (uRes.rows[0]) {
+        const u = uRes.rows[0];
+        sendMembershipActivated({
+          to: u.email,
+          name: u.full_name || u.display_name || "Alumna",
+          planName: plan.name,
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          classLimit: plan.class_limit ?? null,
+        }).catch((e) => console.error("[Email] membership activated:", e.message));
+      }
+    } catch (emailErr) {
+      console.error("[Email] membership create query:", emailErr.message);
+    }
+
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
     console.error("POST /memberships error:", err);
@@ -3160,11 +3285,33 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
 app.put("/api/memberships/:id/activate", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      "UPDATE memberships SET status = 'active', updated_at = NOW() WHERE id = $1 RETURNING *",
+      `UPDATE memberships SET status = 'active', updated_at = NOW() WHERE id = $1
+       RETURNING *, (SELECT name FROM plans WHERE id = memberships.plan_id) AS plan_name,
+                    (SELECT class_limit FROM plans WHERE id = memberships.plan_id) AS plan_class_limit`,
       [req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
-    return res.json({ data: r.rows[0] });
+    const mem = r.rows[0];
+
+    // ── Email: membership activated ──────────────────────────────────────
+    try {
+      const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [mem.user_id]);
+      if (uRes.rows[0]) {
+        const u = uRes.rows[0];
+        sendMembershipActivated({
+          to: u.email,
+          name: u.full_name || u.display_name || "Alumna",
+          planName: mem.plan_name || mem.plan_name_override || "Tu membresía",
+          startDate: mem.start_date,
+          endDate: mem.end_date,
+          classLimit: mem.plan_class_limit ?? mem.class_limit_override ?? null,
+        }).catch((e) => console.error("[Email] membership activate:", e.message));
+      }
+    } catch (emailErr) {
+      console.error("[Email] activate query:", emailErr.message);
+    }
+
+    return res.json({ data: mem });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -4573,8 +4720,101 @@ app.get("*", (_req, res) => {
   res.sendFile(path.join(distDir, "index.html"));
 });
 
+// ─── Email Cron Jobs ─────────────────────────────────────────────────────────
+
+/**
+ * Runs every Sunday at 8:00 AM Mexico City time (UTC-6 = 14:00 UTC).
+ * Sends weekly reminder to all users with an active membership.
+ */
+async function runWeeklyReminderCron() {
+  try {
+    const res = await pool.query(`
+      SELECT u.email, COALESCE(u.full_name, u.display_name, 'Alumna') AS name,
+             m.classes_remaining, m.end_date
+      FROM memberships m
+      JOIN users u ON m.user_id = u.id
+      WHERE m.status = 'active'
+        AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
+    `);
+    console.log(`[Cron] Weekly reminder — ${res.rows.length} members`);
+    for (const row of res.rows) {
+      await sendWeeklyReminder({
+        to:          row.email,
+        name:        row.name,
+        classesLeft: row.classes_remaining,
+        endDate:     row.end_date,
+      }).catch((e) => console.error("[Email] weekly cron:", e.message));
+      // Small delay to avoid rate limits
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  } catch (err) {
+    console.error("[Cron] Weekly reminder error:", err.message);
+  }
+}
+
+/**
+ * Runs every day at 9:00 AM.
+ * Sends renewal reminder to members with 1 class left OR expiring in ≤7 days.
+ */
+async function runRenewalReminderCron() {
+  try {
+    const res = await pool.query(`
+      SELECT u.email, COALESCE(u.full_name, u.display_name, 'Alumna') AS name,
+             m.classes_remaining, m.end_date,
+             COALESCE(p.name, m.plan_name_override, 'Tu membresía') AS plan_name
+      FROM memberships m
+      JOIN users u ON m.user_id = u.id
+      LEFT JOIN plans p ON m.plan_id = p.id
+      WHERE m.status = 'active'
+        AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
+        AND (
+          m.classes_remaining = 1
+          OR (m.end_date IS NOT NULL AND m.end_date <= CURRENT_DATE + INTERVAL '7 days')
+        )
+    `);
+    console.log(`[Cron] Renewal reminder — ${res.rows.length} members`);
+    for (const row of res.rows) {
+      const reason = row.classes_remaining === 1 ? "last_class" : "expiring_soon";
+      await sendRenewalReminder({
+        to:          row.email,
+        name:        row.name,
+        planName:    row.plan_name,
+        classesLeft: row.classes_remaining,
+        endDate:     row.end_date,
+        reason,
+      }).catch((e) => console.error("[Email] renewal cron:", e.message));
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  } catch (err) {
+    console.error("[Cron] Renewal reminder error:", err.message);
+  }
+}
+
+function scheduleEmailCrons() {
+  // Check every hour if it's time to run
+  setInterval(async () => {
+    const now = new Date();
+    // Mexico City = UTC-6 (adjust for daylight saving if needed)
+    const mexicoHour   = (now.getUTCHours() - 6 + 24) % 24;
+    const dayOfWeek    = now.getUTCDay(); // 0 = Sunday
+
+    // Weekly reminder: every Sunday at 8:00 AM Mexico time
+    if (dayOfWeek === 0 && mexicoHour === 8 && now.getUTCMinutes() < 60) {
+      console.log("[Cron] Triggering weekly reminder...");
+      runWeeklyReminderCron();
+    }
+
+    // Renewal reminder: every day at 9:00 AM Mexico time
+    if (mexicoHour === 9 && now.getUTCMinutes() < 60) {
+      console.log("[Cron] Triggering renewal reminder...");
+      runRenewalReminderCron();
+    }
+  }, 60 * 60 * 1000); // every 1 hour
+}
+
 // ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
   await ensureSchema();
+  scheduleEmailCrons();
   console.log(`🚀 Ophelia API + Frontend → http://localhost:${PORT}`);
 });
