@@ -4808,6 +4808,100 @@ app.put("/api/events/:id/register/payment", authMiddleware, async (req, res) => 
   }
 });
 
+// ─── Email test endpoint (admin only) ─────────────────────────────────────────
+app.post("/api/admin/test-emails", adminMiddleware, async (req, res) => {
+  const testTo = req.body.to || "saidromero19@gmail.com";
+  const testName = "Said (Test)";
+  const results = [];
+
+  try {
+    // 1. Membresía activada
+    await sendMembershipActivated({
+      to: testTo, name: testName, planName: "Jumping — 4 Clases",
+      startDate: new Date().toISOString(),
+      endDate: new Date(Date.now() + 30 * 86400000).toISOString(),
+      classLimit: 4,
+    });
+    results.push("✅ Membresía activada");
+  } catch (e) { results.push(`❌ Membresía activada: ${e.message}`); }
+
+  try {
+    // 2. Reserva confirmada
+    await sendBookingConfirmed({
+      to: testTo, name: testName, className: "Jumping Fitness",
+      date: new Date().toISOString(), startTime: "09:00",
+      instructor: "Instructora Diana", classesLeft: 3, isWaitlist: false,
+    });
+    results.push("✅ Reserva confirmada");
+  } catch (e) { results.push(`❌ Reserva confirmada: ${e.message}`); }
+
+  try {
+    // 3. Reserva cancelada (a tiempo)
+    await sendBookingCancelled({
+      to: testTo, name: testName, className: "Jumping Dance",
+      date: new Date().toISOString(), startTime: "11:00",
+      creditRestored: true, isLate: false, classesLeft: 4,
+    });
+    results.push("✅ Reserva cancelada (a tiempo)");
+  } catch (e) { results.push(`❌ Reserva cancelada: ${e.message}`); }
+
+  try {
+    // 4. Reserva cancelada (tardía)
+    await sendBookingCancelled({
+      to: testTo, name: testName, className: "Strong Jump",
+      date: new Date().toISOString(), startTime: "18:00",
+      creditRestored: false, isLate: true, classesLeft: 3,
+    });
+    results.push("✅ Reserva cancelada (tardía)");
+  } catch (e) { results.push(`❌ Reserva cancelada tardía: ${e.message}`); }
+
+  try {
+    // 5. Recordatorio semanal
+    await sendWeeklyReminder({
+      to: testTo, name: testName, classesLeft: 2,
+      endDate: new Date(Date.now() + 15 * 86400000).toISOString(),
+    });
+    results.push("✅ Recordatorio semanal");
+  } catch (e) { results.push(`❌ Recordatorio semanal: ${e.message}`); }
+
+  try {
+    // 6. Recordatorio de renovación (última clase)
+    await sendRenewalReminder({
+      to: testTo, name: testName, planName: "Jumping — 4 Clases",
+      classesLeft: 1, endDate: new Date(Date.now() + 5 * 86400000).toISOString(),
+      reason: "last_class",
+    });
+    results.push("✅ Renovación (última clase)");
+  } catch (e) { results.push(`❌ Renovación: ${e.message}`); }
+
+  try {
+    // 7. Recordatorio de renovación (por vencer)
+    await sendRenewalReminder({
+      to: testTo, name: testName, planName: "Pilates — Mensual Ilimitado",
+      classesLeft: null, endDate: new Date(Date.now() + 3 * 86400000).toISOString(),
+      reason: "expiring_soon",
+    });
+    results.push("✅ Renovación (por vencer)");
+  } catch (e) { results.push(`❌ Renovación por vencer: ${e.message}`); }
+
+  try {
+    // 8. Reset de contraseña
+    await sendPasswordResetEmail({
+      to: testTo, name: testName, token: "test-token-123456",
+    });
+    results.push("✅ Reset de contraseña");
+  } catch (e) { results.push(`❌ Reset contraseña: ${e.message}`); }
+
+  const hasResendKey = !!process.env.RESEND_API_KEY;
+  return res.json({
+    message: hasResendKey
+      ? `Se enviaron ${results.filter(r => r.startsWith("✅")).length} emails de prueba a ${testTo}`
+      : "⚠️ RESEND_API_KEY no está configurada en las variables de entorno. Los emails NO se enviaron.",
+    resendKeySet: hasResendKey,
+    results,
+  });
+});
+
 // ─── Serve React SPA (static) ────────────────────────────────────────────────
 const distDir = path.join(__dirname, "../dist");
 app.use(express.static(distDir));
