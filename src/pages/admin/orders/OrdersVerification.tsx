@@ -24,12 +24,18 @@ const STATUS_BADGE: Record<string, "default" | "outline" | "destructive" | "seco
 interface Order {
   id: string;
   userName?: string;
+  user_name?: string;
   userId: string;
+  user_id?: string;
   amount?: number;
   total_amount?: number;
   status: string;
-  createdAt: string;
+  createdAt?: string;
+  created_at?: string;
   proofUrl?: string;
+  proof_url?: string;
+  planName?: string;
+  plan_name?: string;
   notes?: string;
 }
 
@@ -46,12 +52,12 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
   const orders = Array.isArray(data?.data) ? data.data : [];
 
   const approveMutation = useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes: string }) => api.put(`/orders/${id}/verify`, { notes }),
+    mutationFn: ({ id, notes }: { id: string; notes: string }) => api.put(`/admin/orders/${id}/verify`, { notes }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["orders"] }); toast({ title: "Orden aprobada" }); setSelected(null); },
   });
 
   const rejectMutation = useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes: string }) => api.put(`/orders/${id}/reject`, { notes }),
+    mutationFn: ({ id, notes }: { id: string; notes: string }) => api.put(`/admin/orders/${id}/reject`, { notes }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["orders"] }); toast({ title: "Orden rechazada" }); setSelected(null); },
   });
 
@@ -75,10 +81,10 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
               ))
               : orders.map((o) => (
                 <TableRow key={o.id}>
-                  <TableCell>{o.userName ?? o.userId}</TableCell>
+                  <TableCell>{o.userName ?? o.user_name ?? o.userId ?? o.user_id}</TableCell>
                   <TableCell>${o.total_amount ?? o.amount} MXN</TableCell>
                   <TableCell><Badge variant={STATUS_BADGE[o.status] ?? "outline"}>{o.status}</Badge></TableCell>
-                  <TableCell className="text-sm">{new Date(o.createdAt).toLocaleDateString("es-MX")}</TableCell>
+                  <TableCell className="text-sm">{new Date(o.createdAt ?? o.created_at ?? "").toLocaleDateString("es-MX")}</TableCell>
                   <TableCell>
                     <Button size="sm" variant="outline" onClick={() => { setSelected(o); setNotes(""); }}>
                       Ver detalle
@@ -97,16 +103,17 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
           {selected && (
             <div className="space-y-4">
               <div className="text-sm space-y-1">
-                <div><span className="font-medium">Cliente:</span> {selected.userName}</div>
+                <div><span className="font-medium">Cliente:</span> {selected.userName ?? selected.user_name}</div>
+                <div><span className="font-medium">Plan:</span> {selected.planName ?? selected.plan_name ?? "—"}</div>
                 <div><span className="font-medium">Monto:</span> ${selected.total_amount ?? selected.amount} MXN</div>
                 <div><span className="font-medium">Estado:</span> <Badge variant={STATUS_BADGE[selected.status] ?? "outline"}>{selected.status}</Badge></div>
               </div>
-              {selected.proofUrl && (
+              {(selected.proofUrl || selected.proof_url) && (
                 <div>
                   <Label className="mb-2 block">Comprobante</Label>
-                  {selected.proofUrl.endsWith(".pdf")
-                    ? <a href={selected.proofUrl} target="_blank" rel="noreferrer" className="text-primary text-sm underline">Ver PDF</a>
-                    : <img src={selected.proofUrl} alt="Comprobante" className="max-h-48 rounded-lg object-contain border border-border" />
+                  {(selected.proofUrl ?? selected.proof_url ?? "").endsWith(".pdf")
+                    ? <a href={selected.proofUrl ?? selected.proof_url} target="_blank" rel="noreferrer" className="text-primary text-sm underline">Ver PDF</a>
+                    : <img src={selected.proofUrl ?? selected.proof_url} alt="Comprobante" className="max-h-48 rounded-lg object-contain border border-border" />
                   }
                 </div>
               )}
@@ -142,13 +149,13 @@ const OrdersVerification = () => (
             <TabsTrigger value="all">Todas</TabsTrigger>
           </TabsList>
           <TabsContent value="pending_verification" className="mt-4">
-            <OrdersTable url="/orders?status=pending_verification" queryKey={["orders", "pending_verification"]} />
+            <OrdersTable url="/admin/orders?status=pending_verification" queryKey={["orders", "pending_verification"]} />
           </TabsContent>
           <TabsContent value="pending_payment" className="mt-4">
-            <OrdersTable url="/orders?status=pending_payment" queryKey={["orders", "pending_payment"]} />
+            <OrdersTable url="/admin/orders?status=pending_payment" queryKey={["orders", "pending_payment"]} />
           </TabsContent>
           <TabsContent value="all" className="mt-4">
-            <OrdersTable url="/orders" queryKey={["orders", "all"]} />
+            <OrdersTable url="/admin/orders" queryKey={["orders", "all"]} />
           </TabsContent>
         </Tabs>
       </div>

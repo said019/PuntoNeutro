@@ -98,7 +98,7 @@ const ClientDetail = () => {
                   {(Array.isArray(bookings?.data) ? bookings.data : []).map((b: any) => (
                     <TableRow key={b.id}>
                       <TableCell>{b.className ?? b.classId}</TableCell>
-                      <TableCell>{b.startTime ? new Date(b.startTime).toLocaleString("es-MX") : "—"}</TableCell>
+                      <TableCell>{b.startTime ? new Date(b.startTime).toLocaleString("es-MX", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>
                       <TableCell><Badge variant="outline">{b.status}</Badge></TableCell>
                     </TableRow>
                   ))}

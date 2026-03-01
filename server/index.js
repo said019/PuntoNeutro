@@ -3715,12 +3715,24 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
 app.get("/api/orders/pending", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT o.*, u.display_name AS user_name
-       FROM orders o LEFT JOIN users u ON o.user_id = u.id
+      `SELECT o.*, u.display_name AS user_name, p.name AS plan_name,
+              pp.file_url AS proof_url, pp.status AS proof_status
+       FROM orders o
+       LEFT JOIN users u ON o.user_id = u.id
+       LEFT JOIN plans p ON o.plan_id = p.id
+       LEFT JOIN payment_proofs pp ON pp.order_id = o.id
        WHERE o.status = 'pending_verification'
        ORDER BY o.created_at DESC LIMIT 20`
     );
-    return res.json({ data: r.rows.map(o => ({ ...o, userName: o.user_name })) });
+    return res.json({
+      data: r.rows.map(o => ({
+        ...o,
+        userName: o.user_name,
+        planName: o.plan_name,
+        proofUrl: o.proof_url,
+        proofStatus: o.proof_status,
+      })),
+    });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -3730,13 +3742,27 @@ app.get("/api/orders/pending", adminMiddleware, async (req, res) => {
 app.get("/api/admin/orders", adminMiddleware, async (req, res) => {
   try {
     const { status, limit = 100 } = req.query;
-    let q = `SELECT o.*, u.display_name AS user_name
-             FROM orders o LEFT JOIN users u ON o.user_id = u.id WHERE 1=1`;
+    let q = `SELECT o.*, u.display_name AS user_name, p.name AS plan_name,
+                    pp.file_url AS proof_url, pp.status AS proof_status, pp.uploaded_at AS proof_uploaded_at
+             FROM orders o
+             LEFT JOIN users u ON o.user_id = u.id
+             LEFT JOIN plans p ON o.plan_id = p.id
+             LEFT JOIN payment_proofs pp ON pp.order_id = o.id
+             WHERE 1=1`;
     const params = [];
     if (status) { params.push(status); q += ` AND o.status = $${params.length}`; }
     params.push(parseInt(limit)); q += ` ORDER BY o.created_at DESC LIMIT $${params.length}`;
     const r = await pool.query(q, params);
-    return res.json({ data: r.rows.map(o => ({ ...o, userName: o.user_name })) });
+    return res.json({
+      data: r.rows.map(o => ({
+        ...o,
+        userName: o.user_name,
+        planName: o.plan_name,
+        proofUrl: o.proof_url,
+        proofStatus: o.proof_status,
+        proofUploadedAt: o.proof_uploaded_at,
+      })),
+    });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
