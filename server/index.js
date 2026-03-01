@@ -446,6 +446,18 @@ async function ensureSchema() {
     await pool.query(`
       ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0;
     `).catch(() => { });
+    // ── Reconcile cancellations_used with actual cancelled bookings ────────
+    await pool.query(`
+      UPDATE memberships m
+      SET cancellations_used = sub.cnt
+      FROM (
+        SELECT b.membership_id, COUNT(*) AS cnt
+        FROM bookings b
+        WHERE b.status = 'cancelled' AND b.membership_id IS NOT NULL
+        GROUP BY b.membership_id
+      ) sub
+      WHERE m.id = sub.membership_id AND m.cancellations_used != sub.cnt;
+    `).catch(() => { });
     // ── homepage_video_cards: editable 3-card section on landing page ──────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS homepage_video_cards (

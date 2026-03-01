@@ -116,6 +116,11 @@ const MyBookings = () => {
       });
       setCancelId(null);
     },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || "No se pudo cancelar la reserva.";
+      toast({ title: "No se pudo cancelar", description: msg, variant: "destructive" });
+      setCancelId(null);
+    },
   });
 
   const reviewMutation = useMutation({
