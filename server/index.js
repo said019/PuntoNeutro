@@ -1808,7 +1808,7 @@ function parseGWServiceAccount() {
   let email = process.env.GOOGLE_SA_EMAIL || "";
   let key = "";
 
-  // Option A: whole JSON file base64-encoded (e.g. cat sa.json | base64 | pbcopy)
+  // Option A: whole JSON file base64-encoded (e.g. cat sa.json | base64 -w0 | pbcopy)
   const jsonB64 = process.env.GOOGLE_SA_KEY_JSON_BASE64 || "";
   if (jsonB64) {
     try {
@@ -1816,6 +1816,7 @@ function parseGWServiceAccount() {
       const sa = JSON.parse(decoded);
       if (sa.private_key) key = sa.private_key;
       if (sa.client_email && !email) email = sa.client_email;
+      console.log("GW Key: parsed from GOOGLE_SA_KEY_JSON_BASE64 ✓");
     } catch (e) {
       console.error("Failed to parse GOOGLE_SA_KEY_JSON_BASE64:", e.message);
     }
@@ -1825,26 +1826,66 @@ function parseGWServiceAccount() {
   if (!key) {
     let raw = process.env.GOOGLE_SA_PRIVATE_KEY || "";
     if (raw) {
-      // If the whole thing is base64 (no -----BEGIN), decode it
-      if (!raw.includes("-----BEGIN") && !raw.includes("\\n")) {
+      // Step 1: URL-decode if needed (Railway sometimes encodes)
+      if (raw.includes("%3D") || raw.includes("%2B") || raw.includes("%2F")) {
+        try { raw = decodeURIComponent(raw); } catch (_) {}
+      }
+      // Step 2: If it's a JSON-escaped string (starts with "), unwrap it
+      if (raw.startsWith('"') || raw.startsWith("'")) {
+        try { raw = JSON.parse(raw); } catch (_) {
+          raw = raw.slice(1, -1); // strip quotes manually
+        }
+      }
+      // Step 3: If the whole thing looks like base64 (no PEM markers), decode
+      if (!raw.includes("-----BEGIN") && !raw.includes("\\n") && raw.length > 100) {
         try {
           const decoded = Buffer.from(raw, "base64").toString("utf8");
-          if (decoded.includes("-----BEGIN")) raw = decoded;
-        } catch (_) { /* not base64, continue */ }
+          if (decoded.includes("-----BEGIN") || decoded.includes("PRIVATE KEY")) raw = decoded;
+        } catch (_) {}
       }
-      // If it's a JSON string (starts with "), parse it
-      if (raw.startsWith('"') && raw.endsWith('"')) {
-        try { raw = JSON.parse(raw); } catch (_) {}
-      }
-      // Replace literal \\n with real newlines
-      raw = raw.replace(/\\n/g, "\n");
-      // If still no newlines after BEGIN header, insert them
-      if (raw.includes("-----BEGIN") && !raw.includes("\n-----END")) {
+      // Step 4: Replace escaped newlines (\\n → \n, plus double-escaped)
+      raw = raw.replace(/\\\\n/g, "\n").replace(/\\n/g, "\n");
+      // Step 5: Reconstruct PEM if markers exist but no real newlines between them
+      if (raw.includes("-----BEGIN") && raw.includes("-----END")) {
+        // Ensure proper line breaks around the markers
         raw = raw
-          .replace(/(-----BEGIN[^-]+-----)(\S)/, "$1\n$2")
-          .replace(/(\S)(-----END[^-]+-----)/, "$1\n$2");
+          .replace(/(-----BEGIN [A-Z ]+-----)\s*/g, "$1\n")
+          .replace(/\s*(-----END [A-Z ]+-----)/g, "\n$1");
+        // If the body between markers has no newlines, it's the base64 blob — add line breaks every 64 chars
+        const match = raw.match(/(-----BEGIN [A-Z ]+-----)\n?([\s\S]*?)\n?(-----END [A-Z ]+-----)/);
+        if (match) {
+          const body = match[2].replace(/\s+/g, ""); // strip all whitespace from body
+          const wrapped = body.match(/.{1,64}/g)?.join("\n") || body;
+          raw = `${match[1]}\n${wrapped}\n${match[3]}`;
+        }
       }
       key = raw.trim();
+      console.log("GW Key: parsed from GOOGLE_SA_PRIVATE_KEY, length=" + key.length + ", hasPEM=" + key.includes("-----BEGIN"));
+    }
+  }
+
+  // Validate the key can be used for RS256
+  if (key) {
+    try {
+      crypto.createPrivateKey(key);
+      console.log("GW Key: ✅ Valid RSA private key");
+    } catch (e) {
+      console.error("GW Key: ⚠️ Key validation failed:", e.message);
+      // Last resort: try wrapping in PKCS#8 markers if missing
+      if (!key.includes("-----BEGIN")) {
+        const body = key.replace(/\s+/g, "");
+        const wrapped = body.match(/.{1,64}/g)?.join("\n") || body;
+        key = `-----BEGIN PRIVATE KEY-----\n${wrapped}\n-----END PRIVATE KEY-----`;
+        try {
+          crypto.createPrivateKey(key);
+          console.log("GW Key: ✅ Valid after adding PEM headers");
+        } catch (e2) {
+          console.error("GW Key: ❌ Still invalid after adding headers:", e2.message);
+          key = ""; // unset — will disable Google Wallet gracefully
+        }
+      } else {
+        key = ""; // unset — will disable Google Wallet gracefully
+      }
     }
   }
 
@@ -2105,10 +2146,10 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
     }
 
     // Get user info
-    const userRes = await pool.query("SELECT id, name, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+    const userRes = await pool.query("SELECT id, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
     if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
     const user = userRes.rows[0];
-    const userName = user.full_name || user.display_name || user.name || user.email;
+    const userName = user.full_name || user.display_name || user.email;
 
     // Get points
     const pointsRes = await pool.query(
@@ -2451,10 +2492,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
   try {
     // Get user info
-    const userRes = await pool.query("SELECT id, name, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+    const userRes = await pool.query("SELECT id, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
     if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
     const user = userRes.rows[0];
-    const userName = user.full_name || user.display_name || user.name || user.email;
+    const userName = user.full_name || user.display_name || user.email;
 
     const pointsRes = await pool.query(
       "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
@@ -2512,27 +2553,86 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
       return res.send(pkpassBuffer);
     }
 
-    // Fallback: return JSON data for the frontend to render as a web pass
-    return res.json({
-      webPass: true,
-      data: {
-        userName,
-        points,
-        qrCode,
-        membership: membership ? {
-          plan_name: membership.plan_name,
-          class_limit: membership.class_limit,
-          classes_remaining: membership.classes_remaining,
-          end_date: membership.end_date,
-        } : null,
-        nextBooking: nextBooking ? {
-          class_name: nextBooking.class_name,
-          instructor_name: nextBooking.instructor_name,
-          date: nextBooking.date,
-          start_time: nextBooking.start_time,
-        } : null,
-      },
-    });
+    // Fallback: generate a beautiful standalone HTML pass page
+    const nextBookingHtml = nextBooking
+      ? `<div class="field"><span class="label">Próxima clase</span><span class="value">${nextBooking.class_name || ""}</span></div>
+         <div class="field"><span class="label">Fecha</span><span class="value">${nextBooking.date ? new Date(nextBooking.date).toLocaleDateString("es-MX", { day: "numeric", month: "short" }) : ""} ${nextBooking.start_time || ""}</span></div>`
+      : "";
+    const membershipHtml = membership
+      ? `<div class="field"><span class="label">Plan</span><span class="value">${membership.plan_name}</span></div>
+         <div class="field"><span class="label">Clases restantes</span><span class="value">${membership.classes_remaining ?? "∞"} / ${membership.class_limit ?? "∞"}</span></div>
+         <div class="field"><span class="label">Vigencia</span><span class="value">${membership.end_date ? new Date(membership.end_date).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : "—"}</span></div>`
+      : `<div class="field"><span class="label">Plan</span><span class="value">Sin membresía activa</span></div>`;
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ophelia Club">
+<title>Ophelia Club — ${userName}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.pass{width:100%;max-width:380px;border-radius:24px;overflow:hidden;background:linear-gradient(160deg,#1a0b26 0%,#2d0a40 50%,#1a0b26 100%);box-shadow:0 20px 60px rgba(225,92,184,.2),0 0 0 1px rgba(202,113,225,.15)}
+.header{padding:24px 24px 16px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:18px;font-weight:800;background:linear-gradient(135deg,#E15CB8,#CA71E1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.badge{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:rgba(202,113,225,.7);border:1px solid rgba(202,113,225,.3);padding:4px 10px;border-radius:20px}
+.points-section{text-align:center;padding:8px 24px 24px}
+.points-label{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#CA71E1;margin-bottom:4px}
+.points{font-size:72px;font-weight:900;background:linear-gradient(135deg,#E15CB8,#CA71E1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.points-sub{font-size:13px;color:rgba(255,255,255,.5);margin-top:4px}
+.qr-section{display:flex;justify-content:center;padding:0 24px 24px}
+.qr-wrap{background:#fff;border-radius:20px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.qr-wrap img{width:160px;height:160px;display:block}
+.qr-hint{text-align:center;font-size:11px;color:rgba(255,255,255,.35);padding:0 24px 20px;line-height:1.5}
+.fields{padding:0 24px 24px;display:flex;flex-direction:column;gap:12px}
+.field{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(255,255,255,.05);border-radius:14px;border:1px solid rgba(255,255,255,.06)}
+.label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+.value{font-size:14px;font-weight:600;color:#fff;text-align:right}
+.footer{text-align:center;padding:0 24px 24px;display:flex;gap:8px;justify-content:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 20px;border-radius:14px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:linear-gradient(135deg,#E15CB8,#CA71E1);color:#fff;flex:1}
+.btn-primary:hover{opacity:.9}
+.btn-outline{background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.1);flex:1}
+.btn-outline:hover{background:rgba(255,255,255,.1)}
+.name{text-align:center;font-size:16px;font-weight:700;padding:0 24px 4px;color:#fff}
+</style>
+</head>
+<body>
+<div class="pass">
+  <div class="header">
+    <div class="logo">Ophelia Studio</div>
+    <div class="badge">Club</div>
+  </div>
+  <div class="name">${userName}</div>
+  <div class="points-section">
+    <div class="points-label">Puntos acumulados</div>
+    <div class="points">${points}</div>
+    <div class="points-sub">Ophelia Club</div>
+  </div>
+  <div class="qr-section">
+    <div class="qr-wrap">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrCode)}&bgcolor=FFFFFF&color=1a0b26" alt="QR Code" />
+    </div>
+  </div>
+  <div class="qr-hint">Muestra este código en recepción al llegar al estudio</div>
+  <div class="fields">
+    ${membershipHtml}
+    ${nextBookingHtml}
+  </div>
+  <div class="footer">
+    <button class="btn btn-primary" onclick="window.print()">🖨 Imprimir</button>
+    <button class="btn btn-outline" onclick="alert('Consejo: En Safari, toca Compartir → Añadir a pantalla de inicio para tener tu pase siempre a la mano')">📱 Guardar</button>
+  </div>
+</div>
+</body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.send(html);
   } catch (err) {
     console.error("Apple Wallet pkpass error:", err.message);
     return res.status(500).json({ message: "Error generando pase de Apple Wallet" });
@@ -2603,10 +2703,10 @@ app.get("/api/wallet/v1/passes/:passTypeId/:serial", async (req, res) => {
   // serial = ophelia_<userId without dashes>
   const userId = serial.replace("ophelia_", "").replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, "$1-$2-$3-$4-$5");
   try {
-    const userRes = await pool.query("SELECT id, name, email, full_name, display_name FROM users WHERE id = $1", [userId]);
+    const userRes = await pool.query("SELECT id, email, full_name, display_name FROM users WHERE id = $1", [userId]);
     if (userRes.rows.length === 0) return res.status(404).send();
     const user = userRes.rows[0];
-    const userName = user.full_name || user.display_name || user.name || user.email;
+    const userName = user.full_name || user.display_name || user.email;
     const pointsRes = await pool.query(
       "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
       [userId]

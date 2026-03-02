@@ -80,22 +80,28 @@ const Wallet = () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         toast({ title: "¡Pase descargado!", description: "Ábrelo para agregarlo a Apple Wallet." });
+      } else if (contentType.includes("text/html")) {
+        // Server returned a full HTML web pass page — open in new tab
+        const htmlBlob = new Blob([resp.data], { type: "text/html" });
+        const url = URL.createObjectURL(htmlBlob);
+        window.open(url, "_blank");
+        toast({
+          title: "¡Pase Web abierto!",
+          description: "Se abrió tu pase digital en una nueva pestaña. Puedes guardarlo como acceso directo en tu pantalla de inicio.",
+        });
       } else {
-        // Web pass fallback — parse JSON from blob
-        const text = await resp.data.text();
-        const json = JSON.parse(text);
-        if (json.webPass) {
-          // Redirect to the wallet page which already shows the card and QR
-          toast({
-            title: "Pase Web",
-            description: "Toma una captura de pantalla de tu pase QR arriba para guardarlo en tu teléfono. Apple Wallet nativo estará disponible pronto.",
-          });
-        }
+        // Unknown response type
+        toast({
+          title: "Pase Web",
+          description: "No se pudo generar el pase. Intenta de nuevo más tarde.",
+        });
       }
     } catch (err: any) {
+      console.error("Apple Wallet error:", err);
       toast({
-        title: "Guarda tu Pase",
-        description: "Toma una captura de pantalla de tu código QR arriba para tener tu pase siempre a la mano.",
+        title: "Error",
+        description: "No se pudo descargar el pase. Intenta de nuevo.",
+        variant: "destructive",
       });
     } finally {
       setAppleLoading(false);
