@@ -78,7 +78,7 @@ const VideoList = () => {
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
 
-  // Upload video file for a homepage card (max 500 MB)
+  // Upload video file for a homepage card — direct to Google Drive (bypasses Railway proxy)
   const handleCardVideoUpload = async (cardId: number, file: File) => {
     const MAX_MB = 500;
     if (file.size > MAX_MB * 1024 * 1024) {
@@ -88,36 +88,58 @@ const VideoList = () => {
     setUploadingCardId(cardId);
     setUploadProgress(0);
     try {
-      const formData = new FormData();
-      formData.append("video", file);
+      // Step 1: Get resumable upload URL from our server (small JSON request)
+      const initResp = await api.post("/drive/init-upload", {
+        fileName: `homepage_card_${cardId}_${Date.now()}_${file.name}`,
+        mimeType: file.type || "video/mp4",
+        fileSize: file.size,
+      });
+      const { uploadUrl } = initResp.data?.data || initResp.data || {};
+      if (!uploadUrl) throw new Error("No se obtuvo URL de subida");
 
-      const token = localStorage.getItem("token");
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `/api/homepage-video-cards/${cardId}/upload`);
-      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      // Step 2: Upload file directly to Google Drive in one PUT (for files <500 MB)
+      // Using XHR for progress tracking
+      const driveFileId = await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadUrl);
+        xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+        xhr.setRequestHeader("Content-Length", String(file.size));
 
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
-      };
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 95)); // 95% = upload, 5% = finalize
+        };
 
-      await new Promise<void>((resolve, reject) => {
         xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            qc.invalidateQueries({ queryKey: ["homepage-video-cards"] });
-            toast({ title: "✅ Video subido correctamente" });
-            resolve();
+          if (xhr.status === 200 || xhr.status === 201) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              resolve(result.id);
+            } catch {
+              reject(new Error("Respuesta inválida de Google Drive"));
+            }
           } else {
-            let msg = "Error al subir video";
-            try { msg = JSON.parse(xhr.responseText || "{}").message || msg; } catch {}
-            toast({ title: msg, variant: "destructive" });
-            reject(new Error(msg));
+            reject(new Error(`Error de Google Drive: ${xhr.status}`));
           }
         };
-        xhr.onerror = () => { toast({ title: "Error de conexión. El archivo puede ser demasiado grande.", variant: "destructive" }); reject(new Error("Network error")); };
-        xhr.send(formData);
+
+        xhr.onerror = () => reject(new Error("Error de red al subir a Google Drive"));
+        xhr.send(file);
       });
-    } catch {
-      // error already toasted
+
+      setUploadProgress(97);
+
+      // Step 3: Make file public
+      await api.post(`/drive/make-public/${driveFileId}`);
+
+      // Step 4: Save Drive file ID to homepage card
+      await api.post(`/homepage-video-cards/${cardId}/set-drive-video`, { driveFileId });
+
+      setUploadProgress(100);
+      qc.invalidateQueries({ queryKey: ["homepage-video-cards"] });
+      toast({ title: "✅ Video subido correctamente" });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Error al subir video";
+      toast({ title: msg, variant: "destructive" });
     } finally {
       setUploadingCardId(null);
       setUploadProgress(0);

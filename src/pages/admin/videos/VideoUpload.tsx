@@ -110,10 +110,9 @@ const VideoUpload = () => {
     onError: () => toast({ title: "Error al actualizar video", variant: "destructive" }),
   });
 
-  // XHR upload to /api/videos/upload with progress tracking
+  // Direct-to-Drive upload: init session on server, upload directly to googleapis.com
   const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const videoFile = e.target.files?.[0];
-    const thumbFile = thumbInputRef.current?.files?.[0];
     if (!videoFile) return;
 
     // Client-side size check (500 MB)
@@ -128,44 +127,90 @@ const VideoUpload = () => {
     setUploadProgress(0);
     setUploadedEmbedUrl(null);
 
-    const token = localStorage.getItem("ophelia_token") || sessionStorage.getItem("ophelia_token") || "";
-    const apiUrl = (import.meta.env.VITE_API_URL as string) || "/api";
+    try {
+      // Step 1: Get resumable upload URL from our server (small JSON request)
+      const initResp = await api.post("/drive/init-upload", {
+        fileName: `video_${Date.now()}_${videoFile.name}`,
+        mimeType: videoFile.type || "video/mp4",
+        fileSize: videoFile.size,
+      });
+      const { uploadUrl } = initResp.data?.data || initResp.data || {};
+      if (!uploadUrl) throw new Error("No se obtuvo URL de subida");
 
-    const formData = new FormData();
-    formData.append("video", videoFile);
-    if (thumbFile) formData.append("thumbnail", thumbFile);
+      // Step 2: Upload directly to Google Drive via XHR (for progress)
+      const driveFileId = await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadUrl);
+        xhr.setRequestHeader("Content-Type", videoFile.type || "video/mp4");
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${apiUrl}/videos/upload`);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 90));
+        };
 
-    xhr.upload.onprogress = (ev) => {
-      if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
-    };
+        xhr.onload = () => {
+          if (xhr.status === 200 || xhr.status === 201) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              resolve(result.id);
+            } catch {
+              reject(new Error("Respuesta inválida de Google Drive"));
+            }
+          } else {
+            reject(new Error(`Error de Google Drive: ${xhr.status}`));
+          }
+        };
 
-    xhr.onload = () => {
-      setIsUploading(false);
-      if (xhr.status === 200 || xhr.status === 201) {
-        const result = JSON.parse(xhr.responseText);
-        form.setValue("drive_file_id",       result.drive_file_id   || "");
-        form.setValue("cloudinary_id",       result.cloudinary_id   || "");
-        form.setValue("thumbnail_url",       result.thumbnail_url   || "");
-        form.setValue("thumbnail_drive_id",  result.thumbnail_drive_id || "");
-        if (result.duration_seconds) form.setValue("duration_seconds", result.duration_seconds);
-        setUploadedEmbedUrl(result.embed_url || `https://drive.google.com/file/d/${result.drive_file_id}/preview`);
-        toast({ title: "✅ Video subido a Google Drive" });
-      } else {
-        const err = JSON.parse(xhr.responseText || "{}");
-        toast({ title: "Error al subir: " + (err.message || "Error desconocido"), variant: "destructive" });
+        xhr.onerror = () => reject(new Error("Error de red al subir a Google Drive"));
+        xhr.send(videoFile);
+      });
+
+      setUploadProgress(93);
+
+      // Step 3: Make file public
+      await api.post(`/drive/make-public/${driveFileId}`);
+      setUploadProgress(96);
+
+      // Step 4: Upload thumbnail if provided (small file)
+      const thumbFile = thumbInputRef.current?.files?.[0];
+      let thumbnailUrl = `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w640`;
+      let thumbnailDriveId = "";
+      if (thumbFile) {
+        const thumbInit = await api.post("/drive/init-upload", {
+          fileName: `thumb_${Date.now()}_${thumbFile.name}`,
+          mimeType: thumbFile.type || "image/jpeg",
+          fileSize: thumbFile.size,
+        });
+        const thumbUploadUrl = thumbInit.data?.data?.uploadUrl;
+        if (thumbUploadUrl) {
+          const thumbResp = await fetch(thumbUploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": thumbFile.type || "image/jpeg" },
+            body: thumbFile,
+          });
+          if (thumbResp.ok) {
+            const thumbResult = await thumbResp.json();
+            thumbnailDriveId = thumbResult.id;
+            thumbnailUrl = `https://drive.google.com/thumbnail?id=${thumbResult.id}&sz=w640`;
+            await api.post(`/drive/make-public/${thumbResult.id}`);
+          }
+        }
       }
-    };
 
-    xhr.onerror = () => {
+      setUploadProgress(100);
+
+      // Set form values
+      form.setValue("drive_file_id", driveFileId);
+      form.setValue("cloudinary_id", driveFileId);
+      form.setValue("thumbnail_url", thumbnailUrl);
+      form.setValue("thumbnail_drive_id", thumbnailDriveId);
+      setUploadedEmbedUrl(`https://drive.google.com/file/d/${driveFileId}/preview`);
+      toast({ title: "✅ Video subido a Google Drive" });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Error al subir video";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
       setIsUploading(false);
-      toast({ title: "Error de red al subir el video", variant: "destructive" });
-    };
-
-    xhr.send(formData);
+    }
   };
 
   const handleThumbFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

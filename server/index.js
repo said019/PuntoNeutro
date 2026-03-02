@@ -1825,38 +1825,6 @@ async function ensureGoogleWalletClass() {
       multipleDevicesAndHoldersAllowedStatus: "MULTIPLE_HOLDERS",
       localizedIssuerName: { defaultValue: { language: "es", value: GW_ISSUER_NAME } },
       localizedProgramName: { defaultValue: { language: "es", value: GW_PROGRAM_NAME } },
-      // Welcome message when user first saves the pass
-      discoverableProgram: {
-        merchantSignupInfo: {
-          signupWebsite: { uri: SITE_URL },
-          signupSharedDatas: ["FIRST_NAME", "LAST_NAME", "EMAIL"],
-        },
-        state: "TRUSTED_TESTERS",
-      },
-      // Additional info shown on the back of the pass
-      textModulesData: [
-        {
-          id: "studio_info",
-          header: "OPHELIA JUMP STUDIO",
-          body: "Tu estudio de Jumping Fitness y Pilates favorito 🩷 Clases grupales con la mejor energía.",
-        },
-        {
-          id: "horario",
-          header: "HORARIO",
-          body: "Lunes a Viernes 6:00 – 20:00 • Sábado 8:00 – 13:00",
-        },
-        {
-          id: "contacto",
-          header: "CONTACTO",
-          body: "📍 ophelia-studio.com.mx",
-        },
-      ],
-      linksModuleData: {
-        uris: [
-          { uri: SITE_URL, description: "Sitio Web", id: "website" },
-          { uri: `${SITE_URL}/app/bookings`, description: "Reservar Clase", id: "reservar" },
-        ],
-      },
     };
     // Try to GET the class first
     try {
@@ -3738,6 +3706,92 @@ app.put("/api/homepage-video-cards/:id", adminMiddleware, async (req, res) => {
     if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
     return res.json({ data: r.rows[0] });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ─── Direct-to-Drive Upload (bypasses Railway proxy for large files) ────────
+
+// POST /api/drive/init-upload — returns a Google Drive resumable session URL
+// The browser then uploads the file directly to googleapis.com
+app.post("/api/drive/init-upload", adminMiddleware, async (req, res) => {
+  try {
+    const { fileName, mimeType, fileSize } = req.body;
+    if (!fileName || !mimeType) {
+      return res.status(400).json({ message: "fileName y mimeType son requeridos" });
+    }
+
+    const isDriveConfigured = Boolean(
+      process.env.GOOGLE_CLIENT_ID &&
+      process.env.GOOGLE_CLIENT_SECRET &&
+      process.env.GOOGLE_REFRESH_TOKEN
+    );
+    if (!isDriveConfigured) {
+      return res.status(503).json({ message: "Google Drive no configurado" });
+    }
+
+    const accessToken = await getGoogleDriveAccessToken();
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || "";
+    const metadata = { name: fileName, ...(folderId ? { parents: [folderId] } : {}) };
+
+    // Initiate a resumable upload session on Google Drive
+    const initResp = await axios.post(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink",
+      metadata,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json; charset=UTF-8",
+          "X-Upload-Content-Type": mimeType,
+          ...(fileSize ? { "X-Upload-Content-Length": String(fileSize) } : {}),
+        },
+      }
+    );
+
+    const uploadUrl = initResp.headers.location;
+    if (!uploadUrl) {
+      return res.status(500).json({ message: "No se obtuvo URL de subida de Google Drive" });
+    }
+
+    return res.json({
+      data: {
+        uploadUrl,          // browser sends PUT chunks here
+        accessToken,        // browser needs this for the PUT requests
+        folderId,
+      },
+    });
+  } catch (err) {
+    console.error("Drive init-upload error:", err?.response?.data || err.message);
+    return res.status(500).json({ message: "Error al iniciar subida: " + (err?.response?.data?.error?.message || err.message) });
+  }
+});
+
+// POST /api/drive/make-public/:fileId — make a Drive file publicly readable
+app.post("/api/drive/make-public/:fileId", adminMiddleware, async (req, res) => {
+  try {
+    const accessToken = await getGoogleDriveAccessToken();
+    await makeGoogleDriveFilePublic(req.params.fileId, accessToken);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Drive make-public error:", err?.response?.data || err.message);
+    return res.status(500).json({ message: "Error al hacer público el archivo" });
+  }
+});
+
+// POST /api/homepage-video-cards/:id/set-drive-video — save Drive file ID to card
+app.post("/api/homepage-video-cards/:id/set-drive-video", adminMiddleware, async (req, res) => {
+  try {
+    const { driveFileId } = req.body;
+    if (!driveFileId) return res.status(400).json({ message: "driveFileId requerido" });
+
+    const videoUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
+    const r = await pool.query(
+      `UPDATE homepage_video_cards SET video_url=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
+      [videoUrl, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
 });
 
 // POST /api/homepage-video-cards/:id/upload  (admin — upload video file, max 500 MB)
