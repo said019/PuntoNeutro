@@ -558,6 +558,8 @@ async function ensureSchema() {
     `).catch(() => { });
     // Add video_url column if table already existed
     await pool.query(`ALTER TABLE homepage_video_cards ADD COLUMN IF NOT EXISTS video_url TEXT`).catch(() => { });
+    // Add thumbnail_url column for custom poster images
+    await pool.query(`ALTER TABLE homepage_video_cards ADD COLUMN IF NOT EXISTS thumbnail_url TEXT`).catch(() => { });
     // seed default cards only when table is empty
     await pool.query(`
       INSERT INTO homepage_video_cards (sort_order, title, description, emoji)
@@ -4159,13 +4161,100 @@ app.get("/api/homepage-video-cards", async (req, res) => {
 // PUT /api/homepage-video-cards/:id  (admin — text fields)
 app.put("/api/homepage-video-cards/:id", adminMiddleware, async (req, res) => {
   try {
-    const { title, description, emoji } = req.body;
+    const { title, description, emoji, thumbnail_url } = req.body;
     if (!title || !description) return res.status(400).json({ message: "title y description requeridos" });
     const r = await pool.query(
       `UPDATE homepage_video_cards
-       SET title=$1, description=$2, emoji=$3, updated_at=NOW()
-       WHERE id=$4 RETURNING *`,
-      [title.trim(), description.trim(), (emoji || "🎬").trim(), req.params.id]
+       SET title=$1, description=$2, emoji=$3, thumbnail_url=COALESCE($4, thumbnail_url), updated_at=NOW()
+       WHERE id=$5 RETURNING *`,
+      [title.trim(), description.trim(), (emoji || "🎬").trim(), thumbnail_url || null, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// POST /api/homepage-video-cards/:id/thumbnail — upload a thumbnail image (admin)
+app.post("/api/homepage-video-cards/:id/thumbnail", adminMiddleware, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
+    const cardId = req.params.id;
+
+    // Upload image to Google Drive (reuse existing OAuth setup)
+    const isDriveConfigured = Boolean(
+      process.env.GOOGLE_DRIVE_FOLDER_ID &&
+      process.env.GOOGLE_CLIENT_ID &&
+      process.env.GOOGLE_CLIENT_SECRET &&
+      process.env.GOOGLE_REFRESH_TOKEN
+    );
+
+    let thumbnailUrl;
+    if (isDriveConfigured) {
+      // Get access token
+      const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+          grant_type: "refresh_token",
+        }),
+      });
+      const { access_token } = await tokenResp.json();
+
+      // Upload to Drive
+      const boundary = "thumbnail_boundary_" + Date.now();
+      const metadata = JSON.stringify({
+        name: `thumbnail_card_${cardId}_${Date.now()}.${req.file.originalname.split(".").pop()}`,
+        parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
+      });
+      const body = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${req.file.mimetype}\r\n\r\n`),
+        req.file.buffer,
+        Buffer.from(`\r\n--${boundary}--`),
+      ]);
+
+      const uploadResp = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+        body,
+      });
+      const uploadJson = await uploadResp.json();
+      if (!uploadJson.id) throw new Error("Error al subir imagen a Drive");
+
+      // Make public
+      await fetch(`https://www.googleapis.com/drive/v3/files/${uploadJson.id}/permissions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "reader", type: "anyone" }),
+      });
+
+      // Use proxy URL for consistency
+      thumbnailUrl = `/api/drive/image/${uploadJson.id}`;
+    } else {
+      // Fallback: store as base64 data URI (small images only)
+      thumbnailUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+    }
+
+    const r = await pool.query(
+      `UPDATE homepage_video_cards SET thumbnail_url=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
+      [thumbnailUrl, cardId]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("Thumbnail upload error:", err);
+    return res.status(500).json({ message: err.message || "Error al subir miniatura" });
+  }
+});
+
+// DELETE /api/homepage-video-cards/:id/thumbnail — remove thumbnail (admin)
+app.delete("/api/homepage-video-cards/:id/thumbnail", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE homepage_video_cards SET thumbnail_url=NULL, updated_at=NOW() WHERE id=$1 RETURNING *`,
+      [req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
     return res.json({ data: r.rows[0] });
@@ -4344,6 +4433,33 @@ app.get("/api/drive/video/:fileId", async (req, res) => {
   } catch (err) {
     console.error("Drive video proxy error:", err?.response?.data || err.message);
     if (!res.headersSent) res.status(500).json({ message: "Error al obtener video" });
+  }
+});
+
+// GET /api/drive/image/:fileId — proxy a public Google Drive image
+app.get("/api/drive/image/:fileId", async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    if (!fileId || fileId.length < 10) return res.status(400).end();
+    const accessToken = await getGoogleDriveAccessToken();
+    const metaResp = await axios.get(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,name`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const { mimeType, name } = metaResp.data;
+    const driveResp = await axios.get(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { Authorization: `Bearer ${accessToken}` }, responseType: "stream" }
+    );
+    res.set({
+      "Content-Type": mimeType || "image/jpeg",
+      "Cache-Control": "public, max-age=604800",
+      "Content-Disposition": `inline; filename="${name || "image.jpg"}"`,
+    });
+    driveResp.data.pipe(res);
+  } catch (err) {
+    console.error("Drive image proxy error:", err?.response?.data || err.message);
+    if (!res.headersSent) res.status(500).json({ message: "Error al obtener imagen" });
   }
 });
 

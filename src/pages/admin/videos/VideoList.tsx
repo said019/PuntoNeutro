@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Check, X, Upload, Trash2, Loader2, Video } from "lucide-react";
+import { Plus, Search, Pencil, Check, X, Upload, Trash2, Loader2, Video, Image } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -34,6 +34,7 @@ interface HomepageCard {
   description: string;
   emoji: string;
   video_url?: string | null;
+  thumbnail_url?: string | null;
 }
 
 /** Convert old Google Drive preview URLs to our proxy format */
@@ -53,7 +54,9 @@ const VideoList = () => {
   const [cardDraft, setCardDraft] = useState<Partial<HomepageCard>>({});
   const [uploadingCardId, setUploadingCardId] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingThumbId, setUploadingThumbId] = useState<number | null>(null);
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const thumbInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   const { data, isLoading } = useQuery<{ data: VideoItem[]; total: number }>({
     queryKey: ["videos", debouncedSearch],
@@ -167,6 +170,38 @@ const VideoList = () => {
       toast({ title: "Video eliminado de la tarjeta" });
     },
     onError: () => toast({ title: "Error al eliminar video", variant: "destructive" }),
+  });
+
+  // Upload thumbnail image for a homepage card
+  const handleThumbnailUpload = async (cardId: number, file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "La imagen es muy grande. Máximo 10 MB.", variant: "destructive" });
+      return;
+    }
+    setUploadingThumbId(cardId);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await api.post(`/homepage-video-cards/${cardId}/thumbnail`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      qc.invalidateQueries({ queryKey: ["homepage-video-cards"] });
+      toast({ title: "✅ Miniatura actualizada" });
+    } catch (err: any) {
+      toast({ title: err?.response?.data?.message || "Error al subir miniatura", variant: "destructive" });
+    } finally {
+      setUploadingThumbId(null);
+    }
+  };
+
+  // Delete thumbnail from a homepage card
+  const deleteThumbMutation = useMutation({
+    mutationFn: (cardId: number) => api.delete(`/homepage-video-cards/${cardId}/thumbnail`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["homepage-video-cards"] });
+      toast({ title: "Miniatura eliminada" });
+    },
+    onError: () => toast({ title: "Error al eliminar miniatura", variant: "destructive" }),
   });
 
   const startEdit = (card: HomepageCard) => {
@@ -304,6 +339,73 @@ const VideoList = () => {
                             <p className="text-[0.6rem] text-muted-foreground mt-1 text-center">MP4, MOV — máx 500 MB</p>
                           </div>
                         )}
+
+                        {/* Thumbnail / poster image */}
+                        <div className="space-y-2">
+                          <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wide">Miniatura / Portada</p>
+                          {card.thumbnail_url ? (
+                            <div className="space-y-1.5">
+                              <div className="rounded-lg overflow-hidden border border-border aspect-video bg-black">
+                                <img
+                                  src={card.thumbnail_url}
+                                  alt="Miniatura"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  ref={(el) => { thumbInputRefs.current[card.id] = el; }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleThumbnailUpload(card.id, file);
+                                    e.target.value = "";
+                                  }}
+                                />
+                                <Button
+                                  size="sm" variant="outline" className="flex-1 text-xs gap-1"
+                                  onClick={() => thumbInputRefs.current[card.id]?.click()}
+                                  disabled={uploadingThumbId === card.id}
+                                >
+                                  {uploadingThumbId === card.id ? <Loader2 size={11} className="animate-spin" /> : <Image size={11} />}
+                                  Cambiar
+                                </Button>
+                                <Button
+                                  size="sm" variant="destructive" className="text-xs gap-1"
+                                  onClick={() => deleteThumbMutation.mutate(card.id)}
+                                  disabled={deleteThumbMutation.isPending}
+                                >
+                                  <Trash2 size={11} />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                ref={(el) => { thumbInputRefs.current[card.id] = el; }}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleThumbnailUpload(card.id, file);
+                                  e.target.value = "";
+                                }}
+                              />
+                              <Button
+                                size="sm" variant="outline" className="w-full text-xs gap-1 border-dashed"
+                                onClick={() => thumbInputRefs.current[card.id]?.click()}
+                                disabled={uploadingThumbId === card.id}
+                              >
+                                {uploadingThumbId === card.id ? <Loader2 size={11} className="animate-spin" /> : <Image size={11} />}
+                                Subir miniatura
+                              </Button>
+                              <p className="text-[0.6rem] text-muted-foreground mt-1 text-center">JPG, PNG — máx 10 MB</p>
+                            </div>
+                          )}
+                        </div>
 
                         <Button
                           size="sm" variant="outline" className="w-full text-xs gap-1"

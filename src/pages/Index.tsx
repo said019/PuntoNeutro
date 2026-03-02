@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
@@ -99,10 +99,12 @@ const Index = () => {
   const [packages, setPackages] = useState<PackageRow[]>(FALLBACK_PACKAGES);
   const [activePkgTab, setActivePkgTab] = useState<"jumping" | "pilates" | "mixtos">("jumping");
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
+  const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
 
-  const { data: videoCardsData } = useQuery<{ data: { id: number; title: string; description: string; emoji: string; video_url?: string | null }[] }>({
+  const { data: videoCardsData } = useQuery<{ data: { id: number; title: string; description: string; emoji: string; video_url?: string | null; thumbnail_url?: string | null }[] }>({
     queryKey: ["homepage-video-cards"],
     queryFn: async () => (await api.get("/homepage-video-cards")).data,
     staleTime: 1000 * 60 * 5,
@@ -110,9 +112,9 @@ const Index = () => {
   const videoCards = videoCardsData?.data?.length
     ? videoCardsData.data
     : [
-        { id: 1, title: "Jumping Fitness", description: "Cardio de alta intensidad en trampolín con música que te hará volar.", emoji: "🏋️", video_url: null },
-        { id: 2, title: "Jumping Dance",   description: "Coreografías sobre el trampolín que combinan ritmo y diversión.",     emoji: "💃", video_url: null },
-        { id: 3, title: "Pilates Flow",    description: "Secuencias fluidas para fortalecer tu core y mejorar postura.",        emoji: "🧘", video_url: null },
+        { id: 1, title: "Jumping Fitness", description: "Cardio de alta intensidad en trampolín con música que te hará volar.", emoji: "🏋️", video_url: null, thumbnail_url: null },
+        { id: 2, title: "Jumping Dance",   description: "Coreografías sobre el trampolín que combinan ritmo y diversión.",     emoji: "💃", video_url: null, thumbnail_url: null },
+        { id: 3, title: "Pilates Flow",    description: "Secuencias fluidas para fortalecer tu core y mejorar postura.",        emoji: "🧘", video_url: null, thumbnail_url: null },
       ];
 
   useEffect(() => {
@@ -473,42 +475,102 @@ const Index = () => {
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {videoCards.map((v) => (
-              <div key={v.id} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all">
-                <div className="relative aspect-video bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center overflow-hidden">
-                  {normalizeVideoUrl(v.video_url) ? (
-                    <video
-                      src={normalizeVideoUrl(v.video_url)!}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      controls
-                      preload="metadata"
-                      playsInline
-                      title={v.title}
-                    />
-                  ) : (
-                    <>
-                      {/* decorative glow */}
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary)/0.15)_0%,transparent_65%)]" />
-                      <div className="relative flex flex-col items-center gap-3">
-                        <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_40px_hsl(var(--primary)/0.3)]">
-                          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-primary ml-1">
-                            <polygon points="5 3 19 12 5 21 5 3" />
-                          </svg>
+            {videoCards.map((v) => {
+              const videoUrl = normalizeVideoUrl(v.video_url);
+              const isPlaying = playingVideoId === v.id;
+              const hasThumbnail = Boolean(v.thumbnail_url);
+
+              const handlePlay = () => {
+                if (!videoUrl) return;
+                setPlayingVideoId(v.id);
+                // Give React a tick to render the video element, then play it
+                setTimeout(() => {
+                  const el = videoRefs.current[v.id];
+                  if (el) {
+                    el.play().catch(() => {});
+                  }
+                }, 100);
+              };
+
+              return (
+                <div key={v.id} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all">
+                  <div className="relative aspect-video bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center overflow-hidden">
+                    {/* Playing state: show native video with controls */}
+                    {videoUrl && isPlaying ? (
+                      <video
+                        ref={(el) => { videoRefs.current[v.id] = el; }}
+                        src={videoUrl}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        controls
+                        autoPlay
+                        playsInline
+                        title={v.title}
+                        onEnded={() => setPlayingVideoId(null)}
+                      />
+                    ) : videoUrl ? (
+                      /* Has video but not playing: show thumbnail or first frame with play button */
+                      <button
+                        onClick={handlePlay}
+                        className="absolute inset-0 w-full h-full cursor-pointer focus:outline-none"
+                        aria-label={`Reproducir ${v.title}`}
+                      >
+                        {hasThumbnail ? (
+                          <img
+                            src={v.thumbnail_url!}
+                            alt={v.title}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <video
+                            src={videoUrl}
+                            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                            preload="metadata"
+                            muted
+                            playsInline
+                          />
+                        )}
+                        {/* Play button overlay */}
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/20 transition-colors">
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary/80 backdrop-blur-sm border-2 border-white/30 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_40px_hsl(var(--primary)/0.4)]">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="text-white ml-1">
+                              <polygon points="5 3 19 12 5 21 5 3" />
+                            </svg>
+                          </div>
                         </div>
-                        <span className="text-[0.65rem] tracking-[0.15em] uppercase text-primary/60 font-medium">Video próximamente</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="p-5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xl">{v.emoji}</span>
-                    <h3 className="font-syne font-bold text-[1rem] text-foreground">{v.title}</h3>
+                      </button>
+                    ) : (
+                      /* No video: placeholder */
+                      <>
+                        {hasThumbnail ? (
+                          <img
+                            src={v.thumbnail_url!}
+                            alt={v.title}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary)/0.15)_0%,transparent_65%)]" />
+                        )}
+                        <div className="relative flex flex-col items-center gap-3">
+                          <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_40px_hsl(var(--primary)/0.3)]">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-primary ml-1">
+                              <polygon points="5 3 19 12 5 21 5 3" />
+                            </svg>
+                          </div>
+                          <span className="text-[0.65rem] tracking-[0.15em] uppercase text-primary/60 font-medium">Video próximamente</span>
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <p className="text-[0.82rem] text-muted-foreground leading-[1.6]">{v.description}</p>
+                  <div className="p-5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">{v.emoji}</span>
+                      <h3 className="font-syne font-bold text-[1rem] text-foreground">{v.title}</h3>
+                    </div>
+                    <p className="text-[0.82rem] text-muted-foreground leading-[1.6]">{v.description}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <p className="text-xs text-muted-foreground text-center mt-6 tracking-wide">
             LOS VIDEOS SE ACTUALIZARÁN SEMANALMENTE · SIGUE NUESTRAS REDES PARA MÁS CONTENIDO
