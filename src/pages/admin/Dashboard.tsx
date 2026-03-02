@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -7,16 +8,28 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarDays, Users, DollarSign, AlertCircle } from "lucide-react";
 
+const STATUS_LABEL: Record<string, string> = {
+  pending_payment: "Esperando pago",
+  pending_verification: "Por verificar",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+  cancelled: "Cancelada",
+  active: "Activa",
+  expired: "Expirada",
+  frozen: "Congelada",
+};
+
 interface Stats {
   classesToday: number;
   activeMembers: number;
   monthlyRevenue: number;
   pendingAlerts: number;
   recentMemberships: { id: string; userName: string; planName: string; status: string; createdAt: string }[];
-  pendingOrders: { id: string; userName: string; amount?: number; total_amount?: number; status: string }[];
+  pendingOrders: { id: string; userName: string; totalAmount?: number; total_amount?: number; amount?: number; status: string }[];
 }
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { data: stats, isLoading } = useQuery<Stats>({
     queryKey: ["admin-stats"],
     queryFn: async () => (await api.get("/admin/stats")).data,
@@ -83,7 +96,7 @@ const Dashboard = () => {
                           variant={m.status === "active" ? "default" : "secondary"}
                           className="text-xs"
                         >
-                          {m.status}
+                          {STATUS_LABEL[m.status] ?? m.status}
                         </Badge>
                       </div>
                     ))}
@@ -94,9 +107,15 @@ const Dashboard = () => {
             </Card>
 
             {/* Pending orders */}
-            <Card>
+            <Card
+              className="cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => navigate("/admin/orders")}
+            >
               <CardHeader>
-                <CardTitle className="text-base">Órdenes pendientes</CardTitle>
+                <CardTitle className="text-base flex items-center justify-between">
+                  Órdenes pendientes
+                  <span className="text-xs text-muted-foreground font-normal">Click para ver →</span>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {isLoading
@@ -105,10 +124,10 @@ const Dashboard = () => {
                       <div key={o.id} className="flex items-center justify-between text-sm">
                         <div>
                           <p className="font-medium">{o.userName}</p>
-                          <p className="text-muted-foreground text-xs">${o.total_amount ?? o.amount} MXN</p>
+                          <p className="text-muted-foreground text-xs">${Number(o.totalAmount ?? o.total_amount ?? o.amount ?? 0).toFixed(2)} MXN</p>
                         </div>
                         <Badge variant="outline" className="text-xs">
-                          {o.status}
+                          {STATUS_LABEL[o.status] ?? o.status}
                         </Badge>
                       </div>
                     ))}

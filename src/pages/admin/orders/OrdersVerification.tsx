@@ -21,6 +21,14 @@ const STATUS_BADGE: Record<string, "default" | "outline" | "destructive" | "seco
   cancelled: "secondary",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  pending_payment: "Esperando pago",
+  pending_verification: "Por verificar",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+  cancelled: "Cancelada",
+};
+
 interface Order {
   id: string;
   userName: string;
@@ -76,8 +84,8 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
               : orders.map((o) => (
                 <TableRow key={o.id}>
                   <TableCell>{o.userName ?? o.userId}</TableCell>
-                  <TableCell>${o.totalAmount} MXN</TableCell>
-                  <TableCell><Badge variant={STATUS_BADGE[o.status] ?? "outline"}>{o.status}</Badge></TableCell>
+                  <TableCell>${Number(o.totalAmount).toFixed(2)} MXN</TableCell>
+                  <TableCell><Badge variant={STATUS_BADGE[o.status] ?? "outline"}>{STATUS_LABEL[o.status] ?? o.status}</Badge></TableCell>
                   <TableCell className="text-sm">{new Date(o.createdAt).toLocaleDateString("es-MX")}</TableCell>
                   <TableCell>
                     <Button size="sm" variant="outline" onClick={() => { setSelected(o); setNotes(""); }}>
@@ -99,15 +107,24 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
               <div className="text-sm space-y-1">
                 <div><span className="font-medium">Cliente:</span> {selected.userName}</div>
                 <div><span className="font-medium">Plan:</span> {selected.planName ?? "—"}</div>
-                <div><span className="font-medium">Monto:</span> ${selected.totalAmount} MXN</div>
-                <div><span className="font-medium">Estado:</span> <Badge variant={STATUS_BADGE[selected.status] ?? "outline"}>{selected.status}</Badge></div>
+                <div><span className="font-medium">Monto:</span> ${Number(selected.totalAmount).toFixed(2)} MXN</div>
+                <div><span className="font-medium">Estado:</span> <Badge variant={STATUS_BADGE[selected.status] ?? "outline"}>{STATUS_LABEL[selected.status] ?? selected.status}</Badge></div>
               </div>
               {selected.proofUrl && (
                 <div>
                   <Label className="mb-2 block">Comprobante</Label>
                   {selected.proofUrl.endsWith(".pdf")
                     ? <a href={selected.proofUrl} target="_blank" rel="noreferrer" className="text-primary text-sm underline">Ver PDF</a>
-                    : <img src={selected.proofUrl} alt="Comprobante" className="max-h-48 rounded-lg object-contain border border-border" />
+                    : (
+                      <a href={selected.proofUrl} target="_blank" rel="noreferrer" title="Click para ver en tamaño completo">
+                        <img
+                          src={selected.proofUrl}
+                          alt="Comprobante"
+                          className="max-h-64 rounded-lg object-contain border border-border cursor-pointer hover:opacity-80 transition-opacity"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Click en la imagen para verla en tamaño completo</p>
+                      </a>
+                    )
                   }
                 </div>
               )}
