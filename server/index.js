@@ -1781,11 +1781,66 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
 
 const SITE_URL = process.env.SITE_URL || "https://ophelia-studio.com.mx";
 const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
-const GW_SA_EMAIL = process.env.GOOGLE_SA_EMAIL || "";
-const GW_SA_PRIVATE_KEY = (process.env.GOOGLE_SA_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || "Ophelia Jump Studio";
 const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || "Ophelia Club";
 const GW_HEX_BG = process.env.GOOGLE_HEX_BACKGROUND_COLOR || "#1a0b26";
+
+/**
+ * Parse the Google Service Account private key from various env var formats.
+ * Supports:
+ *  - GOOGLE_SA_KEY_JSON_BASE64: the entire service-account JSON file base64-encoded (easiest)
+ *  - GOOGLE_SA_PRIVATE_KEY: just the private key PEM (escaped \\n, raw, or base64-encoded)
+ */
+function parseGWServiceAccount() {
+  let email = process.env.GOOGLE_SA_EMAIL || "";
+  let key = "";
+
+  // Option A: whole JSON file base64-encoded (e.g. cat sa.json | base64 | pbcopy)
+  const jsonB64 = process.env.GOOGLE_SA_KEY_JSON_BASE64 || "";
+  if (jsonB64) {
+    try {
+      const decoded = Buffer.from(jsonB64, "base64").toString("utf8");
+      const sa = JSON.parse(decoded);
+      if (sa.private_key) key = sa.private_key;
+      if (sa.client_email && !email) email = sa.client_email;
+    } catch (e) {
+      console.error("Failed to parse GOOGLE_SA_KEY_JSON_BASE64:", e.message);
+    }
+  }
+
+  // Option B: separate GOOGLE_SA_PRIVATE_KEY env var
+  if (!key) {
+    let raw = process.env.GOOGLE_SA_PRIVATE_KEY || "";
+    if (raw) {
+      // If the whole thing is base64 (no -----BEGIN), decode it
+      if (!raw.includes("-----BEGIN") && !raw.includes("\\n")) {
+        try {
+          const decoded = Buffer.from(raw, "base64").toString("utf8");
+          if (decoded.includes("-----BEGIN")) raw = decoded;
+        } catch (_) { /* not base64, continue */ }
+      }
+      // If it's a JSON string (starts with "), parse it
+      if (raw.startsWith('"') && raw.endsWith('"')) {
+        try { raw = JSON.parse(raw); } catch (_) {}
+      }
+      // Replace literal \\n with real newlines
+      raw = raw.replace(/\\n/g, "\n");
+      // If still no newlines after BEGIN header, insert them
+      if (raw.includes("-----BEGIN") && !raw.includes("\n-----END")) {
+        raw = raw
+          .replace(/(-----BEGIN[^-]+-----)(\S)/, "$1\n$2")
+          .replace(/(\S)(-----END[^-]+-----)/, "$1\n$2");
+      }
+      key = raw.trim();
+    }
+  }
+
+  return { email, key };
+}
+
+const { email: _gwEmail, key: _gwKey } = parseGWServiceAccount();
+const GW_SA_EMAIL = _gwEmail;
+const GW_SA_PRIVATE_KEY = _gwKey;
 const GW_CLASS_ID = GW_ISSUER_ID ? `${GW_ISSUER_ID}.ophelia_loyalty_v1` : "";
 
 function isGoogleWalletConfigured() {
@@ -2119,9 +2174,13 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
 
 // GET /api/wallet/google/diagnostics — check env config
 app.get("/api/wallet/google/diagnostics", async (_req, res) => {
+  const rawKey = process.env.GOOGLE_SA_PRIVATE_KEY || "";
   const keyPreview = GW_SA_PRIVATE_KEY
-    ? `${GW_SA_PRIVATE_KEY.substring(0, 30)}...length=${GW_SA_PRIVATE_KEY.length}, hasNewlines=${GW_SA_PRIVATE_KEY.includes("\n")}, startsWith=${GW_SA_PRIVATE_KEY.substring(0, 27)}`
+    ? `parsed_length=${GW_SA_PRIVATE_KEY.length}, hasNewlines=${GW_SA_PRIVATE_KEY.includes("\n")}, begins=${GW_SA_PRIVATE_KEY.substring(0, 32)}…`
     : "❌ missing";
+  const rawKeyPreview = rawKey
+    ? `raw_length=${rawKey.length}, hasBeginMarker=${rawKey.includes("-----BEGIN")}, hasLiteralBackslashN=${rawKey.includes("\\n")}`
+    : "❌ env var not set";
 
   // Test JWT signing
   let jwtSignTest = "not tested";
@@ -2150,6 +2209,7 @@ app.get("/api/wallet/google/diagnostics", async (_req, res) => {
     issuerId: GW_ISSUER_ID ? `✅ ${GW_ISSUER_ID}` : "❌ missing",
     saEmail: GW_SA_EMAIL ? `✅ ${GW_SA_EMAIL}` : "❌ missing",
     saPrivateKey: keyPreview,
+    rawKeyInfo: rawKeyPreview,
     classId: GW_CLASS_ID || "N/A",
     issuerName: GW_ISSUER_NAME,
     programName: GW_PROGRAM_NAME,
@@ -2173,6 +2233,11 @@ const APPLE_CERT_PASSWORD = process.env.APPLE_CERT_PASSWORD || "";
 
 function isAppleWalletConfigured() {
   return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_SIGNER_CERT_BASE64 && APPLE_SIGNER_KEY_BASE64 && APPLE_WWDR_CERT_BASE64);
+}
+
+/** Check if we can at least generate a web pass (always true — no certs needed) */
+function isAppleWebPassAvailable() {
+  return true;
 }
 
 /**
@@ -2369,13 +2434,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 
 // ── Apple Wallet endpoints ─────────────────────────────────────────────────
 
-// GET /api/wallet/apple/pkpass — generate and download .pkpass for logged-in user
+// GET /api/wallet/apple/pkpass — generate and download .pkpass (or web pass fallback)
 app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
-  if (!isAppleWalletConfigured()) {
-    return res.status(503).json({ message: "Apple Wallet no configurado — se necesitan certificados de Apple Developer" });
-  }
   try {
-    // Get user info (same queries as Google Wallet)
+    // Get user info
     const userRes = await pool.query("SELECT id, name, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
     if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
     const user = userRes.rows[0];
@@ -2428,11 +2490,36 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
     } catch (e) { console.error("Apple Wallet: booking query error:", e.message); }
 
     const qrCode = Buffer.from(req.userId).toString("base64");
-    const pkpassBuffer = await generateApplePkpass({ userId: req.userId, userName, points, qrCode, membership, nextBooking });
 
-    res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-    res.setHeader("Content-Disposition", `attachment; filename=ophelia-pass.pkpass`);
-    return res.send(pkpassBuffer);
+    // If Apple Developer certs are configured, generate real .pkpass
+    if (isAppleWalletConfigured()) {
+      const pkpassBuffer = await generateApplePkpass({ userId: req.userId, userName, points, qrCode, membership, nextBooking });
+      res.setHeader("Content-Type", "application/vnd.apple.pkpass");
+      res.setHeader("Content-Disposition", `attachment; filename=ophelia-pass.pkpass`);
+      return res.send(pkpassBuffer);
+    }
+
+    // Fallback: return JSON data for the frontend to render as a web pass
+    return res.json({
+      webPass: true,
+      data: {
+        userName,
+        points,
+        qrCode,
+        membership: membership ? {
+          plan_name: membership.plan_name,
+          class_limit: membership.class_limit,
+          classes_remaining: membership.classes_remaining,
+          end_date: membership.end_date,
+        } : null,
+        nextBooking: nextBooking ? {
+          class_name: nextBooking.class_name,
+          instructor_name: nextBooking.instructor_name,
+          date: nextBooking.date,
+          start_time: nextBooking.start_time,
+        } : null,
+      },
+    });
   } catch (err) {
     console.error("Apple Wallet pkpass error:", err.message);
     return res.status(500).json({ message: "Error generando pase de Apple Wallet" });
@@ -2442,13 +2529,13 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
 // GET /api/wallet/apple/status — check Apple Wallet config
 app.get("/api/wallet/apple/status", async (_req, res) => {
   return res.json({
-    configured: isAppleWalletConfigured(),
-    teamId: APPLE_TEAM_ID ? "✅ set" : "❌ missing",
-    passTypeId: APPLE_PASS_TYPE_ID || "N/A",
-    signerCert: APPLE_SIGNER_CERT_BASE64 ? "✅ set" : "❌ missing",
-    signerKey: APPLE_SIGNER_KEY_BASE64 ? "✅ set" : "❌ missing",
-    wwdrCert: APPLE_WWDR_CERT_BASE64 ? "✅ set" : "❌ missing",
-    authToken: APPLE_AUTH_TOKEN ? "✅ set" : "❌ missing",
+    configured: true, // Always true — we have web pass fallback even without Apple certs
+    nativePkpass: isAppleWalletConfigured(),
+    teamId: APPLE_TEAM_ID ? "✅ set" : "❌ (web pass mode)",
+    passTypeId: APPLE_PASS_TYPE_ID || "N/A (web pass mode)",
+    signerCert: APPLE_SIGNER_CERT_BASE64 ? "✅ set" : "❌ (web pass mode)",
+    signerKey: APPLE_SIGNER_KEY_BASE64 ? "✅ set" : "❌ (web pass mode)",
+    wwdrCert: APPLE_WWDR_CERT_BASE64 ? "✅ set" : "❌ (web pass mode)",
   });
 });
 
