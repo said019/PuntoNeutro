@@ -1738,6 +1738,40 @@ async function ensureGoogleWalletClass() {
       reviewStatus: "UNDER_REVIEW",
       countryCode: "MX",
       multipleDevicesAndHoldersAllowedStatus: "MULTIPLE_HOLDERS",
+      localizedIssuerName: { defaultValue: { language: "es", value: GW_ISSUER_NAME } },
+      localizedProgramName: { defaultValue: { language: "es", value: GW_PROGRAM_NAME } },
+      // Welcome message when user first saves the pass
+      discoverableProgram: {
+        merchantSignupInfo: {
+          signupWebsite: { uri: SITE_URL },
+          signupSharedDatas: ["FIRST_NAME", "LAST_NAME", "EMAIL"],
+        },
+        state: "TRUSTED_TESTERS",
+      },
+      // Additional info shown on the back of the pass
+      textModulesData: [
+        {
+          id: "studio_info",
+          header: "OPHELIA JUMP STUDIO",
+          body: "Tu estudio de Jumping Fitness y Pilates favorito 🩷 Clases grupales con la mejor energía.",
+        },
+        {
+          id: "horario",
+          header: "HORARIO",
+          body: "Lunes a Viernes 6:00 – 20:00 • Sábado 8:00 – 13:00",
+        },
+        {
+          id: "contacto",
+          header: "CONTACTO",
+          body: "📍 ophelia-studio.com.mx",
+        },
+      ],
+      linksModuleData: {
+        uris: [
+          { uri: SITE_URL, description: "Sitio Web", id: "website" },
+          { uri: `${SITE_URL}/app/bookings`, description: "Reservar Clase", id: "reservar" },
+        ],
+      },
     };
     // Try to GET the class first
     try {
@@ -1765,9 +1799,108 @@ async function ensureGoogleWalletClass() {
   }
 }
 
-/** Build a Google Wallet Save URL (JWT) for a user */
-function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode }) {
+/** Build a Google Wallet Save URL (JWT) for a user
+ *  @param {Object} opts
+ *  @param {string} opts.userId
+ *  @param {string} opts.userName
+ *  @param {number} opts.points
+ *  @param {string} opts.qrCode
+ *  @param {Object|null} opts.membership  - { plan_name, class_limit, classes_remaining, end_date, start_date }
+ *  @param {Object|null} opts.nextBooking - { class_name, instructor_name, date, start_time }
+ */
+function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking }) {
   const objectId = `${GW_ISSUER_ID}.ophelia_${userId.replace(/-/g, "")}`;
+
+  // ── Determine pass type and details based on membership ──────────────────
+  const hasMembership = !!membership;
+  const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
+  const isPackage = hasMembership && !isUnlimited && membership.class_limit > 1;
+  const isSingleClass = hasMembership && !isUnlimited && membership.class_limit === 1;
+
+  // Header label
+  let passHeader = "OPHELIA CLUB";
+  if (hasMembership) {
+    if (isUnlimited) passHeader = "MEMBRESÍA";
+    else if (isPackage) passHeader = "PAQUETE";
+    else if (isSingleClass) passHeader = "CLASE INDIVIDUAL";
+  }
+
+  // ── Build textModulesData rows ───────────────────────────────────────────
+  const textModules = [];
+
+  // Row 1: Plan Name
+  if (hasMembership) {
+    textModules.push({
+      id: "plan",
+      header: passHeader,
+      body: membership.plan_name || "Plan Activo",
+    });
+  } else {
+    textModules.push({
+      id: "plan",
+      header: "ESTADO",
+      body: "Sin membresía activa",
+    });
+  }
+
+  // Row 2: Vigencia (valid until)
+  if (hasMembership && membership.end_date) {
+    const endDate = new Date(membership.end_date);
+    const now = new Date();
+    const daysLeft = Math.max(0, Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)));
+    const endFormatted = endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+    textModules.push({
+      id: "vigencia",
+      header: "VIGENTE HASTA",
+      body: `${endFormatted} (${daysLeft} días restantes)`,
+    });
+  }
+
+  // Row 3: Classes info
+  if (hasMembership) {
+    if (isUnlimited) {
+      textModules.push({
+        id: "clases",
+        header: "CLASES",
+        body: "♾️ Ilimitadas",
+      });
+    } else if (membership.class_limit) {
+      const used = Math.max(0, (membership.class_limit || 0) - (membership.classes_remaining || 0));
+      textModules.push({
+        id: "clases",
+        header: "CLASES DISPONIBLES",
+        body: `${membership.classes_remaining ?? 0} de ${membership.class_limit} restantes (${used} usadas)`,
+      });
+    }
+  }
+
+  // Row 4: Next class
+  if (nextBooking) {
+    const bookingDate = new Date(nextBooking.date);
+    const dateStr = bookingDate.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+    const timeStr = nextBooking.start_time ? String(nextBooking.start_time).substring(0, 5) : "";
+    textModules.push({
+      id: "next_class",
+      header: "PRÓXIMA CLASE",
+      body: `${nextBooking.class_name || "Clase"} — ${dateStr} ${timeStr}`,
+    });
+    if (nextBooking.instructor_name) {
+      textModules.push({
+        id: "instructor",
+        header: "INSTRUCTORA",
+        body: nextBooking.instructor_name,
+      });
+    }
+  }
+
+  // Row 5: Points
+  textModules.push({
+    id: "puntos",
+    header: "PUNTOS OPHELIA CLUB",
+    body: `${points.toLocaleString("es-MX")} pts`,
+  });
+
+  // ── Build loyaltyObject ──────────────────────────────────────────────────
   const loyaltyObject = {
     id: objectId,
     classId: GW_CLASS_ID,
@@ -1775,20 +1908,45 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode }) {
     accountId: userId,
     accountName: userName,
     hexBackgroundColor: GW_HEX_BG,
-    barcode: { type: "QR_CODE", value: qrCode },
+    barcode: {
+      type: "QR_CODE",
+      value: qrCode,
+      alternateText: "Escanea en recepción",
+    },
     loyaltyPoints: {
       balance: { int: points },
       label: "PUNTOS",
     },
-    textModulesData: [
-      { id: "studio", header: "ESTUDIO", body: "Ophelia Jump Studio" },
-    ],
+    header: {
+      defaultValue: { language: "es", value: passHeader },
+    },
+    textModulesData: textModules,
     linksModuleData: {
       uris: [
         { uri: `${SITE_URL}/app/wallet`, description: "Mi Wallet", id: "wallet_link" },
+        { uri: `${SITE_URL}/app/bookings`, description: "Reservar Clase", id: "book_link" },
+      ],
+    },
+    infoModuleData: {
+      showLastUpdateTime: true,
+      labelValueRows: hasMembership ? [
+        {
+          columns: [
+            { label: "Miembro", value: userName },
+            { label: "Plan", value: membership.plan_name || "—" },
+          ],
+        },
+      ] : [
+        {
+          columns: [
+            { label: "Miembro", value: userName },
+            { label: "Puntos", value: String(points) },
+          ],
+        },
       ],
     },
   };
+
   const payload = {
     iss: GW_SA_EMAIL,
     aud: "google",
@@ -1811,21 +1969,78 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
   }
   try {
     // Get user info
-    const userRes = await pool.query("SELECT id, name, email FROM users WHERE id = $1", [req.userId]);
+    const userRes = await pool.query("SELECT id, name, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
     if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
     const user = userRes.rows[0];
+    const userName = user.full_name || user.display_name || user.name || user.email;
+
     // Get points
     const pointsRes = await pool.query(
       "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
       [req.userId]
     );
     const points = parseInt(pointsRes.rows[0].total);
+
+    // Get active membership with plan info
+    let membership = null;
+    try {
+      const memRes = await pool.query(
+        `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.end_date,
+                m.plan_name_override, m.class_limit_override,
+                p.name AS plan_name, p.class_limit AS plan_class_limit, p.duration_days
+         FROM memberships m
+         LEFT JOIN plans p ON m.plan_id = p.id
+         WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
+         ORDER BY m.end_date DESC
+         LIMIT 1`,
+        [req.userId]
+      );
+      if (memRes.rows.length > 0) {
+        const m = memRes.rows[0];
+        membership = {
+          plan_name: m.plan_name_override || m.plan_name || "Plan Activo",
+          class_limit: m.class_limit_override ?? m.plan_class_limit,
+          classes_remaining: m.classes_remaining,
+          start_date: m.start_date,
+          end_date: m.end_date,
+        };
+      }
+    } catch (memErr) {
+      console.error("Wallet: membership query error:", memErr.message);
+    }
+
+    // Get next confirmed booking
+    let nextBooking = null;
+    try {
+      const bookRes = await pool.query(
+        `SELECT c.date, c.start_time, ct.name AS class_name,
+                COALESCE(i.display_name, i.full_name) AS instructor_name
+         FROM bookings b
+         JOIN classes c ON b.class_id = c.id
+         JOIN class_types ct ON c.class_type_id = ct.id
+         LEFT JOIN instructors i ON c.instructor_id = i.id
+         WHERE b.user_id = $1
+           AND b.status IN ('confirmed', 'waitlist')
+           AND c.date >= CURRENT_DATE
+         ORDER BY c.date ASC, c.start_time ASC
+         LIMIT 1`,
+        [req.userId]
+      );
+      if (bookRes.rows.length > 0) {
+        nextBooking = bookRes.rows[0];
+      }
+    } catch (bookErr) {
+      console.error("Wallet: booking query error:", bookErr.message);
+    }
+
     const qrCode = Buffer.from(req.userId).toString("base64");
     const saveUrl = buildGoogleWalletSaveUrl({
       userId: req.userId,
-      userName: user.name || user.email,
+      userName,
       points,
       qrCode,
+      membership,
+      nextBooking,
     });
     return res.json({ data: { saveUrl } });
   } catch (err) {
