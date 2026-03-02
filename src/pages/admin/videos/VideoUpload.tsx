@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, Video, Image, CheckCircle2, ExternalLink } from "lucide-react";
+import { Loader2, Upload, Video, Image, CheckCircle2 } from "lucide-react";
 
 const videoSchema = z.object({
   title: z.string().min(1, "Título requerido"),
@@ -95,7 +95,7 @@ const VideoUpload = () => {
   // Pre-fill embed URL when editing
   const existingDriveId = existing?.drive_file_id;
   if (existingDriveId && !uploadedEmbedUrl) {
-    setUploadedEmbedUrl(`https://drive.google.com/file/d/${existingDriveId}/preview`);
+    setUploadedEmbedUrl(`/api/drive/video/${existingDriveId}`);
   }
 
   const createMutation = useMutation({
@@ -210,7 +210,7 @@ const VideoUpload = () => {
       form.setValue("cloudinary_id", driveFileId);
       form.setValue("thumbnail_url", thumbnailUrl);
       form.setValue("thumbnail_drive_id", thumbnailDriveId);
-      setUploadedEmbedUrl(`https://drive.google.com/file/d/${driveFileId}/preview`);
+      setUploadedEmbedUrl(`/api/drive/video/${driveFileId}`);
       toast({ title: "✅ Video subido a Google Drive" });
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || "Error al subir video";
@@ -292,16 +292,13 @@ const VideoUpload = () => {
               {uploadedEmbedUrl && !isUploading && (
                 <div className="space-y-2">
                   <p className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle2 size={13} /> Video en Google Drive</p>
-                  <iframe
+                  <video
                     src={uploadedEmbedUrl}
-                    className="w-full rounded-lg border aspect-video"
-                    allow="autoplay"
-                    title="Preview"
+                    className="w-full rounded-lg border aspect-video bg-black"
+                    controls
+                    preload="metadata"
+                    playsInline
                   />
-                  <a href={uploadedEmbedUrl.replace("/preview", "/view")} target="_blank" rel="noreferrer"
-                    className="text-xs text-primary flex items-center gap-1 hover:underline">
-                    <ExternalLink size={12} /> Abrir en Drive
-                  </a>
                 </div>
               )}
 

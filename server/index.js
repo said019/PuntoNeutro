@@ -2620,10 +2620,17 @@ app.get("/api/videos", authMiddleware, async (req, res) => {
       [req.userId]
     );
     const hasMembership = memRes.rows.length > 0;
-    const rows = r.rows.map(v => ({
-      ...v,
-      has_access: v.access_type === "free" || v.access_type === "gratuito" || hasMembership,
-    }));
+    const rows = r.rows.map(v => {
+      // Derive video_url from drive_file_id (proxy) if available
+      let videoUrl = v.video_url;
+      if (v.drive_file_id) {
+        videoUrl = `/api/drive/video/${v.drive_file_id}`;
+      } else if (videoUrl) {
+        const m = videoUrl.match(/drive\.google\.com\/file\/d\/([^/]+)\/preview/);
+        if (m) videoUrl = `/api/drive/video/${m[1]}`;
+      }
+      return { ...v, video_url: videoUrl, has_access: v.access_type === "free" || v.access_type === "gratuito" || hasMembership };
+    });
     return res.json({ data: rows });
   } catch (err) {
     console.error("Videos error:", err);
@@ -2646,6 +2653,13 @@ app.get("/api/videos/:id", authMiddleware, async (req, res) => {
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "Video no encontrado" });
     const video = r.rows[0];
+    // Derive video_url from drive_file_id (proxy) if available
+    if (video.drive_file_id) {
+      video.video_url = `/api/drive/video/${video.drive_file_id}`;
+    } else if (video.video_url) {
+      const m = video.video_url.match(/drive\.google\.com\/file\/d\/([^\/]+)\/preview/);
+      if (m) video.video_url = `/api/drive/video/${m[1]}`;
+    }
     const memRes = await pool.query(
       "SELECT id FROM memberships WHERE user_id = $1 AND status = 'active' LIMIT 1",
       [req.userId]
@@ -4043,7 +4057,15 @@ app.delete("/api/videos/:id", adminMiddleware, async (req, res) => {
 app.get("/api/homepage-video-cards", async (req, res) => {
   try {
     const r = await pool.query("SELECT * FROM homepage_video_cards ORDER BY sort_order ASC");
-    return res.json({ data: r.rows });
+    // Normalize any old Google Drive preview URLs to proxy URLs
+    const rows = r.rows.map(card => {
+      if (card.video_url) {
+        const m = card.video_url.match(/drive\.google\.com\/file\/d\/([^/]+)\/preview/);
+        if (m) card.video_url = `/api/drive/video/${m[1]}`;
+      }
+      return card;
+    });
+    return res.json({ data: rows });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
@@ -4179,13 +4201,73 @@ app.post("/api/drive/make-public/:fileId", adminMiddleware, async (req, res) => 
   }
 });
 
+// GET /api/drive/video/:fileId — stream a public Google Drive video (proxy)
+app.get("/api/drive/video/:fileId", async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    if (!fileId || fileId.length < 10) return res.status(400).end();
+
+    const accessToken = await getGoogleDriveAccessToken();
+
+    // First, get file metadata to know the mimeType & size
+    const metaResp = await axios.get(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,size,name`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const { mimeType, size, name } = metaResp.data;
+    const totalSize = parseInt(size, 10);
+
+    // Support Range requests for seeking
+    const rangeHeader = req.headers.range;
+    let start = 0;
+    let end = totalSize - 1;
+
+    if (rangeHeader) {
+      const parts = rangeHeader.replace(/bytes=/, "").split("-");
+      start = parseInt(parts[0], 10);
+      end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+      if (start >= totalSize || end >= totalSize) {
+        res.writeHead(416, { "Content-Range": `bytes */${totalSize}` });
+        return res.end();
+      }
+    }
+
+    const chunkSize = end - start + 1;
+    const driveHeaders = {
+      Authorization: `Bearer ${accessToken}`,
+      Range: `bytes=${start}-${end}`,
+    };
+
+    const driveResp = await axios.get(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: driveHeaders, responseType: "stream" }
+    );
+
+    const statusCode = rangeHeader ? 206 : 200;
+    res.writeHead(statusCode, {
+      "Content-Type": mimeType || "video/mp4",
+      "Content-Length": chunkSize,
+      "Content-Range": `bytes ${start}-${end}/${totalSize}`,
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "public, max-age=86400",
+      "Content-Disposition": `inline; filename="${name || "video.mp4"}"`,
+    });
+
+    driveResp.data.pipe(res);
+  } catch (err) {
+    console.error("Drive video proxy error:", err?.response?.data || err.message);
+    if (!res.headersSent) res.status(500).json({ message: "Error al obtener video" });
+  }
+});
+
 // POST /api/homepage-video-cards/:id/set-drive-video — save Drive file ID to card
 app.post("/api/homepage-video-cards/:id/set-drive-video", adminMiddleware, async (req, res) => {
   try {
     const { driveFileId } = req.body;
     if (!driveFileId) return res.status(400).json({ message: "driveFileId requerido" });
 
-    const videoUrl = `https://drive.google.com/file/d/${driveFileId}/preview`;
+    // Store the proxy URL instead of the Google Drive preview URL
+    const videoUrl = `/api/drive/video/${driveFileId}`;
     const r = await pool.query(
       `UPDATE homepage_video_cards SET video_url=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
       [videoUrl, req.params.id]
@@ -4194,6 +4276,23 @@ app.post("/api/homepage-video-cards/:id/set-drive-video", adminMiddleware, async
     return res.json({ data: r.rows[0] });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/homepage-video-cards/migrate-urls — convert old Google Drive preview URLs to proxy URLs
+app.post("/api/homepage-video-cards/migrate-urls", adminMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE homepage_video_cards
+       SET video_url = '/api/drive/video/' || regexp_replace(video_url, '^https://drive\\.google\\.com/file/d/([^/]+)/preview$', '\\1'),
+           updated_at = NOW()
+       WHERE video_url LIKE 'https://drive.google.com/file/d/%/preview'
+       RETURNING id, video_url`
+    );
+    return res.json({ migrated: result.rowCount, rows: result.rows });
+  } catch (err) {
+    console.error("Migration error:", err.message);
+    return res.status(500).json({ message: "Error al migrar URLs" });
   }
 });
 
@@ -4233,7 +4332,7 @@ app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, (req, res, nex
       // Clean up temp file
       fs.unlink(videoFile.path, () => {});
       await makeGoogleDriveFilePublic(result.id, accessToken);
-      videoUrl = `https://drive.google.com/file/d/${result.id}/preview`;
+      videoUrl = `/api/drive/video/${result.id}`;
     } else {
       if (videoFile.path) fs.unlink(videoFile.path, () => {});
       return res.status(503).json({

@@ -82,6 +82,17 @@ const TESTIMONIOS = [
   { name: "Fernanda T.", stars: 5, text: "Las instructoras son excelentes, siempre atentas a la tecnica. Me encanta que hay clases para todos los niveles. Ophelia es mi lugar favorito.", avatar: "FT" },
 ];
 
+/** Convert old Google Drive preview URLs to our proxy format */
+function normalizeVideoUrl(url?: string | null): string | null {
+  if (!url) return null;
+  // Already using proxy format
+  if (url.startsWith("/api/drive/video/")) return url;
+  // Old format: https://drive.google.com/file/d/FILE_ID/preview
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)\/preview/);
+  if (m) return `/api/drive/video/${m[1]}`;
+  return url;
+}
+
 const Index = () => {
   const [navScrolled, setNavScrolled] = useState(false);
   const [classTypes, setClassTypes] = useState<ClassTypeRow[]>(FALLBACK_CLASS_TYPES);
@@ -465,12 +476,13 @@ const Index = () => {
             {videoCards.map((v) => (
               <div key={v.id} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all">
                 <div className="relative aspect-video bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center overflow-hidden">
-                  {v.video_url ? (
-                    <iframe
-                      src={v.video_url}
-                      className="absolute inset-0 w-full h-full"
-                      allow="autoplay; encrypted-media"
-                      allowFullScreen
+                  {normalizeVideoUrl(v.video_url) ? (
+                    <video
+                      src={normalizeVideoUrl(v.video_url)!}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      controls
+                      preload="metadata"
+                      playsInline
                       title={v.title}
                     />
                   ) : (

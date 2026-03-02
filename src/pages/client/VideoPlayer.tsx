@@ -54,10 +54,15 @@ const VideoEmbed = ({ url }: { url: string }) => {
       </div>
     );
   }
+  // Normalize old Google Drive preview URLs to proxy
+  let videoSrc = url;
+  const m = url?.match(/drive\.google\.com\/file\/d\/([^/]+)\/preview/);
+  if (m) videoSrc = `/api/drive/video/${m[1]}`;
   return (
     <video
-      src={url}
+      src={videoSrc}
       controls
+      playsInline
       className="w-full rounded-xl aspect-video bg-black"
     />
   );

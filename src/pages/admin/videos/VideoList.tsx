@@ -36,6 +36,15 @@ interface HomepageCard {
   video_url?: string | null;
 }
 
+/** Convert old Google Drive preview URLs to our proxy format */
+function normalizeVideoUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("/api/drive/video/")) return url;
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)\/preview/);
+  if (m) return `/api/drive/video/${m[1]}`;
+  return url;
+}
+
 const VideoList = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -241,7 +250,7 @@ const VideoList = () => {
                         <p className="text-xs text-muted-foreground leading-relaxed">{card.description}</p>
 
                         {/* Video status */}
-                        {card.video_url ? (
+                        {normalizeVideoUrl(card.video_url) ? (
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
                               <Badge variant="default" className="text-[0.6rem] bg-green-600">
@@ -249,11 +258,12 @@ const VideoList = () => {
                               </Badge>
                             </div>
                             <div className="rounded-lg overflow-hidden border border-border aspect-video bg-black">
-                              <iframe
-                                src={card.video_url}
-                                className="w-full h-full"
-                                allow="autoplay"
-                                allowFullScreen
+                              <video
+                                src={normalizeVideoUrl(card.video_url)!}
+                                className="w-full h-full object-cover"
+                                controls
+                                preload="metadata"
+                                playsInline
                               />
                             </div>
                             <Button
