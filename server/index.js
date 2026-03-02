@@ -1317,10 +1317,10 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
 
     // ── Email: booking confirmed / waitlist ────────────────────────────────
     try {
-      const userRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+      const userRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [req.userId]);
       const classFullRes = await pool.query(
         `SELECT c.date, c.start_time, ct.name AS class_type_name,
-                COALESCE(i.full_name, i.display_name) AS instructor_name
+                i.display_name AS instructor_name
          FROM classes c
          JOIN class_types ct ON c.class_type_id = ct.id
          LEFT JOIN instructors i ON c.instructor_id = i.id
@@ -1336,7 +1336,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
         const cl = classFullRes.rows[0];
         sendBookingConfirmed({
           to: u.email,
-          name: u.full_name || u.display_name || "Alumna",
+          name: u.display_name || "Alumna",
           className: cl.class_type_name,
           date: cl.date,
           startTime: cl.start_time,
@@ -1434,13 +1434,13 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
           // Late cancellation: credit is LOST — do not restore
           // Email: cancelled, no credit restored
           try {
-            const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+            const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [req.userId]);
             const memAfter = await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id]);
             if (uRes.rows[0]) {
               const u = uRes.rows[0];
               sendBookingCancelled({
                 to: u.email,
-                name: u.full_name || u.display_name || "Alumna",
+                name: u.display_name || "Alumna",
                 className: booking.class_type_name || "tu clase",
                 date: booking.date,
                 startTime: booking.start_time,
@@ -1470,7 +1470,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
 
     // ── Email: booking cancelled ───────────────────────────────────────────
     try {
-      const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+      const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [req.userId]);
       const memAfter = membership
         ? await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id])
         : null;
@@ -1478,7 +1478,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
         const u = uRes.rows[0];
         sendBookingCancelled({
           to: u.email,
-          name: u.full_name || u.display_name || "Alumna",
+          name: u.display_name || "Alumna",
           className: booking.class_type_name || "tu clase",
           date: booking.date,
           startTime: booking.start_time,
@@ -2146,10 +2146,10 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
     }
 
     // Get user info
-    const userRes = await pool.query("SELECT id, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+    const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1", [req.userId]);
     if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
     const user = userRes.rows[0];
-    const userName = user.full_name || user.display_name || user.email;
+    const userName = user.display_name || user.email;
 
     // Get points
     const pointsRes = await pool.query(
@@ -2191,7 +2191,7 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
     try {
       const bookRes = await pool.query(
         `SELECT c.date, c.start_time, ct.name AS class_name,
-                COALESCE(i.display_name, i.full_name) AS instructor_name
+                i.display_name AS instructor_name
          FROM bookings b
          JOIN classes c ON b.class_id = c.id
          JOIN class_types ct ON c.class_type_id = ct.id
@@ -2492,10 +2492,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
   try {
     // Get user info
-    const userRes = await pool.query("SELECT id, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+    const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1", [req.userId]);
     if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
     const user = userRes.rows[0];
-    const userName = user.full_name || user.display_name || user.email;
+    const userName = user.display_name || user.email;
 
     const pointsRes = await pool.query(
       "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
@@ -2531,7 +2531,7 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
     try {
       const bookRes = await pool.query(
         `SELECT c.date, c.start_time, ct.name AS class_name,
-                COALESCE(i.display_name, i.full_name) AS instructor_name
+                i.display_name AS instructor_name
          FROM bookings b
          JOIN classes c ON b.class_id = c.id
          JOIN class_types ct ON c.class_type_id = ct.id
@@ -2703,10 +2703,10 @@ app.get("/api/wallet/v1/passes/:passTypeId/:serial", async (req, res) => {
   // serial = ophelia_<userId without dashes>
   const userId = serial.replace("ophelia_", "").replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, "$1-$2-$3-$4-$5");
   try {
-    const userRes = await pool.query("SELECT id, email, full_name, display_name FROM users WHERE id = $1", [userId]);
+    const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1", [userId]);
     if (userRes.rows.length === 0) return res.status(404).send();
     const user = userRes.rows[0];
-    const userName = user.full_name || user.display_name || user.email;
+    const userName = user.display_name || user.email;
     const pointsRes = await pool.query(
       "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
       [userId]
@@ -2728,7 +2728,7 @@ app.get("/api/wallet/v1/passes/:passTypeId/:serial", async (req, res) => {
     let nextBooking = null;
     try {
       const bookRes = await pool.query(
-        `SELECT c.date, c.start_time, ct.name AS class_name, COALESCE(i.display_name, i.full_name) AS instructor_name
+        `SELECT c.date, c.start_time, ct.name AS class_name, i.display_name AS instructor_name
          FROM bookings b JOIN classes c ON b.class_id = c.id JOIN class_types ct ON c.class_type_id = ct.id LEFT JOIN instructors i ON c.instructor_id = i.id
          WHERE b.user_id = $1 AND b.status IN ('confirmed','waitlist') AND c.date >= CURRENT_DATE
          ORDER BY c.date ASC, c.start_time ASC LIMIT 1`, [userId]);
@@ -4817,12 +4817,12 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
 
     // ── Email: membership activated ──────────────────────────────────────
     try {
-      const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [userId]);
+      const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [userId]);
       if (uRes.rows[0]) {
         const u = uRes.rows[0];
         sendMembershipActivated({
           to: u.email,
-          name: u.full_name || u.display_name || "Alumna",
+          name: u.display_name || "Alumna",
           planName: plan.name,
           startDate: start.toISOString(),
           endDate: end.toISOString(),
@@ -4854,12 +4854,12 @@ app.put("/api/memberships/:id/activate", adminMiddleware, async (req, res) => {
 
     // ── Email: membership activated ──────────────────────────────────────
     try {
-      const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [mem.user_id]);
+      const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [mem.user_id]);
       if (uRes.rows[0]) {
         const u = uRes.rows[0];
         sendMembershipActivated({
           to: u.email,
-          name: u.full_name || u.display_name || "Alumna",
+          name: u.display_name || "Alumna",
           planName: mem.plan_name || mem.plan_name_override || "Tu membresía",
           startDate: mem.start_date,
           endDate: mem.end_date,
@@ -5222,12 +5222,12 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
         // Email: membership activated
         if (order.user_id) {
           try {
-            const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [order.user_id]);
+            const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [order.user_id]);
             if (uRes.rows[0]) {
               const u = uRes.rows[0];
               sendMembershipActivated({
                 to: u.email,
-                name: u.full_name || u.display_name || "Alumna",
+                name: u.display_name || "Alumna",
                 planName: plan.name,
                 startDate: new Date().toISOString(),
                 endDate: end.toISOString(),
@@ -6367,7 +6367,7 @@ app.get("*", (_req, res) => {
 async function runWeeklyReminderCron() {
   try {
     const res = await pool.query(`
-      SELECT u.email, COALESCE(u.full_name, u.display_name, 'Alumna') AS name,
+      SELECT u.email, COALESCE(u.display_name, 'Alumna') AS name,
              m.classes_remaining, m.end_date
       FROM memberships m
       JOIN users u ON m.user_id = u.id
@@ -6397,7 +6397,7 @@ async function runWeeklyReminderCron() {
 async function runRenewalReminderCron() {
   try {
     const res = await pool.query(`
-      SELECT u.email, COALESCE(u.full_name, u.display_name, 'Alumna') AS name,
+      SELECT u.email, COALESCE(u.display_name, 'Alumna') AS name,
              m.classes_remaining, m.end_date,
              COALESCE(p.name, m.plan_name_override, 'Tu membresía') AS plan_name
       FROM memberships m
