@@ -522,7 +522,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                       <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(t.id)}>Eliminar</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este tipo de clase?")) deleteMutation.mutate(t.id); }}>Eliminar</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -1036,7 +1036,7 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
                         <DropdownMenuItem onClick={() => { setUploadTarget(ins.id); setTimeout(() => fileRef.current?.click(), 50); }}>
                           Subir foto
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(ins.id)}>
+                        <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este instructor?")) deleteMutation.mutate(ins.id); }}>
                           Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>

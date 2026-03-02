@@ -122,7 +122,7 @@ const WeeklySchedule = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="bg-[#0f0518] border-white/10">
                           <DropdownMenuItem className="text-white/70 hover:text-white" onClick={() => openEdit(s)}>Editar</DropdownMenuItem>
-                          <DropdownMenuItem className="text-[#f87171]" onClick={() => deleteMutation.mutate(s.id)}>Eliminar</DropdownMenuItem>
+                          <DropdownMenuItem className="text-[#f87171]" onClick={() => { if (window.confirm("¿Eliminar este horario?")) deleteMutation.mutate(s.id); }}>Eliminar</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

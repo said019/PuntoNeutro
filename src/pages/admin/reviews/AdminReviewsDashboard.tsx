@@ -48,7 +48,7 @@ const ReviewTagsManager = () => {
           <div key={t.id} className="flex items-center gap-1">
             <Badge style={{ backgroundColor: `${t.color}22`, color: t.color, borderColor: `${t.color}44` }} variant="outline">{t.name}</Badge>
             <Button variant="ghost" size="icon" className="h-5 w-5 text-xs" onClick={() => { form.reset(t); setEditing(t); setOpen(true); }}>✎</Button>
-            <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive text-xs" onClick={() => deleteMutation.mutate(t.id)}>✕</Button>
+            <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive text-xs" onClick={() => { if (window.confirm("¿Eliminar este tag?")) deleteMutation.mutate(t.id); }}>✕</Button>
           </div>
         ))}
       </div>

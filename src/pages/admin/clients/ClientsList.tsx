@@ -227,7 +227,7 @@ const ClientsList = () => {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-[#f87171] hover:text-[#f87171] focus:text-[#f87171] hover:bg-[#f87171]/5 focus:bg-[#f87171]/5"
-                              onClick={() => deleteMutation.mutate(c.id)}
+                              onClick={() => { if (window.confirm("¿Eliminar este cliente?")) deleteMutation.mutate(c.id); }}
                             >
                               Eliminar
                             </DropdownMenuItem>

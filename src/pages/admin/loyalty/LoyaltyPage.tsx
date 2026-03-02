@@ -117,7 +117,7 @@ const LoyaltyRewards = () => {
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem onClick={() => { form.reset(r); setEditing(r); setOpen(true); }}>Editar</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(r.id)}>Eliminar</DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar esta recompensa?")) deleteMutation.mutate(r.id); }}>Eliminar</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

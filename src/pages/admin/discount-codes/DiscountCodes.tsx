@@ -99,7 +99,7 @@ const DiscountCodes = () => {
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent>
                           <DropdownMenuItem onClick={() => openEdit(c)}>Editar</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(c.id)}>Eliminar</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este código de descuento?")) deleteMutation.mutate(c.id); }}>Eliminar</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

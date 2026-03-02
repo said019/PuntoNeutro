@@ -80,7 +80,7 @@ const ProductsPage = () => {
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem onClick={() => { form.reset(p); setEditing(p); setOpen(true); }}>Editar</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(p.id)}>Eliminar</DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este producto?")) deleteMutation.mutate(p.id); }}>Eliminar</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

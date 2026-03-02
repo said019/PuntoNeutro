@@ -498,7 +498,7 @@ const VideoList = () => {
                       <p className="text-xs text-muted-foreground mt-1">{formatDuration(v.duration_seconds ?? 0)}</p>
                       <div className="flex gap-2 mt-3">
                         <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => navigate(`/admin/videos/upload?id=${v.id}`)}>Editar</Button>
-                        <Button size="sm" variant="destructive" className="text-xs" onClick={() => deleteMutation.mutate(v.id)}>Eliminar</Button>
+                        <Button size="sm" variant="destructive" className="text-xs" onClick={() => { if (window.confirm("¿Eliminar este video?")) deleteMutation.mutate(v.id); }}>Eliminar</Button>
                       </div>
                     </div>
                   </div>

@@ -169,7 +169,7 @@ const PlansList = () => {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
                             <DropdownMenuItem onClick={() => openEdit(p)}>Editar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(p.id)}>Eliminar</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este plan?")) deleteMutation.mutate(p.id); }}>Eliminar</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

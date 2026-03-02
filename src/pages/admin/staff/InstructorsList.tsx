@@ -38,6 +38,7 @@ const InstructorsList = () => {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Instructor | null>(null);
+  const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery<{ data: Instructor[] }>({
@@ -104,6 +105,18 @@ const InstructorsList = () => {
           </div>
 
           <div className="rounded-xl border border-border overflow-hidden">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              ref={fileRef}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f && uploadTargetId) uploadPhotoMutation.mutate({ id: uploadTargetId, file: f });
+                e.target.value = "";
+                setUploadTargetId(null);
+              }}
+            />
             <Table>
               <TableHeader>
                 <TableRow>
@@ -133,23 +146,13 @@ const InstructorsList = () => {
                       <TableCell className="text-xs text-muted-foreground">{ins.specialties?.join(", ")}</TableCell>
                       <TableCell><Badge variant={ins.isActive ? "default" : "secondary"}>{ins.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
                       <TableCell>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          ref={fileRef}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) uploadPhotoMutation.mutate({ id: ins.id, file: f });
-                          }}
-                        />
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent>
                             <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => fileRef.current?.click()}>Subir foto</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir foto</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => magicLinkMutation.mutate(ins.id)}>Magic link</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(ins.id)}>Eliminar</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este instructor?")) deleteMutation.mutate(ins.id); }}>Eliminar</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

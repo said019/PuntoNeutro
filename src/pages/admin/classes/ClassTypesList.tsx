@@ -114,7 +114,7 @@ const ClassTypesList = () => {
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent>
                           <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(t.id)}>Eliminar</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este tipo de clase?")) deleteMutation.mutate(t.id); }}>Eliminar</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
