@@ -78,8 +78,13 @@ const VideoList = () => {
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
 
-  // Upload video file for a homepage card
+  // Upload video file for a homepage card (max 50 MB)
   const handleCardVideoUpload = async (cardId: number, file: File) => {
+    const MAX_MB = 50;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      toast({ title: `El archivo es demasiado grande. Máximo ${MAX_MB} MB.`, variant: "destructive" });
+      return;
+    }
     setUploadingCardId(cardId);
     setUploadProgress(0);
     try {
@@ -102,12 +107,13 @@ const VideoList = () => {
             toast({ title: "✅ Video subido correctamente" });
             resolve();
           } else {
-            const err = JSON.parse(xhr.responseText || "{}");
-            toast({ title: err.message || "Error al subir video", variant: "destructive" });
-            reject(new Error(err.message));
+            let msg = "Error al subir video";
+            try { msg = JSON.parse(xhr.responseText || "{}").message || msg; } catch {}
+            toast({ title: msg, variant: "destructive" });
+            reject(new Error(msg));
           }
         };
-        xhr.onerror = () => { toast({ title: "Error de conexión", variant: "destructive" }); reject(new Error("Network error")); };
+        xhr.onerror = () => { toast({ title: "Error de conexión. El archivo puede ser demasiado grande.", variant: "destructive" }); reject(new Error("Network error")); };
         xhr.send(formData);
       });
     } catch {
@@ -259,7 +265,7 @@ const VideoList = () => {
                             >
                               <Upload size={11} />Subir video
                             </Button>
-                            <p className="text-[0.6rem] text-muted-foreground mt-1 text-center">MP4, MOV — máx 600MB</p>
+                            <p className="text-[0.6rem] text-muted-foreground mt-1 text-center">MP4, MOV — máx 50 MB</p>
                           </div>
                         )}
 

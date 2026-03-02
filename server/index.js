@@ -36,8 +36,8 @@ const evolutionApi = axios.create({
 // ─── File upload (memory storage, max 10 MB) ────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// ─── File upload for videos (memory storage, max 600 MB) ────────────────────
-const uploadVideo = multer({ storage: multer.memoryStorage(), limits: { fileSize: 600 * 1024 * 1024 } });
+// ─── File upload for videos (memory storage, max 50 MB) ────────────────────
+const uploadVideo = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ─── Google Drive helpers ────────────────────────────────────────────────────
 async function getGoogleDriveAccessToken() {
@@ -1607,12 +1607,7 @@ app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
     const total = parseInt(pointsRes.rows[0].total);
     // QR data: user ID encoded
     const qrData = Buffer.from(req.userId).toString("base64");
-    // Simple level system
-    let level = "Jade";
-    if (total >= 5000) level = "Diamante";
-    else if (total >= 2000) level = "Oro";
-    else if (total >= 500) level = "Plata";
-    return res.json({ data: { points: total, qr_code: qrData, level } });
+    return res.json({ data: { points: total, qr_code: qrData } });
   } catch (err) {
     console.error("Wallet/pass error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -1766,7 +1761,7 @@ async function ensureGoogleWalletClass() {
 }
 
 /** Build a Google Wallet Save URL (JWT) for a user */
-function buildGoogleWalletSaveUrl({ userId, userName, points, level, qrCode }) {
+function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode }) {
   const objectId = `${GW_ISSUER_ID}.ophelia_${userId.replace(/-/g, "")}`;
   const loyaltyObject = {
     id: objectId,
@@ -1781,7 +1776,6 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, level, qrCode }) {
       label: "PUNTOS",
     },
     textModulesData: [
-      { id: "level", header: "NIVEL", body: level },
       { id: "studio", header: "ESTUDIO", body: "Ophelia Jump Studio" },
     ],
     linksModuleData: {
@@ -1821,16 +1815,11 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
       [req.userId]
     );
     const points = parseInt(pointsRes.rows[0].total);
-    let level = "Jade";
-    if (points >= 5000) level = "Diamante";
-    else if (points >= 2000) level = "Oro";
-    else if (points >= 500) level = "Plata";
     const qrCode = Buffer.from(req.userId).toString("base64");
     const saveUrl = buildGoogleWalletSaveUrl({
       userId: req.userId,
       userName: user.name || user.email,
       points,
-      level,
       qrCode,
     });
     return res.json({ data: { saveUrl } });
@@ -3439,8 +3428,18 @@ app.put("/api/homepage-video-cards/:id", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-// POST /api/homepage-video-cards/:id/upload  (admin — upload video file)
-app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, uploadVideo.single("video"), async (req, res) => {
+// POST /api/homepage-video-cards/:id/upload  (admin — upload video file, max 50 MB)
+app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, (req, res, next) => {
+  uploadVideo.single("video")(req, res, (err) => {
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({ message: "El archivo es demasiado grande. Máximo 50 MB." });
+      }
+      return res.status(400).json({ message: err.message || "Error al procesar archivo" });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const videoFile = req.file;
     if (!videoFile) return res.status(400).json({ message: "Se requiere un archivo de video" });

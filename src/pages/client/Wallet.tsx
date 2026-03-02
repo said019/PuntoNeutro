@@ -52,7 +52,7 @@ const Wallet = () => {
                 {/* Logo */}
                 <img src={opheliaLogo} alt="Ophelia Studio" className="h-10 w-auto opacity-90" />
 
-                {/* Points & Level */}
+                {/* Points */}
                 <div className="space-y-1">
                   <p className="text-xs font-semibold uppercase tracking-widest text-[#CA71E1]">Ophelia Club</p>
                   <p className="text-6xl font-black bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-transparent bg-clip-text drop-shadow-sm">
@@ -60,12 +60,6 @@ const Wallet = () => {
                   </p>
                   <p className="text-sm font-medium text-muted-foreground">Puntos acumulados</p>
                 </div>
-
-                {wallet?.level && (
-                  <div className="px-5 py-1.5 rounded-full border border-[#E7EB6E]/30 bg-[#E7EB6E]/10 text-[#E7EB6E] text-sm font-bold tracking-wide">
-                    Nivel {wallet.level}
-                  </div>
-                )}
 
                 {/* QR Code section */}
                 {wallet?.qr_code && (
