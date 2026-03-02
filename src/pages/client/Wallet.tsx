@@ -19,17 +19,14 @@ const Wallet = () => {
   const wallet = data?.data ?? data ?? null;
 
   // Google Wallet save URL
-  const { data: gwData, isLoading: gwLoading } = useQuery({
+  const { data: gwData, isLoading: gwLoading, error: gwError } = useQuery({
     queryKey: ["google-wallet-save"],
     queryFn: async () => {
-      try {
-        const resp = await api.get("/wallet/google/save-url");
-        return resp.data?.data ?? resp.data ?? null;
-      } catch {
-        return null;
-      }
+      const resp = await api.get("/wallet/google/save-url");
+      return resp.data?.data ?? resp.data ?? null;
     },
-    retry: false,
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
   });
 
   const googleSaveUrl = gwData?.saveUrl || null;
@@ -84,7 +81,17 @@ const Wallet = () => {
             </p>
             <div className="flex flex-col gap-2.5">
               {/* Google Wallet */}
-              {googleSaveUrl ? (
+              {gwLoading ? (
+                <div className="flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black border border-white/10 animate-pulse">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12.5 6.9c1.32 0 2.21.57 2.72 1.05l1.99-1.94C15.85 4.79 14.35 4 12.5 4c-3.07 0-5.64 2.05-6.52 4.82l2.32 1.8C9.03 8.57 10.6 6.9 12.5 6.9z" fill="#EA4335"/>
+                    <path d="M18.77 12.16c0-.53-.08-1.04-.2-1.52H12.5v2.87h3.52c-.15.8-.61 1.48-1.3 1.94l2.01 1.56c1.2-1.1 1.88-2.73 1.88-4.85h.16z" fill="#4285F4"/>
+                    <path d="M8.3 13.38A4.6 4.6 0 018.06 12c0-.48.09-.94.24-1.38l-2.32-1.8A7.52 7.52 0 005 12c0 1.2.29 2.34.8 3.34l2.5-1.96z" fill="#FBBC05"/>
+                    <path d="M12.5 20c1.84 0 3.38-.61 4.51-1.65l-2.01-1.56c-.63.4-1.43.64-2.5.64-1.9 0-3.47-1.27-4.06-3h-2.5l-.03.1A7.99 7.99 0 0012.5 20z" fill="#34A853"/>
+                  </svg>
+                  <span className="text-white/50 font-medium text-sm">Cargando Google Wallet…</span>
+                </div>
+              ) : googleSaveUrl ? (
                 <a
                   href={googleSaveUrl}
                   target="_blank"
@@ -101,15 +108,18 @@ const Wallet = () => {
                   <ExternalLink size={14} className="text-white/50" />
                 </a>
               ) : (
-                <div className="flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black/50 border border-white/5 opacity-60 cursor-not-allowed">
+                <button
+                  onClick={() => toast({ title: "Error", description: "No se pudo generar el pase. Intenta de nuevo.", variant: "destructive" })}
+                  className="flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+                >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12.5 6.9c1.32 0 2.21.57 2.72 1.05l1.99-1.94C15.85 4.79 14.35 4 12.5 4c-3.07 0-5.64 2.05-6.52 4.82l2.32 1.8C9.03 8.57 10.6 6.9 12.5 6.9z" fill="#888"/>
-                    <path d="M18.77 12.16c0-.53-.08-1.04-.2-1.52H12.5v2.87h3.52c-.15.8-.61 1.48-1.3 1.94l2.01 1.56c1.2-1.1 1.88-2.73 1.88-4.85h.16z" fill="#888"/>
-                    <path d="M8.3 13.38A4.6 4.6 0 018.06 12c0-.48.09-.94.24-1.38l-2.32-1.8A7.52 7.52 0 005 12c0 1.2.29 2.34.8 3.34l2.5-1.96z" fill="#888"/>
-                    <path d="M12.5 20c1.84 0 3.38-.61 4.51-1.65l-2.01-1.56c-.63.4-1.43.64-2.5.64-1.9 0-3.47-1.27-4.06-3h-2.5l-.03.1A7.99 7.99 0 0012.5 20z" fill="#888"/>
+                    <path d="M12.5 6.9c1.32 0 2.21.57 2.72 1.05l1.99-1.94C15.85 4.79 14.35 4 12.5 4c-3.07 0-5.64 2.05-6.52 4.82l2.32 1.8C9.03 8.57 10.6 6.9 12.5 6.9z" fill="#EA4335"/>
+                    <path d="M18.77 12.16c0-.53-.08-1.04-.2-1.52H12.5v2.87h3.52c-.15.8-.61 1.48-1.3 1.94l2.01 1.56c1.2-1.1 1.88-2.73 1.88-4.85h.16z" fill="#4285F4"/>
+                    <path d="M8.3 13.38A4.6 4.6 0 018.06 12c0-.48.09-.94.24-1.38l-2.32-1.8A7.52 7.52 0 005 12c0 1.2.29 2.34.8 3.34l2.5-1.96z" fill="#FBBC05"/>
+                    <path d="M12.5 20c1.84 0 3.38-.61 4.51-1.65l-2.01-1.56c-.63.4-1.43.64-2.5.64-1.9 0-3.47-1.27-4.06-3h-2.5l-.03.1A7.99 7.99 0 0012.5 20z" fill="#34A853"/>
                   </svg>
-                  <span className="text-white/50 font-medium text-sm">Google Wallet — próximamente</span>
-                </div>
+                  <span className="text-white/70 font-medium text-sm">Reintentar Google Wallet</span>
+                </button>
               )}
 
               {/* Apple Wallet */}

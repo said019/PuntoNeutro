@@ -2021,6 +2021,9 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
     return res.status(503).json({ message: "Google Wallet no configurado" });
   }
   try {
+    // Ensure loyalty class exists (retries if startup creation failed)
+    await ensureGoogleWalletClass();
+
     // Get user info
     const userRes = await pool.query("SELECT id, name, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
     if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
