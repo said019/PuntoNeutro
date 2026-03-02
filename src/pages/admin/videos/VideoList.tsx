@@ -78,9 +78,9 @@ const VideoList = () => {
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
 
-  // Upload video file for a homepage card (max 50 MB)
+  // Upload video file for a homepage card (max 500 MB)
   const handleCardVideoUpload = async (cardId: number, file: File) => {
-    const MAX_MB = 50;
+    const MAX_MB = 500;
     if (file.size > MAX_MB * 1024 * 1024) {
       toast({ title: `El archivo es demasiado grande. Máximo ${MAX_MB} MB.`, variant: "destructive" });
       return;
@@ -265,7 +265,7 @@ const VideoList = () => {
                             >
                               <Upload size={11} />Subir video
                             </Button>
-                            <p className="text-[0.6rem] text-muted-foreground mt-1 text-center">MP4, MOV — máx 50 MB</p>
+                            <p className="text-[0.6rem] text-muted-foreground mt-1 text-center">MP4, MOV — máx 500 MB</p>
                           </div>
                         )}
 

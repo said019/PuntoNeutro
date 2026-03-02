@@ -116,6 +116,13 @@ const VideoUpload = () => {
     const thumbFile = thumbInputRef.current?.files?.[0];
     if (!videoFile) return;
 
+    // Client-side size check (500 MB)
+    const MAX_MB = 500;
+    if (videoFile.size > MAX_MB * 1024 * 1024) {
+      toast({ title: `El archivo es demasiado grande. Máximo ${MAX_MB} MB.`, variant: "destructive" });
+      return;
+    }
+
     setVideoFileName(videoFile.name);
     setIsUploading(true);
     setUploadProgress(0);
@@ -206,7 +213,7 @@ const VideoUpload = () => {
                   <>
                     <Upload size={28} className="text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">Haz click para seleccionar el video</p>
-                    <p className="text-xs text-muted-foreground">MP4, MOV, AVI — máx. 600 MB</p>
+                    <p className="text-xs text-muted-foreground">MP4, MOV, AVI — máx. 500 MB</p>
                   </>
                 )}
                 <input

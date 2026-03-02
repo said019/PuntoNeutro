@@ -5,6 +5,8 @@ import { Pool } from "pg";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import path from "path";
+import fs from "fs";
+import os from "os";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import axios from "axios";
@@ -36,8 +38,16 @@ const evolutionApi = axios.create({
 // ─── File upload (memory storage, max 10 MB) ────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// ─── File upload for videos (memory storage, max 50 MB) ────────────────────
-const uploadVideo = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+// ─── File upload for videos (disk storage, max 500 MB) ─────────────────────
+// Use disk storage so large videos don't fill Node.js RAM
+const VIDEO_MAX_MB = 500;
+const uploadVideo = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, os.tmpdir()),
+    filename: (req, file, cb) => cb(null, `ophelia_vid_${Date.now()}_${file.originalname}`),
+  }),
+  limits: { fileSize: VIDEO_MAX_MB * 1024 * 1024 },
+});
 
 // ─── Google Drive helpers ────────────────────────────────────────────────────
 async function getGoogleDriveAccessToken() {
@@ -58,6 +68,7 @@ async function makeGoogleDriveFilePublic(fileId, accessToken) {
   ).catch(() => { }); // best-effort
 }
 
+/** Upload a Buffer to Google Drive using simple multipart (for small files like thumbnails) */
 async function uploadBufferToDrive(buffer, fileName, mimeType, accessToken) {
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || "";
   const metadata = { name: fileName, ...(folderId ? { parents: [folderId] } : {}) };
@@ -76,6 +87,80 @@ async function uploadBufferToDrive(buffer, fileName, mimeType, accessToken) {
     { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": `multipart/related; boundary="${boundary}"` }, maxBodyLength: Infinity, maxContentLength: Infinity }
   );
   return resp.data; // { id, webViewLink }
+}
+
+/**
+ * Upload a file from disk to Google Drive using Resumable Upload (streams in 5 MB chunks).
+ * Works for files of any size without loading them entirely into memory.
+ * @param {string} filePath  - absolute path to the temp file on disk
+ * @param {string} fileName  - desired file name in Drive
+ * @param {string} mimeType  - e.g. "video/mp4"
+ * @param {string} accessToken - Google OAuth2 access token
+ * @returns {{ id: string, webViewLink?: string }}
+ */
+async function uploadFileToDriveResumable(filePath, fileName, mimeType, accessToken) {
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || "";
+  const metadata = { name: fileName, ...(folderId ? { parents: [folderId] } : {}) };
+  const fileSize = fs.statSync(filePath).size;
+
+  // Step 1: Initiate resumable upload session
+  const initResp = await axios.post(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink",
+    metadata,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": mimeType,
+        "X-Upload-Content-Length": String(fileSize),
+      },
+    }
+  );
+  const uploadUri = initResp.headers.location; // resumable session URI
+
+  // Step 2: Upload file in chunks of 5 MB (must be multiples of 256 KB)
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
+  let offset = 0;
+  const fd = fs.openSync(filePath, "r");
+
+  try {
+    while (offset < fileSize) {
+      const bytesToRead = Math.min(CHUNK_SIZE, fileSize - offset);
+      const chunk = Buffer.alloc(bytesToRead);
+      fs.readSync(fd, chunk, 0, bytesToRead, offset);
+
+      const endByte = offset + bytesToRead - 1;
+      const contentRange = `bytes ${offset}-${endByte}/${fileSize}`;
+
+      const resp = await axios.put(uploadUri, chunk, {
+        headers: {
+          "Content-Length": String(bytesToRead),
+          "Content-Range": contentRange,
+        },
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+        // 308 Resume Incomplete is expected for intermediate chunks
+        validateStatus: (status) => status === 200 || status === 201 || status === 308,
+      });
+
+      if (resp.status === 200 || resp.status === 201) {
+        // Final chunk — upload complete
+        return resp.data; // { id, webViewLink }
+      }
+
+      // 308: read next range from Range header
+      const rangeHeader = resp.headers.range; // e.g. "bytes=0-5242879"
+      if (rangeHeader) {
+        offset = parseInt(rangeHeader.split("-")[1], 10) + 1;
+      } else {
+        offset += bytesToRead;
+      }
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  throw new Error("Resumable upload ended without a final 200/201 response");
 }
 
 
@@ -3494,25 +3579,29 @@ app.post("/api/videos/upload", adminMiddleware, uploadVideo.fields([{ name: "vid
 
     const accessToken = await getGoogleDriveAccessToken();
 
-    // Upload video
-    const videoResult = await uploadBufferToDrive(
-      videoFile.buffer,
+    // Upload video using resumable upload (streams from disk in 5 MB chunks)
+    const videoResult = await uploadFileToDriveResumable(
+      videoFile.path,
       videoFile.originalname,
       videoFile.mimetype,
       accessToken
     );
+    // Clean up temp file
+    fs.unlink(videoFile.path, () => {});
     await makeGoogleDriveFilePublic(videoResult.id, accessToken);
 
-    // Upload thumbnail (optional)
+    // Upload thumbnail (optional) — small file, use buffer multipart
     let thumbnailUrl = `https://drive.google.com/thumbnail?id=${videoResult.id}&sz=w640`;
     let thumbnailDriveId = "";
     if (thumbnailFile) {
+      const thumbBuffer = fs.readFileSync(thumbnailFile.path);
       const thumbResult = await uploadBufferToDrive(
-        thumbnailFile.buffer,
+        thumbBuffer,
         thumbnailFile.originalname,
         thumbnailFile.mimetype,
         accessToken
       );
+      fs.unlink(thumbnailFile.path, () => {});
       await makeGoogleDriveFilePublic(thumbResult.id, accessToken);
       thumbnailUrl = `https://drive.google.com/thumbnail?id=${thumbResult.id}&sz=w640`;
       thumbnailDriveId = thumbResult.id;
@@ -3528,6 +3617,9 @@ app.post("/api/videos/upload", adminMiddleware, uploadVideo.fields([{ name: "vid
       duration_seconds: 0,
     });
   } catch (err) {
+    // Clean up temp files on error
+    if (req.files?.video?.[0]?.path) fs.unlink(req.files.video[0].path, () => {});
+    if (req.files?.thumbnail?.[0]?.path) fs.unlink(req.files.thumbnail[0].path, () => {});
     console.error("Video upload error:", err?.response?.data || err.message);
     return res.status(500).json({ message: "Error al subir video: " + (err?.response?.data?.error?.message || err.message) });
   }
@@ -3648,12 +3740,12 @@ app.put("/api/homepage-video-cards/:id", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-// POST /api/homepage-video-cards/:id/upload  (admin — upload video file, max 50 MB)
+// POST /api/homepage-video-cards/:id/upload  (admin — upload video file, max 500 MB)
 app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, (req, res, next) => {
   uploadVideo.single("video")(req, res, (err) => {
     if (err) {
       if (err.code === "LIMIT_FILE_SIZE") {
-        return res.status(413).json({ message: "El archivo es demasiado grande. Máximo 50 MB." });
+        return res.status(413).json({ message: `El archivo es demasiado grande. Máximo ${VIDEO_MAX_MB} MB.` });
       }
       return res.status(400).json({ message: err.message || "Error al procesar archivo" });
     }
@@ -3673,18 +3765,20 @@ app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, (req, res, nex
     let videoUrl;
 
     if (isDriveConfigured) {
-      // Upload to Google Drive
+      // Upload to Google Drive using resumable upload (streams in 5 MB chunks)
       const accessToken = await getGoogleDriveAccessToken();
-      const result = await uploadBufferToDrive(
-        videoFile.buffer,
+      const result = await uploadFileToDriveResumable(
+        videoFile.path,
         `homepage_card_${req.params.id}_${Date.now()}_${videoFile.originalname}`,
         videoFile.mimetype,
         accessToken
       );
+      // Clean up temp file
+      fs.unlink(videoFile.path, () => {});
       await makeGoogleDriveFilePublic(result.id, accessToken);
-      // Use the direct preview/embed URL
       videoUrl = `https://drive.google.com/file/d/${result.id}/preview`;
     } else {
+      if (videoFile.path) fs.unlink(videoFile.path, () => {});
       return res.status(503).json({
         message: "Google Drive no está configurado. Configura GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN para subir videos.",
       });
@@ -3698,6 +3792,8 @@ app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, (req, res, nex
     if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
     return res.json({ data: r.rows[0] });
   } catch (err) {
+    // Clean up temp file on error
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
     console.error("Homepage card video upload error:", err?.response?.data || err.message);
     return res.status(500).json({ message: "Error al subir video: " + (err?.response?.data?.error?.message || err.message) });
   }
