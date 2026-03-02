@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Check, X } from "lucide-react";
+import { Plus, Search, Pencil, Check, X, Upload, Trash2, Loader2, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "@/hooks/use-debounce";
 
-interface Video {
+interface VideoItem {
   id: string;
   title: string;
   description?: string;
@@ -32,6 +33,7 @@ interface HomepageCard {
   title: string;
   description: string;
   emoji: string;
+  video_url?: string | null;
 }
 
 const VideoList = () => {
@@ -40,8 +42,11 @@ const VideoList = () => {
   const debouncedSearch = useDebounce(search, 300);
   const [editingCard, setEditingCard] = useState<number | null>(null);
   const [cardDraft, setCardDraft] = useState<Partial<HomepageCard>>({});
+  const [uploadingCardId, setUploadingCardId] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
-  const { data, isLoading } = useQuery<{ data: Video[]; total: number }>({
+  const { data, isLoading } = useQuery<{ data: VideoItem[]; total: number }>({
     queryKey: ["videos", debouncedSearch],
     queryFn: async () => (await api.get(`/videos?search=${debouncedSearch}&limit=20`)).data,
   });
@@ -73,6 +78,56 @@ const VideoList = () => {
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
 
+  // Upload video file for a homepage card
+  const handleCardVideoUpload = async (cardId: number, file: File) => {
+    setUploadingCardId(cardId);
+    setUploadProgress(0);
+    try {
+      const formData = new FormData();
+      formData.append("video", file);
+
+      const token = localStorage.getItem("token");
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `/api/homepage-video-cards/${cardId}/upload`);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            qc.invalidateQueries({ queryKey: ["homepage-video-cards"] });
+            toast({ title: "✅ Video subido correctamente" });
+            resolve();
+          } else {
+            const err = JSON.parse(xhr.responseText || "{}");
+            toast({ title: err.message || "Error al subir video", variant: "destructive" });
+            reject(new Error(err.message));
+          }
+        };
+        xhr.onerror = () => { toast({ title: "Error de conexión", variant: "destructive" }); reject(new Error("Network error")); };
+        xhr.send(formData);
+      });
+    } catch {
+      // error already toasted
+    } finally {
+      setUploadingCardId(null);
+      setUploadProgress(0);
+    }
+  };
+
+  // Delete video from a homepage card
+  const deleteCardVideoMutation = useMutation({
+    mutationFn: (cardId: number) => api.delete(`/homepage-video-cards/${cardId}/video`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["homepage-video-cards"] });
+      toast({ title: "Video eliminado de la tarjeta" });
+    },
+    onError: () => toast({ title: "Error al eliminar video", variant: "destructive" }),
+  });
+
   const startEdit = (card: HomepageCard) => {
     setEditingCard(card.id);
     setCardDraft({ title: card.title, description: card.description, emoji: card.emoji });
@@ -100,7 +155,7 @@ const VideoList = () => {
           <section>
             <div className="mb-4">
               <h2 className="text-lg font-bold">Tarjetas de inicio</h2>
-              <p className="text-sm text-muted-foreground">Edita el nombre, descripción e ícono de cada tarjeta en la sección «Mira cómo se vive» del inicio.</p>
+              <p className="text-sm text-muted-foreground">Edita el nombre, descripción y sube un video para cada tarjeta en la sección «Mira cómo se vive» del inicio.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -152,11 +207,67 @@ const VideoList = () => {
                           <p className="font-semibold text-sm">{card.title}</p>
                         </div>
                         <p className="text-xs text-muted-foreground leading-relaxed">{card.description}</p>
+
+                        {/* Video status */}
+                        {card.video_url ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="default" className="text-[0.6rem] bg-green-600">
+                                <Video size={10} className="mr-1" />Video cargado
+                              </Badge>
+                            </div>
+                            <div className="rounded-lg overflow-hidden border border-border aspect-video bg-black">
+                              <iframe
+                                src={card.video_url}
+                                className="w-full h-full"
+                                allow="autoplay"
+                                allowFullScreen
+                              />
+                            </div>
+                            <Button
+                              size="sm" variant="destructive" className="w-full text-xs gap-1"
+                              onClick={() => deleteCardVideoMutation.mutate(card.id)}
+                              disabled={deleteCardVideoMutation.isPending}
+                            >
+                              <Trash2 size={11} />Eliminar video
+                            </Button>
+                          </div>
+                        ) : uploadingCardId === card.id ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 size={14} className="animate-spin" />
+                              Subiendo video... {uploadProgress}%
+                            </div>
+                            <Progress value={uploadProgress} className="h-2" />
+                          </div>
+                        ) : (
+                          <div>
+                            <input
+                              type="file"
+                              accept="video/*"
+                              className="hidden"
+                              ref={(el) => { fileInputRefs.current[card.id] = el; }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleCardVideoUpload(card.id, file);
+                                e.target.value = "";
+                              }}
+                            />
+                            <Button
+                              size="sm" variant="outline" className="w-full text-xs gap-1 border-dashed"
+                              onClick={() => fileInputRefs.current[card.id]?.click()}
+                            >
+                              <Upload size={11} />Subir video
+                            </Button>
+                            <p className="text-[0.6rem] text-muted-foreground mt-1 text-center">MP4, MOV — máx 600MB</p>
+                          </div>
+                        )}
+
                         <Button
                           size="sm" variant="outline" className="w-full text-xs gap-1"
                           onClick={() => startEdit(card)}
                         >
-                          <Pencil size={11} />Editar
+                          <Pencil size={11} />Editar texto
                         </Button>
                       </>
                     )}

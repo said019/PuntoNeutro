@@ -91,7 +91,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
 
-  const { data: videoCardsData } = useQuery<{ data: { id: number; title: string; description: string; emoji: string }[] }>({
+  const { data: videoCardsData } = useQuery<{ data: { id: number; title: string; description: string; emoji: string; video_url?: string | null }[] }>({
     queryKey: ["homepage-video-cards"],
     queryFn: async () => (await api.get("/homepage-video-cards")).data,
     staleTime: 1000 * 60 * 5,
@@ -99,9 +99,9 @@ const Index = () => {
   const videoCards = videoCardsData?.data?.length
     ? videoCardsData.data
     : [
-        { id: 1, title: "Jumping Fitness", description: "Cardio de alta intensidad en trampolín con música que te hará volar.", emoji: "🏋️" },
-        { id: 2, title: "Jumping Dance",   description: "Coreografías sobre el trampolín que combinan ritmo y diversión.",     emoji: "💃" },
-        { id: 3, title: "Pilates Flow",    description: "Secuencias fluidas para fortalecer tu core y mejorar postura.",        emoji: "🧘" },
+        { id: 1, title: "Jumping Fitness", description: "Cardio de alta intensidad en trampolín con música que te hará volar.", emoji: "🏋️", video_url: null },
+        { id: 2, title: "Jumping Dance",   description: "Coreografías sobre el trampolín que combinan ritmo y diversión.",     emoji: "💃", video_url: null },
+        { id: 3, title: "Pilates Flow",    description: "Secuencias fluidas para fortalecer tu core y mejorar postura.",        emoji: "🧘", video_url: null },
       ];
 
   useEffect(() => {
@@ -465,16 +465,28 @@ const Index = () => {
             {videoCards.map((v) => (
               <div key={v.id} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all">
                 <div className="relative aspect-video bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center overflow-hidden">
-                  {/* decorative glow */}
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary)/0.15)_0%,transparent_65%)]" />
-                  <div className="relative flex flex-col items-center gap-3">
-                    <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_40px_hsl(var(--primary)/0.3)]">
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-primary ml-1">
-                        <polygon points="5 3 19 12 5 21 5 3" />
-                      </svg>
-                    </div>
-                    <span className="text-[0.65rem] tracking-[0.15em] uppercase text-primary/60 font-medium">Video próximamente</span>
-                  </div>
+                  {v.video_url ? (
+                    <iframe
+                      src={v.video_url}
+                      className="absolute inset-0 w-full h-full"
+                      allow="autoplay; encrypted-media"
+                      allowFullScreen
+                      title={v.title}
+                    />
+                  ) : (
+                    <>
+                      {/* decorative glow */}
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary)/0.15)_0%,transparent_65%)]" />
+                      <div className="relative flex flex-col items-center gap-3">
+                        <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_40px_hsl(var(--primary)/0.3)]">
+                          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-primary ml-1">
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                          </svg>
+                        </div>
+                        <span className="text-[0.65rem] tracking-[0.15em] uppercase text-primary/60 font-medium">Video próximamente</span>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="p-5">
                   <div className="flex items-center gap-2 mb-2">

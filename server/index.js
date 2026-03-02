@@ -466,9 +466,12 @@ async function ensureSchema() {
         title       VARCHAR(120) NOT NULL,
         description TEXT NOT NULL DEFAULT '',
         emoji       VARCHAR(10)  NOT NULL DEFAULT '🎬',
+        video_url   TEXT,
         updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `).catch(() => { });
+    // Add video_url column if table already existed
+    await pool.query(`ALTER TABLE homepage_video_cards ADD COLUMN IF NOT EXISTS video_url TEXT`).catch(() => { });
     // seed default cards only when table is empty
     await pool.query(`
       INSERT INTO homepage_video_cards (sort_order, title, description, emoji)
@@ -3143,7 +3146,7 @@ app.get("/api/homepage-video-cards", async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-// PUT /api/homepage-video-cards/:id  (admin)
+// PUT /api/homepage-video-cards/:id  (admin — text fields)
 app.put("/api/homepage-video-cards/:id", adminMiddleware, async (req, res) => {
   try {
     const { title, description, emoji } = req.body;
@@ -3153,6 +3156,63 @@ app.put("/api/homepage-video-cards/:id", adminMiddleware, async (req, res) => {
        SET title=$1, description=$2, emoji=$3, updated_at=NOW()
        WHERE id=$4 RETURNING *`,
       [title.trim(), description.trim(), (emoji || "🎬").trim(), req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// POST /api/homepage-video-cards/:id/upload  (admin — upload video file)
+app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, uploadVideo.single("video"), async (req, res) => {
+  try {
+    const videoFile = req.file;
+    if (!videoFile) return res.status(400).json({ message: "Se requiere un archivo de video" });
+
+    const isDriveConfigured = Boolean(
+      process.env.GOOGLE_CLIENT_ID &&
+      process.env.GOOGLE_CLIENT_SECRET &&
+      process.env.GOOGLE_REFRESH_TOKEN
+    );
+
+    let videoUrl;
+
+    if (isDriveConfigured) {
+      // Upload to Google Drive
+      const accessToken = await getGoogleDriveAccessToken();
+      const result = await uploadBufferToDrive(
+        videoFile.buffer,
+        `homepage_card_${req.params.id}_${Date.now()}_${videoFile.originalname}`,
+        videoFile.mimetype,
+        accessToken
+      );
+      await makeGoogleDriveFilePublic(result.id, accessToken);
+      // Use the direct preview/embed URL
+      videoUrl = `https://drive.google.com/file/d/${result.id}/preview`;
+    } else {
+      return res.status(503).json({
+        message: "Google Drive no está configurado. Configura GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN para subir videos.",
+      });
+    }
+
+    // Save video_url to DB
+    const r = await pool.query(
+      `UPDATE homepage_video_cards SET video_url=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
+      [videoUrl, req.params.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("Homepage card video upload error:", err?.response?.data || err.message);
+    return res.status(500).json({ message: "Error al subir video: " + (err?.response?.data?.error?.message || err.message) });
+  }
+});
+
+// DELETE /api/homepage-video-cards/:id/video  (admin — remove video)
+app.delete("/api/homepage-video-cards/:id/video", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE homepage_video_cards SET video_url=NULL, updated_at=NOW() WHERE id=$1 RETURNING *`,
+      [req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
     return res.json({ data: r.rows[0] });
