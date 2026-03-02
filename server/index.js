@@ -513,6 +513,19 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_type  VARCHAR(30) NOT NULL DEFAULT 'custom'`).catch(() => { });
     await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS reward_value VARCHAR(150)`).catch(() => { });
     await pool.query(`ALTER TABLE loyalty_rewards ADD COLUMN IF NOT EXISTS stock        INTEGER`).catch(() => { });
+    // ── Apple Wallet device registration table ────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS apple_wallet_devices (
+        id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        device_id      VARCHAR(255) NOT NULL,
+        push_token     VARCHAR(255) NOT NULL DEFAULT '',
+        pass_type_id   VARCHAR(255) NOT NULL,
+        serial_number  VARCHAR(255) NOT NULL,
+        created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(device_id, pass_type_id, serial_number)
+      );
+    `).catch(() => { });
     // ── Review tags table ──────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS review_tags (
@@ -1674,6 +1687,270 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
     console.error("Loyalty/redeem error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
+});
+
+// ─── Google Wallet helpers ──────────────────────────────────────────────────
+
+const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
+const GW_SA_EMAIL = process.env.GOOGLE_SA_EMAIL || "";
+const GW_SA_PRIVATE_KEY = (process.env.GOOGLE_SA_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || "Ophelia Jump Studio";
+const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || "Ophelia Club";
+const GW_HEX_BG = process.env.GOOGLE_HEX_BACKGROUND_COLOR || "#1a0b26";
+const GW_CLASS_ID = GW_ISSUER_ID ? `${GW_ISSUER_ID}.ophelia_loyalty_v1` : "";
+
+function isGoogleWalletConfigured() {
+  return !!(GW_ISSUER_ID && GW_SA_EMAIL && GW_SA_PRIVATE_KEY);
+}
+
+/** Get OAuth2 access token for Google Wallet API using service account */
+async function getGoogleWalletAccessToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const claim = {
+    iss: GW_SA_EMAIL,
+    scope: "https://www.googleapis.com/auth/wallet_object.issuer",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  };
+  const saJwt = jwt.sign(claim, GW_SA_PRIVATE_KEY, { algorithm: "RS256" });
+  const resp = await axios.post("https://oauth2.googleapis.com/token", new URLSearchParams({
+    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    assertion: saJwt,
+  }), { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+  return resp.data.access_token;
+}
+
+/** Create or update the Google Wallet Loyalty Class (run once at startup) */
+async function ensureGoogleWalletClass() {
+  if (!isGoogleWalletConfigured()) return;
+  try {
+    const token = await getGoogleWalletAccessToken();
+    const classObj = {
+      id: GW_CLASS_ID,
+      issuerName: GW_ISSUER_NAME,
+      programName: GW_PROGRAM_NAME,
+      programLogo: {
+        sourceUri: { uri: "https://ophelia-jump-studio-production.up.railway.app/ophelia-logo.png" },
+        contentDescription: { defaultValue: { language: "es", value: "Ophelia Jump Studio" } },
+      },
+      hexBackgroundColor: GW_HEX_BG,
+      reviewStatus: "UNDER_REVIEW",
+      countryCode: "MX",
+      multipleDevicesAndHoldersAllowedStatus: "MULTIPLE_HOLDERS",
+    };
+    // Try to GET the class first
+    try {
+      await axios.get(`https://walletobjects.googleapis.com/walletobjects/v1/loyaltyClass/${GW_CLASS_ID}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // If exists, update it
+      await axios.put(`https://walletobjects.googleapis.com/walletobjects/v1/loyaltyClass/${GW_CLASS_ID}`, classObj, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      console.log("✅ Google Wallet loyalty class updated:", GW_CLASS_ID);
+    } catch (getErr) {
+      if (getErr.response?.status === 404) {
+        // Create new class
+        await axios.post("https://walletobjects.googleapis.com/walletobjects/v1/loyaltyClass", classObj, {
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        });
+        console.log("✅ Google Wallet loyalty class created:", GW_CLASS_ID);
+      } else {
+        throw getErr;
+      }
+    }
+  } catch (err) {
+    console.error("⚠️  Google Wallet class setup error:", err.response?.data || err.message);
+  }
+}
+
+/** Build a Google Wallet Save URL (JWT) for a user */
+function buildGoogleWalletSaveUrl({ userId, userName, points, level, qrCode }) {
+  const objectId = `${GW_ISSUER_ID}.ophelia_${userId.replace(/-/g, "")}`;
+  const loyaltyObject = {
+    id: objectId,
+    classId: GW_CLASS_ID,
+    state: "ACTIVE",
+    accountId: userId,
+    accountName: userName,
+    hexBackgroundColor: GW_HEX_BG,
+    barcode: { type: "QR_CODE", value: qrCode },
+    loyaltyPoints: {
+      balance: { int: points },
+      label: "PUNTOS",
+    },
+    textModulesData: [
+      { id: "level", header: "NIVEL", body: level },
+      { id: "studio", header: "ESTUDIO", body: "Ophelia Jump Studio" },
+    ],
+    linksModuleData: {
+      uris: [
+        { uri: "https://ophelia-jump-studio-production.up.railway.app/app/wallet", description: "Mi Wallet", id: "wallet_link" },
+      ],
+    },
+  };
+  const payload = {
+    iss: GW_SA_EMAIL,
+    aud: "google",
+    origins: ["https://ophelia-jump-studio-production.up.railway.app"],
+    typ: "savetowallet",
+    payload: {
+      loyaltyObjects: [loyaltyObject],
+    },
+  };
+  const signedJwt = jwt.sign(payload, GW_SA_PRIVATE_KEY, { algorithm: "RS256" });
+  return `https://pay.google.com/gp/v/save/${signedJwt}`;
+}
+
+// ─── Routes: /api/wallet/google ─────────────────────────────────────────────
+
+// GET /api/wallet/google/save-url — returns Save URL for logged-in user
+app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
+  if (!isGoogleWalletConfigured()) {
+    return res.status(503).json({ message: "Google Wallet no configurado" });
+  }
+  try {
+    // Get user info
+    const userRes = await pool.query("SELECT id, name, email FROM users WHERE id = $1", [req.userId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
+    const user = userRes.rows[0];
+    // Get points
+    const pointsRes = await pool.query(
+      "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
+      [req.userId]
+    );
+    const points = parseInt(pointsRes.rows[0].total);
+    let level = "Jade";
+    if (points >= 5000) level = "Diamante";
+    else if (points >= 2000) level = "Oro";
+    else if (points >= 500) level = "Plata";
+    const qrCode = Buffer.from(req.userId).toString("base64");
+    const saveUrl = buildGoogleWalletSaveUrl({
+      userId: req.userId,
+      userName: user.name || user.email,
+      points,
+      level,
+      qrCode,
+    });
+    return res.json({ data: { saveUrl } });
+  } catch (err) {
+    console.error("Google Wallet save-url error:", err.response?.data || err.message);
+    return res.status(500).json({ message: "Error generando pase de Google Wallet" });
+  }
+});
+
+// GET /api/wallet/google/diagnostics — check env config
+app.get("/api/wallet/google/diagnostics", async (_req, res) => {
+  return res.json({
+    configured: isGoogleWalletConfigured(),
+    issuerId: GW_ISSUER_ID ? "✅ set" : "❌ missing",
+    saEmail: GW_SA_EMAIL ? "✅ set" : "❌ missing",
+    saPrivateKey: GW_SA_PRIVATE_KEY ? "✅ set" : "❌ missing",
+    classId: GW_CLASS_ID || "N/A",
+    issuerName: GW_ISSUER_NAME,
+    programName: GW_PROGRAM_NAME,
+  });
+});
+
+// ─── Apple Wallet config ────────────────────────────────────────────────────
+
+const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || "";
+const APPLE_PASS_TYPE_ID = process.env.APPLE_PASS_TYPE_ID || "";
+const APPLE_KEY_ID = process.env.APPLE_KEY_ID || "";
+const APPLE_APNS_KEY_BASE64 = process.env.APPLE_APNS_KEY_BASE64 || "";
+const APPLE_AUTH_TOKEN = process.env.APPLE_AUTH_TOKEN || "";
+
+function isAppleWalletConfigured() {
+  return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_KEY_ID && APPLE_APNS_KEY_BASE64 && APPLE_AUTH_TOKEN);
+}
+
+// Apple Wallet Web Service endpoints (protocol V1)
+// These allow iOS to register devices, check for updates, and download updated passes
+// Note: .pkpass generation requires a signing certificate (.p12) not provided yet
+
+// POST /api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serial
+app.post("/api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serial", async (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  if (!authHeader.startsWith("ApplePass ") || authHeader.replace("ApplePass ", "") !== APPLE_AUTH_TOKEN) {
+    return res.status(401).send("Unauthorized");
+  }
+  const { deviceId, serial } = req.params;
+  const pushToken = req.body?.pushToken || "";
+  try {
+    await pool.query(`
+      INSERT INTO apple_wallet_devices (device_id, push_token, pass_type_id, serial_number)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (device_id, pass_type_id, serial_number) DO UPDATE SET push_token = $2, updated_at = NOW()
+    `, [deviceId, pushToken, APPLE_PASS_TYPE_ID, serial]);
+    return res.status(201).send();
+  } catch (err) {
+    console.error("Apple register device error:", err);
+    return res.status(500).send();
+  }
+});
+
+// GET /api/wallet/v1/devices/:deviceId/registrations/:passTypeId
+app.get("/api/wallet/v1/devices/:deviceId/registrations/:passTypeId", async (req, res) => {
+  const { deviceId } = req.params;
+  try {
+    const r = await pool.query(
+      "SELECT serial_number, updated_at FROM apple_wallet_devices WHERE device_id = $1 AND pass_type_id = $2",
+      [deviceId, APPLE_PASS_TYPE_ID]
+    );
+    if (r.rows.length === 0) return res.status(204).send();
+    return res.json({
+      serialNumbers: r.rows.map((d) => d.serial_number),
+      lastUpdated: r.rows[0].updated_at?.toISOString() || new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("Apple list passes error:", err);
+    return res.status(500).send();
+  }
+});
+
+// GET /api/wallet/v1/passes/:passTypeId/:serial — download updated pass
+app.get("/api/wallet/v1/passes/:passTypeId/:serial", async (req, res) => {
+  // .pkpass generation requires signing certificate - placeholder for now
+  return res.status(501).json({ message: "Pass generation not yet configured — signing certificate needed" });
+});
+
+// DELETE /api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serial
+app.delete("/api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serial", async (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  if (!authHeader.startsWith("ApplePass ") || authHeader.replace("ApplePass ", "") !== APPLE_AUTH_TOKEN) {
+    return res.status(401).send("Unauthorized");
+  }
+  const { deviceId, serial } = req.params;
+  try {
+    await pool.query(
+      "DELETE FROM apple_wallet_devices WHERE device_id = $1 AND pass_type_id = $2 AND serial_number = $3",
+      [deviceId, APPLE_PASS_TYPE_ID, serial]
+    );
+    return res.status(200).send();
+  } catch (err) {
+    console.error("Apple unregister device error:", err);
+    return res.status(500).send();
+  }
+});
+
+// POST /api/wallet/v1/log — Apple Wallet error log
+app.post("/api/wallet/v1/log", (req, res) => {
+  console.log("Apple Wallet log:", JSON.stringify(req.body));
+  return res.status(200).send();
+});
+
+// GET /api/wallet/apple/status — check Apple Wallet config
+app.get("/api/wallet/apple/status", async (_req, res) => {
+  return res.json({
+    configured: isAppleWalletConfigured(),
+    teamId: APPLE_TEAM_ID ? "✅ set" : "❌ missing",
+    passTypeId: APPLE_PASS_TYPE_ID || "N/A",
+    keyId: APPLE_KEY_ID ? "✅ set" : "❌ missing",
+    apnsKey: APPLE_APNS_KEY_BASE64 ? "✅ set" : "❌ missing",
+    authToken: APPLE_AUTH_TOKEN ? "✅ set" : "❌ missing",
+    note: "Para generar .pkpass se necesita el certificado de firma (.p12) del Pass Type ID",
+  });
 });
 
 // ─── Routes: /api/videos ────────────────────────────────────────────────────
@@ -4992,5 +5269,7 @@ function scheduleEmailCrons() {
 app.listen(PORT, async () => {
   await ensureSchema();
   scheduleEmailCrons();
+  // Initialize Google Wallet loyalty class if configured
+  ensureGoogleWalletClass().catch(() => { });
   console.log(`🚀 Ophelia API + Frontend → http://localhost:${PORT}`);
 });
