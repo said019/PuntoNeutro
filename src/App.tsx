@@ -44,7 +44,6 @@ import ClientDetail from "./pages/admin/clients/ClientDetail";
 import ClassesCalendar from "./pages/admin/classes/ClassesCalendar";
 import ClassTypesList from "./pages/admin/classes/ClassTypesList";
 import GenerateClasses from "./pages/admin/classes/GenerateClasses";
-import WeeklySchedule from "./pages/admin/schedules/WeeklySchedule";
 import BookingsList from "./pages/admin/bookings/BookingsList";
 import Waitlist from "./pages/admin/bookings/Waitlist";
 import PaymentsPage from "./pages/admin/payments/PaymentsPage";
@@ -130,7 +129,7 @@ const App = () => (
           <Route path="/admin/classes" element={<ClassesCalendar />} />
           <Route path="/admin/classes/types" element={<ClassTypesList />} />
           <Route path="/admin/classes/generate" element={<GenerateClasses />} />
-          <Route path="/admin/schedules" element={<WeeklySchedule />} />
+          <Route path="/admin/schedules" element={<Navigate to="/admin/classes" replace />} />
           <Route path="/admin/bookings" element={<BookingsList />} />
           <Route path="/admin/bookings/waitlist" element={<Waitlist />} />
           <Route path="/admin/staff" element={<Navigate to="/admin/classes" replace />} />

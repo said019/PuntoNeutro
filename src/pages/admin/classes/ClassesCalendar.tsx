@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format, startOfWeek, addDays, parseISO } from "date-fns";
+import { format, startOfWeek, addDays, parseISO, eachDayOfInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -20,7 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TimePicker } from "@/components/ui/time-picker";
+import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck, Sparkles, Calendar } from "lucide-react";
 
 /* ── Palette ── */
 const PALETTE_COLORS = [
@@ -104,18 +106,6 @@ const typeSchema = z.object({
   isActive: z.boolean().default(true),
 });
 type TypeFormData = z.infer<typeof typeSchema>;
-
-const generateSchema = z.object({
-  classTypeId: z.string().min(1),
-  instructorId: z.string().min(1),
-  startDate: z.string().min(1),
-  endDate: z.string().min(1),
-  daysOfWeek: z.array(z.number()).min(1),
-  startTime: z.string().min(1),
-  endTime: z.string().min(1),
-  maxCapacity: z.coerce.number().min(1),
-});
-type GenerateFormData = z.infer<typeof generateSchema>;
 
 /* ── Instructor schemas ── */
 const instructorSchema = z.object({
@@ -611,7 +601,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   TAB 3 – GENERATE WEEK
+   TAB 3 – GENERATE WEEK  (beautiful version)
    ═══════════════════════════════════════════════════════════════════ */
 function GenerateTab({
   types,
@@ -622,105 +612,289 @@ function GenerateTab({
   instructors: { id: string; displayName: string }[];
   toast: any;
 }) {
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("10:00");
+  const [classTypeId, setClassTypeId] = useState("");
+  const [instructorId, setInstructorId] = useState("");
+  const [maxCapacity, setMaxCapacity] = useState(20);
 
-  const form = useForm<GenerateFormData>({
-    resolver: zodResolver(generateSchema),
-    defaultValues: { daysOfWeek: [], maxCapacity: 10, startTime: "09:00", endTime: "10:00" },
-  });
+  const selectedType = types.find((t) => t.id === classTypeId);
+  const selectedInstructor = instructors.find((i) => i.id === instructorId);
+
+  // Preview: how many classes will be generated
+  const preview = useMemo(() => {
+    if (!startDate || !endDate || !selectedDays.length) return [];
+    try {
+      const days = eachDayOfInterval({
+        start: parseISO(startDate),
+        end: parseISO(endDate),
+      });
+      return days.filter((d) => selectedDays.includes(d.getDay()));
+    } catch {
+      return [];
+    }
+  }, [startDate, endDate, selectedDays]);
 
   const generateMutation = useMutation({
-    mutationFn: (d: GenerateFormData) => api.post("/classes/generate", d),
-    onSuccess: (res: any) => toast({ title: (res.data?.created ?? "N") + " clases generadas" }),
+    mutationFn: () =>
+      api.post("/classes/generate", {
+        classTypeId,
+        instructorId,
+        startDate,
+        endDate,
+        daysOfWeek: selectedDays,
+        startTime,
+        endTime,
+        maxCapacity,
+      }),
+    onSuccess: (res: any) => toast({ title: `✨ ${res.data?.created ?? 0} clases generadas` }),
     onError: () => toast({ title: "Error generando clases", variant: "destructive" }),
   });
 
   const toggleDay = (v: number) => {
-    const updated = selectedDays.includes(v) ? selectedDays.filter((d) => d !== v) : [...selectedDays, v];
-    setSelectedDays(updated);
-    form.setValue("daysOfWeek", updated);
+    setSelectedDays((prev) =>
+      prev.includes(v) ? prev.filter((d) => d !== v) : [...prev, v]
+    );
   };
 
+  const canGenerate = classTypeId && instructorId && startDate && endDate && selectedDays.length > 0;
+
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold mb-1">Generar clases de la semana</h2>
-        <p className="text-sm text-muted-foreground mb-6">Crea múltiples clases de un tipo en un rango de fechas.</p>
-
-        <form onSubmit={form.handleSubmit((d) => generateMutation.mutate(d))} className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Tipo de clase</Label>
-              <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
-                <SelectContent>
-                  {types.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      <span className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: t.color }} />
-                        {t.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Instructor</Label>
-              <Select onValueChange={(v) => form.setValue("instructorId", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                <SelectContent>
-                  {instructors.map((inst) => (
-                    <SelectItem key={inst.id} value={inst.id}>{inst.displayName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="space-y-1"><Label>Fecha inicio</Label><Input type="date" {...form.register("startDate")} /></div>
-            <div className="space-y-1"><Label>Fecha fin</Label><Input type="date" {...form.register("endDate")} /></div>
-            <div className="space-y-1"><Label>Hora inicio</Label><Input type="time" {...form.register("startTime")} /></div>
-            <div className="space-y-1"><Label>Hora fin</Label><Input type="time" {...form.register("endTime")} /></div>
-          </div>
-
-          <div className="space-y-1">
-            <Label>Capacidad máxima</Label>
-            <Input type="number" {...form.register("maxCapacity")} className="max-w-[120px]" />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Días de la semana</Label>
-            <div className="flex flex-wrap gap-2">
-              {GENERATE_DAYS.map((d) => (
-                <button
-                  key={d.value}
-                  type="button"
-                  onClick={() => toggleDay(d.value)}
-                  className={
-                    "px-4 py-2 rounded-lg text-sm font-medium transition-all " +
-                    (selectedDays.includes(d.value)
-                      ? "bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white shadow-md"
-                      : "bg-secondary text-muted-foreground hover:text-foreground")
-                  }
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <Button
-            type="submit"
-            disabled={generateMutation.isPending}
-            className="w-full bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] hover:from-[#CA71E1]/90 hover:to-[#E15CB8]/90 text-white font-medium"
-          >
-            {generateMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : <Zap size={14} className="mr-2" />}
-            Generar clases
-          </Button>
-        </form>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="text-center mb-2">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-[#CA71E1]/10 to-[#E15CB8]/10 border border-[#CA71E1]/20 mb-3">
+          <Sparkles size={14} className="text-[#E7EB6E]" />
+          <span className="text-xs font-semibold text-[#CA71E1]">Generador de clases</span>
+        </div>
+        <h2 className="text-2xl font-bold text-white">Generar clases en bloque</h2>
+        <p className="text-sm text-white/40 mt-1">Selecciona tipo, instructor, rango de fechas y días</p>
       </div>
+
+      {/* ── Step 1: Class type + Instructor ── */}
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#CA71E1]/20 text-[#CA71E1] text-xs font-bold">1</span>
+          <span className="text-xs font-semibold text-[#CA71E1]/70 uppercase tracking-wider">Clase e instructor</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Tipo de clase</Label>
+            <Select onValueChange={setClassTypeId}>
+              <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                <SelectValue placeholder="Seleccionar tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {types.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: t.color }} />
+                      {t.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Instructor</Label>
+            <Select onValueChange={setInstructorId}>
+              <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                <SelectValue placeholder="Seleccionar instructor" />
+              </SelectTrigger>
+              <SelectContent>
+                {instructors.map((inst) => (
+                  <SelectItem key={inst.id} value={inst.id}>{inst.displayName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Step 2: Date range ── */}
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#E15CB8]/20 text-[#E15CB8] text-xs font-bold">2</span>
+          <span className="text-xs font-semibold text-[#E15CB8]/70 uppercase tracking-wider">Rango de fechas</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Fecha inicio</Label>
+            <DatePicker value={startDate} onChange={setStartDate} placeholder="Desde" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Fecha fin</Label>
+            <DatePicker value={endDate} onChange={setEndDate} placeholder="Hasta" min={startDate} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Step 3: Days of week ── */}
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#E7EB6E]/20 text-[#E7EB6E] text-xs font-bold">3</span>
+          <span className="text-xs font-semibold text-[#E7EB6E]/70 uppercase tracking-wider">Días de la semana</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {GENERATE_DAYS.map((d) => (
+            <button
+              key={d.value}
+              type="button"
+              onClick={() => toggleDay(d.value)}
+              className={
+                "relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all " +
+                (selectedDays.includes(d.value)
+                  ? "bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white shadow-[0_0_12px_rgba(225,92,184,0.3)]"
+                  : "bg-white/[0.04] border border-white/[0.07] text-white/45 hover:text-white/75 hover:border-white/20")
+              }
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-3 mt-2">
+          <button
+            type="button"
+            onClick={() => setSelectedDays([1, 2, 3, 4, 5])}
+            className="text-[10px] text-[#CA71E1] font-medium hover:underline"
+          >
+            Lun–Vie
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDays([1, 2, 3, 4, 5, 6])}
+            className="text-[10px] text-[#CA71E1] font-medium hover:underline"
+          >
+            Lun–Sáb
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDays([0, 1, 2, 3, 4, 5, 6])}
+            className="text-[10px] text-[#CA71E1] font-medium hover:underline"
+          >
+            Todos
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDays([])}
+            className="text-[10px] text-white/30 font-medium hover:underline"
+          >
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      {/* ── Step 4: Time + Capacity ── */}
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] text-xs font-bold">4</span>
+          <span className="text-xs font-semibold text-[#8B5CF6]/70 uppercase tracking-wider">Horario y capacidad</span>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Hora inicio</Label>
+            <TimePicker value={startTime} onChange={setStartTime} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Hora fin</Label>
+            <TimePicker value={endTime} onChange={setEndTime} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-white/60 text-xs">Capacidad máx.</Label>
+            <Input
+              type="number"
+              value={maxCapacity}
+              onChange={(e) => setMaxCapacity(Number(e.target.value))}
+              className="bg-white/[0.04] border-white/[0.08] text-white text-center"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Preview ── */}
+      {preview.length > 0 && (
+        <div className="rounded-2xl border border-[#CA71E1]/20 bg-gradient-to-br from-[#CA71E1]/5 to-[#E15CB8]/5 p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calendar size={14} className="text-[#E7EB6E]" />
+              <span className="text-xs font-semibold text-white/60 uppercase tracking-wider">Vista previa</span>
+            </div>
+            <Badge variant="outline" className="border-[#CA71E1]/30 text-[#CA71E1] font-bold">
+              {preview.length} {preview.length === 1 ? "clase" : "clases"}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5">
+            {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
+              <div key={d} className="text-center text-[10px] font-bold text-white/25 uppercase">{d}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 max-h-[200px] overflow-y-auto">
+            {preview.map((d) => (
+              <div
+                key={d.toISOString()}
+                className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg bg-white/[0.03] border border-white/[0.05]"
+              >
+                <span className="text-[10px] text-white/40">
+                  {format(d, "MMM", { locale: es })}
+                </span>
+                <span className="text-sm font-bold text-white">
+                  {format(d, "d")}
+                </span>
+                <span className="text-[9px] text-[#E7EB6E]/60 font-medium">
+                  {startTime}
+                </span>
+                {selectedType && (
+                  <span
+                    className="w-2 h-2 rounded-full mt-0.5"
+                    style={{ backgroundColor: selectedType.color }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {selectedType && (
+            <div className="flex items-center gap-3 pt-2 border-t border-white/[0.05]">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedType.color }} />
+              <span className="text-xs text-white/60">
+                <strong className="text-white/80">{selectedType.name}</strong>
+                {selectedInstructor && <> · {selectedInstructor.displayName}</>}
+                {" · "}{startTime}–{endTime} · {maxCapacity} cupos
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Generate Button ── */}
+      <button
+        type="button"
+        disabled={!canGenerate || generateMutation.isPending}
+        onClick={() => generateMutation.mutate()}
+        className={
+          "w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-semibold text-white transition-all " +
+          (canGenerate
+            ? "bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 shadow-[0_4px_20px_rgba(225,92,184,0.25)]"
+            : "bg-white/[0.05] text-white/25 cursor-not-allowed")
+        }
+      >
+        {generateMutation.isPending ? (
+          <Loader2 className="animate-spin" size={16} />
+        ) : (
+          <Sparkles size={16} />
+        )}
+        {generateMutation.isPending
+          ? "Generando…"
+          : preview.length > 0
+          ? `Generar ${preview.length} clases`
+          : "Generar clases"}
+      </button>
     </div>
   );
 }
