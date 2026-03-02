@@ -2476,77 +2476,6 @@ app.delete("/api/schedules/:id", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-// ─── Orders verify/reject ────────────────────────────────────────────────────
-
-// PUT /api/orders/:id/verify
-app.put("/api/orders/:id/verify", adminMiddleware, async (req, res) => {
-  try {
-    const r = await pool.query(
-      "UPDATE orders SET status='approved', verified_at=NOW(), verified_by=$1 WHERE id=$2 RETURNING *",
-      [req.userId, req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
-    const order = r.rows[0];
-    if (order.plan_id) {
-      const planRes = await pool.query("SELECT * FROM plans WHERE id = $1", [order.plan_id]);
-      if (planRes.rows.length) {
-        const plan = planRes.rows[0];
-        const end = new Date(); end.setDate(end.getDate() + (plan.duration_days || 30));
-        await pool.query(
-          `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
-           VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)
-           ON CONFLICT (order_id) DO UPDATE SET status='active'`,
-          [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
-        ).catch(() => { });
-
-        // ── Email: membership activated via order ────────────────────────
-        if (order.user_id) {
-          try {
-            const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [order.user_id]);
-            if (uRes.rows[0]) {
-              const u = uRes.rows[0];
-              sendMembershipActivated({
-                to: u.email,
-                name: u.full_name || u.display_name || "Alumna",
-                planName: plan.name,
-                startDate: new Date().toISOString(),
-                endDate: end.toISOString(),
-                classLimit: plan.class_limit ?? null,
-              }).catch((e) => console.error("[Email] order verify membership:", e.message));
-            }
-          } catch (emailErr) {
-            console.error("[Email] order verify query:", emailErr.message);
-          }
-        }
-      }
-    }
-    // Award loyalty points for purchase (points_per_peso)
-    if (order.user_id && order.total_amount > 0) {
-      try {
-        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-        const pts = Math.floor((order.total_amount || 0) * (cfg.points_per_peso ?? 1));
-        if (cfg.enabled !== false && pts > 0) {
-          await pool.query(
-            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
-            [order.user_id, pts, `Compra aprobada — $${order.total_amount}`]
-          );
-        }
-      } catch (e) { /* loyalty earn error shouldn't fail verify */ }
-    }
-    return res.json({ data: order });
-  } catch (err) { console.error("orders/:id/verify error:", err); return res.status(500).json({ message: "Error interno" }); }
-});
-
-// PUT /api/orders/:id/reject
-app.put("/api/orders/:id/reject", adminMiddleware, async (req, res) => {
-  try {
-    const r = await pool.query("UPDATE orders SET status='rejected', verified_at=NOW() WHERE id=$1 RETURNING *", [req.params.id]);
-    if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
-});
-
 // POST /api/pos/checkout — alias for /pos/sale
 app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
   req.url = "/api/pos/sale";
@@ -3711,33 +3640,6 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/orders/pending
-app.get("/api/orders/pending", adminMiddleware, async (req, res) => {
-  try {
-    const r = await pool.query(
-      `SELECT o.*, u.display_name AS user_name, p.name AS plan_name,
-              pp.file_url AS proof_url, pp.status AS proof_status
-       FROM orders o
-       LEFT JOIN users u ON o.user_id = u.id
-       LEFT JOIN plans p ON o.plan_id = p.id
-       LEFT JOIN payment_proofs pp ON pp.order_id = o.id
-       WHERE o.status = 'pending_verification'
-       ORDER BY o.created_at DESC LIMIT 20`
-    );
-    return res.json({
-      data: r.rows.map(o => ({
-        ...o,
-        userName: o.user_name,
-        planName: o.plan_name,
-        proofUrl: o.proof_url,
-        proofStatus: o.proof_status,
-      })),
-    });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
 // GET /api/admin/orders — all orders
 app.get("/api/admin/orders", adminMiddleware, async (req, res) => {
   try {
@@ -3757,10 +3659,13 @@ app.get("/api/admin/orders", adminMiddleware, async (req, res) => {
       data: r.rows.map(o => ({
         ...o,
         userName: o.user_name,
+        userId: o.user_id,
         planName: o.plan_name,
         proofUrl: o.proof_url,
         proofStatus: o.proof_status,
         proofUploadedAt: o.proof_uploaded_at,
+        totalAmount: o.total_amount,
+        createdAt: o.created_at,
       })),
     });
   } catch (err) {
@@ -3776,8 +3681,9 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
       [req.userId, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
-    // Activate membership if this order is for a plan
     const order = r.rows[0];
+
+    // Activate membership if this order is for a plan
     if (order.plan_id) {
       const planRes = await pool.query("SELECT * FROM plans WHERE id = $1", [order.plan_id]);
       if (planRes.rows.length) {
@@ -3789,10 +3695,46 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
            VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)
            ON CONFLICT (order_id) DO UPDATE SET status='active'`,
           [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
-        );
+        ).catch(() => { });
+
+        // Email: membership activated
+        if (order.user_id) {
+          try {
+            const uRes = await pool.query("SELECT email, full_name, display_name FROM users WHERE id = $1", [order.user_id]);
+            if (uRes.rows[0]) {
+              const u = uRes.rows[0];
+              sendMembershipActivated({
+                to: u.email,
+                name: u.full_name || u.display_name || "Alumna",
+                planName: plan.name,
+                startDate: new Date().toISOString(),
+                endDate: end.toISOString(),
+                classLimit: plan.class_limit ?? null,
+              }).catch((e) => console.error("[Email] admin order verify:", e.message));
+            }
+          } catch (emailErr) {
+            console.error("[Email] admin order verify query:", emailErr.message);
+          }
+        }
       }
     }
-    return res.json({ data: r.rows[0] });
+
+    // Award loyalty points for purchase
+    if (order.user_id && order.total_amount > 0) {
+      try {
+        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+        const pts = Math.floor((order.total_amount || 0) * (cfg.points_per_peso ?? 1));
+        if (cfg.enabled !== false && pts > 0) {
+          await pool.query(
+            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
+            [order.user_id, pts, `Compra aprobada — $${order.total_amount}`]
+          );
+        }
+      } catch (e) { /* loyalty earn error shouldn't fail verify */ }
+    }
+
+    return res.json({ data: order });
   } catch (err) {
     console.error("PUT /admin/orders/:id/verify error:", err);
     return res.status(500).json({ message: "Error interno" });

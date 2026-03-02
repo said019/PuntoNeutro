@@ -23,19 +23,13 @@ const STATUS_BADGE: Record<string, "default" | "outline" | "destructive" | "seco
 
 interface Order {
   id: string;
-  userName?: string;
-  user_name?: string;
+  userName: string;
   userId: string;
-  user_id?: string;
-  amount?: number;
-  total_amount?: number;
+  totalAmount: number;
   status: string;
-  createdAt?: string;
-  created_at?: string;
+  createdAt: string;
   proofUrl?: string;
-  proof_url?: string;
   planName?: string;
-  plan_name?: string;
   notes?: string;
 }
 
@@ -81,10 +75,10 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
               ))
               : orders.map((o) => (
                 <TableRow key={o.id}>
-                  <TableCell>{o.userName ?? o.user_name ?? o.userId ?? o.user_id}</TableCell>
-                  <TableCell>${o.total_amount ?? o.amount} MXN</TableCell>
+                  <TableCell>{o.userName ?? o.userId}</TableCell>
+                  <TableCell>${o.totalAmount} MXN</TableCell>
                   <TableCell><Badge variant={STATUS_BADGE[o.status] ?? "outline"}>{o.status}</Badge></TableCell>
-                  <TableCell className="text-sm">{new Date(o.createdAt ?? o.created_at ?? "").toLocaleDateString("es-MX")}</TableCell>
+                  <TableCell className="text-sm">{new Date(o.createdAt).toLocaleDateString("es-MX")}</TableCell>
                   <TableCell>
                     <Button size="sm" variant="outline" onClick={() => { setSelected(o); setNotes(""); }}>
                       Ver detalle
@@ -103,17 +97,17 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
           {selected && (
             <div className="space-y-4">
               <div className="text-sm space-y-1">
-                <div><span className="font-medium">Cliente:</span> {selected.userName ?? selected.user_name}</div>
-                <div><span className="font-medium">Plan:</span> {selected.planName ?? selected.plan_name ?? "—"}</div>
-                <div><span className="font-medium">Monto:</span> ${selected.total_amount ?? selected.amount} MXN</div>
+                <div><span className="font-medium">Cliente:</span> {selected.userName}</div>
+                <div><span className="font-medium">Plan:</span> {selected.planName ?? "—"}</div>
+                <div><span className="font-medium">Monto:</span> ${selected.totalAmount} MXN</div>
                 <div><span className="font-medium">Estado:</span> <Badge variant={STATUS_BADGE[selected.status] ?? "outline"}>{selected.status}</Badge></div>
               </div>
-              {(selected.proofUrl || selected.proof_url) && (
+              {selected.proofUrl && (
                 <div>
                   <Label className="mb-2 block">Comprobante</Label>
-                  {(selected.proofUrl ?? selected.proof_url ?? "").endsWith(".pdf")
-                    ? <a href={selected.proofUrl ?? selected.proof_url} target="_blank" rel="noreferrer" className="text-primary text-sm underline">Ver PDF</a>
-                    : <img src={selected.proofUrl ?? selected.proof_url} alt="Comprobante" className="max-h-48 rounded-lg object-contain border border-border" />
+                  {selected.proofUrl.endsWith(".pdf")
+                    ? <a href={selected.proofUrl} target="_blank" rel="noreferrer" className="text-primary text-sm underline">Ver PDF</a>
+                    : <img src={selected.proofUrl} alt="Comprobante" className="max-h-48 rounded-lg object-contain border border-border" />
                   }
                 </div>
               )}

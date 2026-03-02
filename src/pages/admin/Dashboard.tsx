@@ -29,7 +29,7 @@ const Dashboard = () => {
 
   const { data: pendingOrders } = useQuery<{ data: Stats["pendingOrders"] }>({
     queryKey: ["orders-pending"],
-    queryFn: async () => (await api.get("/orders/pending")).data,
+    queryFn: async () => (await api.get("/admin/orders?status=pending_verification")).data,
   });
 
   const metric = (label: string, value: number | undefined, icon: React.ReactNode, prefix = "", accent = "#CA71E1") => (
