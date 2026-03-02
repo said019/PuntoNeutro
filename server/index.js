@@ -2319,31 +2319,60 @@ const APPLE_PASS_TYPE_ID = process.env.APPLE_PASS_TYPE_ID || "";
 const APPLE_KEY_ID = process.env.APPLE_KEY_ID || "";
 const APPLE_APNS_KEY_BASE64 = process.env.APPLE_APNS_KEY_BASE64 || "";
 const APPLE_AUTH_TOKEN = process.env.APPLE_AUTH_TOKEN || crypto.randomBytes(32).toString("hex");
-// Signing certificates (PEM base64-encoded in env vars)
-const APPLE_SIGNER_CERT_BASE64 = process.env.APPLE_SIGNER_CERT_BASE64 || "";
-const APPLE_SIGNER_KEY_BASE64 = process.env.APPLE_SIGNER_KEY_BASE64 || "";
-const APPLE_WWDR_CERT_BASE64 = process.env.APPLE_WWDR_CERT_BASE64 || "";
 const APPLE_CERT_PASSWORD = process.env.APPLE_CERT_PASSWORD || "";
 
-function isAppleWalletConfigured() {
-  return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_SIGNER_CERT_BASE64 && APPLE_SIGNER_KEY_BASE64 && APPLE_WWDR_CERT_BASE64);
+// ── Certificate loading: files first, then base64 env vars ──────────────────
+// Priority 1: Read from files in wallet-assets/apple-pass/
+// Priority 2: Decode from base64 env vars (APPLE_SIGNER_CERT_BASE64, etc.)
+
+const WALLET_ASSETS_DIR = path.join(__dirname, "..", "wallet-assets", "apple-pass");
+const CERT_FILE_PATHS = {
+  cert: process.env.APPLE_PASS_CERT || path.join(WALLET_ASSETS_DIR, "pass.pem"),
+  key:  process.env.APPLE_PASS_KEY  || path.join(WALLET_ASSETS_DIR, "pass.key"),
+  wwdr: process.env.APPLE_PASS_WWDR || path.join(WALLET_ASSETS_DIR, "wwdr.pem"),
+};
+
+/** Try to load PEM from file, return empty string if not found */
+function loadCertFile(filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, "utf8").trim();
+      if (content.includes("-----BEGIN")) {
+        console.log(`[Apple Wallet] ✅ Loaded cert from file: ${filePath} (${content.length} chars)`);
+        return content;
+      }
+    }
+  } catch (e) {
+    console.error(`[Apple Wallet] ❌ Error reading ${filePath}:`, e.message);
+  }
+  return "";
 }
 
 /** Decode base64 env var to PEM, ensuring proper PEM formatting */
 function decodeBase64ToPem(b64, label = "CERTIFICATE") {
   if (!b64) return "";
   let raw = Buffer.from(b64, "base64").toString("utf8").trim();
-  // If it already has PEM headers, clean it up
   if (raw.includes("-----BEGIN")) {
-    // Normalize line endings
     raw = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     return raw;
   }
-  // Otherwise, it's just raw base64 content — wrap it in PEM headers
-  // Remove any whitespace/newlines from the raw base64
   const cleanB64 = raw.replace(/[\s\n\r]/g, "");
   const lines = cleanB64.match(/.{1,64}/g) || [cleanB64];
   return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
+}
+
+// Load certs: try files first, then env vars
+const APPLE_SIGNER_CERT_PEM = loadCertFile(CERT_FILE_PATHS.cert)
+  || decodeBase64ToPem(process.env.APPLE_SIGNER_CERT_BASE64 || "", "CERTIFICATE");
+
+const APPLE_SIGNER_KEY_PEM = loadCertFile(CERT_FILE_PATHS.key)
+  || decodeBase64ToPem(process.env.APPLE_SIGNER_KEY_BASE64 || "", "PRIVATE KEY");
+
+const APPLE_WWDR_CERT_PEM = loadCertFile(CERT_FILE_PATHS.wwdr)
+  || decodeBase64ToPem(process.env.APPLE_WWDR_CERT_BASE64 || "", "CERTIFICATE");
+
+function isAppleWalletConfigured() {
+  return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_SIGNER_CERT_PEM && APPLE_SIGNER_KEY_PEM && APPLE_WWDR_CERT_PEM);
 }
 
 /** Find image assets — check both public/ and dist/ directories */
@@ -2360,31 +2389,31 @@ function findAssetDir() {
       return dir;
     }
   }
-  return candidates[0]; // fallback
+  return candidates[0];
 }
 
 console.log("[Apple Wallet] Config check:",
-  isAppleWalletConfigured() ? "✅ All certs configured — .pkpass mode" : "⚠️ Missing certs — web pass fallback mode",
+  isAppleWalletConfigured() ? "✅ All certs configured — .pkpass mode" : "⚠️ Missing certs — web pass fallback mode");
+console.log("[Apple Wallet]",
   "| TEAM:", APPLE_TEAM_ID ? "✅" : "❌",
   "| PASS_TYPE:", APPLE_PASS_TYPE_ID ? "✅" : "❌",
-  "| CERT:", APPLE_SIGNER_CERT_BASE64 ? `✅ (${APPLE_SIGNER_CERT_BASE64.length} chars)` : "❌",
-  "| KEY:", APPLE_SIGNER_KEY_BASE64 ? `✅ (${APPLE_SIGNER_KEY_BASE64.length} chars)` : "❌",
-  "| WWDR:", APPLE_WWDR_CERT_BASE64 ? `✅ (${APPLE_WWDR_CERT_BASE64.length} chars)` : "❌",
-  "| ASSET_DIR:", findAssetDir()
-);
+  "| CERT:", APPLE_SIGNER_CERT_PEM ? `✅ (${APPLE_SIGNER_CERT_PEM.length} chars)` : "❌",
+  "| KEY:", APPLE_SIGNER_KEY_PEM ? `✅ (${APPLE_SIGNER_KEY_PEM.length} chars)` : "❌",
+  "| WWDR:", APPLE_WWDR_CERT_PEM ? `✅ (${APPLE_WWDR_CERT_PEM.length} chars)` : "❌");
+console.log("[Apple Wallet] File paths checked:",
+  "cert:", CERT_FILE_PATHS.cert, fs.existsSync(CERT_FILE_PATHS.cert) ? "✅" : "❌",
+  "| key:", CERT_FILE_PATHS.key, fs.existsSync(CERT_FILE_PATHS.key) ? "✅" : "❌",
+  "| wwdr:", CERT_FILE_PATHS.wwdr, fs.existsSync(CERT_FILE_PATHS.wwdr) ? "✅" : "❌");
+console.log("[Apple Wallet] ASSET_DIR:", findAssetDir());
 
 // Validate certs at startup if configured
 if (isAppleWalletConfigured()) {
   try {
-    const certPem = decodeBase64ToPem(APPLE_SIGNER_CERT_BASE64, "CERTIFICATE");
-    const keyPem = decodeBase64ToPem(APPLE_SIGNER_KEY_BASE64, "PRIVATE KEY");
-    const wwdrPem = decodeBase64ToPem(APPLE_WWDR_CERT_BASE64, "CERTIFICATE");
-    console.log("[Apple Wallet] Cert PEM starts with:", certPem.substring(0, 50));
-    console.log("[Apple Wallet] Key PEM starts with:", keyPem.substring(0, 50));
-    console.log("[Apple Wallet] WWDR PEM starts with:", wwdrPem.substring(0, 50));
-    // Try to verify the key is valid
+    console.log("[Apple Wallet] Cert PEM starts with:", APPLE_SIGNER_CERT_PEM.substring(0, 50));
+    console.log("[Apple Wallet] Key PEM starts with:", APPLE_SIGNER_KEY_PEM.substring(0, 50));
+    console.log("[Apple Wallet] WWDR PEM starts with:", APPLE_WWDR_CERT_PEM.substring(0, 50));
     try {
-      crypto.createPrivateKey(keyPem);
+      crypto.createPrivateKey(APPLE_SIGNER_KEY_PEM);
       console.log("[Apple Wallet] ✅ Private key validated successfully");
     } catch (keyErr) {
       console.error("[Apple Wallet] ❌ Private key validation failed:", keyErr.message);
@@ -2543,9 +2572,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   files["manifest.json"] = manifestBuffer;
 
   // Sign manifest with Apple certificates to create PKCS#7 signature
-  const signerCertPem = decodeBase64ToPem(APPLE_SIGNER_CERT_BASE64, "CERTIFICATE");
-  const signerKeyPem = decodeBase64ToPem(APPLE_SIGNER_KEY_BASE64, "PRIVATE KEY");
-  const wwdrPem = decodeBase64ToPem(APPLE_WWDR_CERT_BASE64, "CERTIFICATE");
+  // Use pre-loaded PEM variables (from files or base64 env vars)
+  const signerCertPem = APPLE_SIGNER_CERT_PEM;
+  const signerKeyPem = APPLE_SIGNER_KEY_PEM;
+  const wwdrPem = APPLE_WWDR_CERT_PEM;
 
   console.log("[Apple Wallet] PEM sizes — cert:", signerCertPem.length, "key:", signerKeyPem.length, "wwdr:", wwdrPem.length);
 
@@ -2681,9 +2711,9 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
     console.log("[Apple Wallet] ⚠️ Certs not configured — using web pass fallback.",
       "TEAM:", APPLE_TEAM_ID ? "✅" : "❌",
       "PASS_TYPE:", APPLE_PASS_TYPE_ID ? "✅" : "❌",
-      "CERT:", APPLE_SIGNER_CERT_BASE64 ? "✅" : "❌",
-      "KEY:", APPLE_SIGNER_KEY_BASE64 ? "✅" : "❌",
-      "WWDR:", APPLE_WWDR_CERT_BASE64 ? "✅" : "❌"
+      "CERT:", APPLE_SIGNER_CERT_PEM ? "✅" : "❌",
+      "KEY:", APPLE_SIGNER_KEY_PEM ? "✅" : "❌",
+      "WWDR:", APPLE_WWDR_CERT_PEM ? "✅" : "❌"
     );
 
     // Fallback: generate a beautiful standalone HTML pass page
@@ -2779,9 +2809,14 @@ app.get("/api/wallet/apple/status", async (_req, res) => {
     nativePkpass: isAppleWalletConfigured(),
     teamId: APPLE_TEAM_ID ? "✅ set" : "❌ (web pass mode)",
     passTypeId: APPLE_PASS_TYPE_ID || "N/A (web pass mode)",
-    signerCert: APPLE_SIGNER_CERT_BASE64 ? "✅ set" : "❌ (web pass mode)",
-    signerKey: APPLE_SIGNER_KEY_BASE64 ? "✅ set" : "❌ (web pass mode)",
-    wwdrCert: APPLE_WWDR_CERT_BASE64 ? "✅ set" : "❌ (web pass mode)",
+    signerCert: APPLE_SIGNER_CERT_PEM ? `✅ loaded (${APPLE_SIGNER_CERT_PEM.length} chars)` : "❌ (web pass mode)",
+    signerKey: APPLE_SIGNER_KEY_PEM ? `✅ loaded (${APPLE_SIGNER_KEY_PEM.length} chars)` : "❌ (web pass mode)",
+    wwdrCert: APPLE_WWDR_CERT_PEM ? `✅ loaded (${APPLE_WWDR_CERT_PEM.length} chars)` : "❌ (web pass mode)",
+    certFiles: {
+      cert: `${CERT_FILE_PATHS.cert} ${fs.existsSync(CERT_FILE_PATHS.cert) ? "✅" : "❌"}`,
+      key: `${CERT_FILE_PATHS.key} ${fs.existsSync(CERT_FILE_PATHS.key) ? "✅" : "❌"}`,
+      wwdr: `${CERT_FILE_PATHS.wwdr} ${fs.existsSync(CERT_FILE_PATHS.wwdr) ? "✅" : "❌"}`,
+    },
   });
 });
 
@@ -2798,10 +2833,22 @@ app.get("/api/wallet/apple/debug", authMiddleware, async (req, res) => {
     envVars: {
       APPLE_TEAM_ID: APPLE_TEAM_ID ? `✅ "${APPLE_TEAM_ID}"` : "❌ not set",
       APPLE_PASS_TYPE_ID: APPLE_PASS_TYPE_ID ? `✅ "${APPLE_PASS_TYPE_ID}"` : "❌ not set",
-      APPLE_SIGNER_CERT_BASE64: APPLE_SIGNER_CERT_BASE64 ? `✅ (${APPLE_SIGNER_CERT_BASE64.length} chars)` : "❌ not set",
-      APPLE_SIGNER_KEY_BASE64: APPLE_SIGNER_KEY_BASE64 ? `✅ (${APPLE_SIGNER_KEY_BASE64.length} chars)` : "❌ not set",
-      APPLE_WWDR_CERT_BASE64: APPLE_WWDR_CERT_BASE64 ? `✅ (${APPLE_WWDR_CERT_BASE64.length} chars)` : "❌ not set",
       APPLE_CERT_PASSWORD: APPLE_CERT_PASSWORD ? "✅ set" : "⬜ not set (OK if key has no password)",
+    },
+    certFiles: {
+      certPath: `${CERT_FILE_PATHS.cert} ${fs.existsSync(CERT_FILE_PATHS.cert) ? "✅ exists" : "❌ not found"}`,
+      keyPath: `${CERT_FILE_PATHS.key} ${fs.existsSync(CERT_FILE_PATHS.key) ? "✅ exists" : "❌ not found"}`,
+      wwdrPath: `${CERT_FILE_PATHS.wwdr} ${fs.existsSync(CERT_FILE_PATHS.wwdr) ? "✅ exists" : "❌ not found"}`,
+    },
+    loadedPems: {
+      signerCert: APPLE_SIGNER_CERT_PEM ? `✅ loaded (${APPLE_SIGNER_CERT_PEM.length} chars), starts: ${APPLE_SIGNER_CERT_PEM.substring(0, 40)}...` : "❌ not loaded",
+      signerKey: APPLE_SIGNER_KEY_PEM ? `✅ loaded (${APPLE_SIGNER_KEY_PEM.length} chars), starts: ${APPLE_SIGNER_KEY_PEM.substring(0, 40)}...` : "❌ not loaded",
+      wwdr: APPLE_WWDR_CERT_PEM ? `✅ loaded (${APPLE_WWDR_CERT_PEM.length} chars), starts: ${APPLE_WWDR_CERT_PEM.substring(0, 40)}...` : "❌ not loaded",
+    },
+    base64EnvFallback: {
+      APPLE_SIGNER_CERT_BASE64: process.env.APPLE_SIGNER_CERT_BASE64 ? `✅ (${process.env.APPLE_SIGNER_CERT_BASE64.length} chars)` : "⬜ not set",
+      APPLE_SIGNER_KEY_BASE64: process.env.APPLE_SIGNER_KEY_BASE64 ? `✅ (${process.env.APPLE_SIGNER_KEY_BASE64.length} chars)` : "⬜ not set",
+      APPLE_WWDR_CERT_BASE64: process.env.APPLE_WWDR_CERT_BASE64 ? `✅ (${process.env.APPLE_WWDR_CERT_BASE64.length} chars)` : "⬜ not set",
     },
     assetDir: findAssetDir(),
     assetsFound: {
@@ -2809,7 +2856,6 @@ app.get("/api/wallet/apple/debug", authMiddleware, async (req, res) => {
       "ophelia-logo-full.png": fs.existsSync(path.join(findAssetDir(), "ophelia-logo-full.png")),
     },
     opensslVersion: "unknown",
-    certDecode: {},
     keyValidation: "not tested",
   };
 
@@ -2820,31 +2866,14 @@ app.get("/api/wallet/apple/debug", authMiddleware, async (req, res) => {
     checks.opensslVersion = "❌ openssl not found: " + e.message;
   }
 
-  // Check cert decoding
-  if (APPLE_SIGNER_CERT_BASE64) {
+  // Validate private key
+  if (APPLE_SIGNER_KEY_PEM) {
     try {
-      const pem = decodeBase64ToPem(APPLE_SIGNER_CERT_BASE64, "CERTIFICATE");
-      checks.certDecode.signerCert = `✅ decoded (${pem.length} chars), starts: ${pem.substring(0, 40)}...`;
-    } catch (e) { checks.certDecode.signerCert = "❌ " + e.message; }
-  }
-  if (APPLE_SIGNER_KEY_BASE64) {
-    try {
-      const pem = decodeBase64ToPem(APPLE_SIGNER_KEY_BASE64, "PRIVATE KEY");
-      checks.certDecode.signerKey = `✅ decoded (${pem.length} chars), starts: ${pem.substring(0, 40)}...`;
-      // Validate key
-      try {
-        crypto.createPrivateKey(pem);
-        checks.keyValidation = "✅ key is valid";
-      } catch (keyErr) {
-        checks.keyValidation = "❌ " + keyErr.message;
-      }
-    } catch (e) { checks.certDecode.signerKey = "❌ " + e.message; }
-  }
-  if (APPLE_WWDR_CERT_BASE64) {
-    try {
-      const pem = decodeBase64ToPem(APPLE_WWDR_CERT_BASE64, "CERTIFICATE");
-      checks.certDecode.wwdr = `✅ decoded (${pem.length} chars), starts: ${pem.substring(0, 40)}...`;
-    } catch (e) { checks.certDecode.wwdr = "❌ " + e.message; }
+      crypto.createPrivateKey(APPLE_SIGNER_KEY_PEM);
+      checks.keyValidation = "✅ key is valid";
+    } catch (keyErr) {
+      checks.keyValidation = "❌ " + keyErr.message;
+    }
   }
 
   return res.json(checks);

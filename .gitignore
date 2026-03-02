@@ -18,6 +18,12 @@ dist-ssr
 .env.production
 .env.staging
 
+# Apple Wallet certificates — NEVER commit these
+wallet-assets/apple-pass/*.pem
+wallet-assets/apple-pass/*.key
+wallet-assets/apple-pass/*.p12
+wallet-assets/apple-pass/*.cer
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
