@@ -2026,11 +2026,15 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
 // GET /api/wallet/google/save-url — returns Save URL for logged-in user
 app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
   if (!isGoogleWalletConfigured()) {
-    return res.status(503).json({ message: "Google Wallet no configurado" });
+    return res.status(503).json({ message: "Google Wallet no configurado", detail: { issuer: !!GW_ISSUER_ID, email: !!GW_SA_EMAIL, key: !!GW_SA_PRIVATE_KEY } });
   }
   try {
-    // Ensure loyalty class exists (retries if startup creation failed)
-    await ensureGoogleWalletClass();
+    // Ensure loyalty class exists (best-effort — don't fail the request if this errors)
+    try {
+      await ensureGoogleWalletClass();
+    } catch (classErr) {
+      console.error("Google Wallet class ensure error (non-fatal):", classErr.response?.data || classErr.message);
+    }
 
     // Get user info
     const userRes = await pool.query("SELECT id, name, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
@@ -2108,21 +2112,49 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
     });
     return res.json({ data: { saveUrl } });
   } catch (err) {
-    console.error("Google Wallet save-url error:", err.response?.data || err.message);
-    return res.status(500).json({ message: "Error generando pase de Google Wallet" });
+    console.error("Google Wallet save-url error:", err.response?.data || err.message, err.stack?.split("\n").slice(0,3).join("\n"));
+    return res.status(500).json({ message: "Error generando pase de Google Wallet", detail: err.message });
   }
 });
 
 // GET /api/wallet/google/diagnostics — check env config
 app.get("/api/wallet/google/diagnostics", async (_req, res) => {
+  const keyPreview = GW_SA_PRIVATE_KEY
+    ? `${GW_SA_PRIVATE_KEY.substring(0, 30)}...length=${GW_SA_PRIVATE_KEY.length}, hasNewlines=${GW_SA_PRIVATE_KEY.includes("\n")}, startsWith=${GW_SA_PRIVATE_KEY.substring(0, 27)}`
+    : "❌ missing";
+
+  // Test JWT signing
+  let jwtSignTest = "not tested";
+  if (GW_SA_EMAIL && GW_SA_PRIVATE_KEY) {
+    try {
+      jwt.sign({ iss: GW_SA_EMAIL, aud: "test", iat: Math.floor(Date.now() / 1000) }, GW_SA_PRIVATE_KEY, { algorithm: "RS256" });
+      jwtSignTest = "✅ JWT signing works";
+    } catch (e) {
+      jwtSignTest = `❌ JWT signing failed: ${e.message}`;
+    }
+  }
+
+  // Test OAuth token
+  let oauthTest = "not tested";
+  if (isGoogleWalletConfigured()) {
+    try {
+      const token = await getGoogleWalletAccessToken();
+      oauthTest = `✅ Got access token (${token.substring(0, 10)}...)`;
+    } catch (e) {
+      oauthTest = `❌ OAuth failed: ${e.response?.data?.error_description || e.message}`;
+    }
+  }
+
   return res.json({
     configured: isGoogleWalletConfigured(),
-    issuerId: GW_ISSUER_ID ? "✅ set" : "❌ missing",
-    saEmail: GW_SA_EMAIL ? "✅ set" : "❌ missing",
-    saPrivateKey: GW_SA_PRIVATE_KEY ? "✅ set" : "❌ missing",
+    issuerId: GW_ISSUER_ID ? `✅ ${GW_ISSUER_ID}` : "❌ missing",
+    saEmail: GW_SA_EMAIL ? `✅ ${GW_SA_EMAIL}` : "❌ missing",
+    saPrivateKey: keyPreview,
     classId: GW_CLASS_ID || "N/A",
     issuerName: GW_ISSUER_NAME,
     programName: GW_PROGRAM_NAME,
+    jwtSignTest,
+    oauthTest,
   });
 });
 
