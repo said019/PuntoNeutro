@@ -2289,14 +2289,71 @@ const APPLE_CERT_PASSWORD = process.env.APPLE_CERT_PASSWORD || "";
 function isAppleWalletConfigured() {
   return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_SIGNER_CERT_BASE64 && APPLE_SIGNER_KEY_BASE64 && APPLE_WWDR_CERT_BASE64);
 }
+
+/** Decode base64 env var to PEM, ensuring proper PEM formatting */
+function decodeBase64ToPem(b64, label = "CERTIFICATE") {
+  if (!b64) return "";
+  let raw = Buffer.from(b64, "base64").toString("utf8").trim();
+  // If it already has PEM headers, clean it up
+  if (raw.includes("-----BEGIN")) {
+    // Normalize line endings
+    raw = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    return raw;
+  }
+  // Otherwise, it's just raw base64 content — wrap it in PEM headers
+  // Remove any whitespace/newlines from the raw base64
+  const cleanB64 = raw.replace(/[\s\n\r]/g, "");
+  const lines = cleanB64.match(/.{1,64}/g) || [cleanB64];
+  return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
+}
+
+/** Find image assets — check both public/ and dist/ directories */
+function findAssetDir() {
+  const candidates = [
+    path.join(__dirname, "..", "public"),
+    path.join(__dirname, "..", "dist"),
+    path.join(__dirname, "..", "dist", "public"),
+    path.join(process.cwd(), "public"),
+    path.join(process.cwd(), "dist"),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, "ophelia-logo.png"))) {
+      return dir;
+    }
+  }
+  return candidates[0]; // fallback
+}
+
 console.log("[Apple Wallet] Config check:",
   isAppleWalletConfigured() ? "✅ All certs configured — .pkpass mode" : "⚠️ Missing certs — web pass fallback mode",
   "| TEAM:", APPLE_TEAM_ID ? "✅" : "❌",
   "| PASS_TYPE:", APPLE_PASS_TYPE_ID ? "✅" : "❌",
   "| CERT:", APPLE_SIGNER_CERT_BASE64 ? `✅ (${APPLE_SIGNER_CERT_BASE64.length} chars)` : "❌",
   "| KEY:", APPLE_SIGNER_KEY_BASE64 ? `✅ (${APPLE_SIGNER_KEY_BASE64.length} chars)` : "❌",
-  "| WWDR:", APPLE_WWDR_CERT_BASE64 ? `✅ (${APPLE_WWDR_CERT_BASE64.length} chars)` : "❌"
+  "| WWDR:", APPLE_WWDR_CERT_BASE64 ? `✅ (${APPLE_WWDR_CERT_BASE64.length} chars)` : "❌",
+  "| ASSET_DIR:", findAssetDir()
 );
+
+// Validate certs at startup if configured
+if (isAppleWalletConfigured()) {
+  try {
+    const certPem = decodeBase64ToPem(APPLE_SIGNER_CERT_BASE64, "CERTIFICATE");
+    const keyPem = decodeBase64ToPem(APPLE_SIGNER_KEY_BASE64, "PRIVATE KEY");
+    const wwdrPem = decodeBase64ToPem(APPLE_WWDR_CERT_BASE64, "CERTIFICATE");
+    console.log("[Apple Wallet] Cert PEM starts with:", certPem.substring(0, 50));
+    console.log("[Apple Wallet] Key PEM starts with:", keyPem.substring(0, 50));
+    console.log("[Apple Wallet] WWDR PEM starts with:", wwdrPem.substring(0, 50));
+    // Try to verify the key is valid
+    try {
+      crypto.createPrivateKey(keyPem);
+      console.log("[Apple Wallet] ✅ Private key validated successfully");
+    } catch (keyErr) {
+      console.error("[Apple Wallet] ❌ Private key validation failed:", keyErr.message);
+    }
+  } catch (certErr) {
+    console.error("[Apple Wallet] ❌ Cert decode error:", certErr.message);
+  }
+}
 
 /** Check if we can at least generate a web pass (always true — no certs needed) */
 function isAppleWebPassAvailable() {
@@ -2416,14 +2473,14 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     relevantDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  // Read image assets from public/ folder
-  const publicDir = path.join(__dirname, "..", "public");
-  const iconBuffer = fs.existsSync(path.join(publicDir, "ophelia-logo.png"))
-    ? fs.readFileSync(path.join(publicDir, "ophelia-logo.png"))
-    : null;
-  const logoBuffer = fs.existsSync(path.join(publicDir, "ophelia-logo-full.png"))
-    ? fs.readFileSync(path.join(publicDir, "ophelia-logo-full.png"))
-    : null;
+  // Read image assets — try multiple directories
+  const assetDir = findAssetDir();
+  console.log("[Apple Wallet] Looking for assets in:", assetDir);
+  const iconPath = path.join(assetDir, "ophelia-logo.png");
+  const logoPath = path.join(assetDir, "ophelia-logo-full.png");
+  const iconBuffer = fs.existsSync(iconPath) ? fs.readFileSync(iconPath) : null;
+  const logoBuffer = fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
+  console.log("[Apple Wallet] Assets found — icon:", !!iconBuffer, "logo:", !!logoBuffer);
 
   // Build file map for the pass
   const files = {};
@@ -2447,9 +2504,11 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   files["manifest.json"] = manifestBuffer;
 
   // Sign manifest with Apple certificates to create PKCS#7 signature
-  const signerCertPem = Buffer.from(APPLE_SIGNER_CERT_BASE64, "base64").toString("utf8");
-  const signerKeyPem = Buffer.from(APPLE_SIGNER_KEY_BASE64, "base64").toString("utf8");
-  const wwdrPem = Buffer.from(APPLE_WWDR_CERT_BASE64, "base64").toString("utf8");
+  const signerCertPem = decodeBase64ToPem(APPLE_SIGNER_CERT_BASE64, "CERTIFICATE");
+  const signerKeyPem = decodeBase64ToPem(APPLE_SIGNER_KEY_BASE64, "PRIVATE KEY");
+  const wwdrPem = decodeBase64ToPem(APPLE_WWDR_CERT_BASE64, "CERTIFICATE");
+
+  console.log("[Apple Wallet] PEM sizes — cert:", signerCertPem.length, "key:", signerKeyPem.length, "wwdr:", wwdrPem.length);
 
   // Use openssl to create detached PKCS#7 signature
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pkpass-"));
@@ -2565,20 +2624,28 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
         console.log("[Apple Wallet] ✅ .pkpass generated, size:", pkpassBuffer.length, "bytes");
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
         res.setHeader("Content-Disposition", `attachment; filename="ophelia-pass.pkpass"`);
+        res.setHeader("Content-Length", pkpassBuffer.length);
         return res.send(pkpassBuffer);
       } catch (pkpassErr) {
         console.error("[Apple Wallet] ❌ .pkpass generation failed:", pkpassErr.message);
-        // Fall through to HTML web pass
+        console.error("[Apple Wallet] ❌ Full error:", pkpassErr.stack || pkpassErr);
+        // Return JSON error so frontend knows what happened
+        return res.status(500).json({
+          message: "Error generando pase .pkpass",
+          error: pkpassErr.message,
+          fallback: "webpass",
+        });
       }
-    } else {
-      console.log("[Apple Wallet] ⚠️ Certs not configured — using web pass fallback.",
-        "TEAM:", APPLE_TEAM_ID ? "✅" : "❌",
-        "PASS_TYPE:", APPLE_PASS_TYPE_ID ? "✅" : "❌",
-        "CERT:", APPLE_SIGNER_CERT_BASE64 ? "✅" : "❌",
-        "KEY:", APPLE_SIGNER_KEY_BASE64 ? "✅" : "❌",
-        "WWDR:", APPLE_WWDR_CERT_BASE64 ? "✅" : "❌"
-      );
     }
+
+    // No certs configured — return web pass HTML
+    console.log("[Apple Wallet] ⚠️ Certs not configured — using web pass fallback.",
+      "TEAM:", APPLE_TEAM_ID ? "✅" : "❌",
+      "PASS_TYPE:", APPLE_PASS_TYPE_ID ? "✅" : "❌",
+      "CERT:", APPLE_SIGNER_CERT_BASE64 ? "✅" : "❌",
+      "KEY:", APPLE_SIGNER_KEY_BASE64 ? "✅" : "❌",
+      "WWDR:", APPLE_WWDR_CERT_BASE64 ? "✅" : "❌"
+    );
 
     // Fallback: generate a beautiful standalone HTML pass page
     const nextBookingHtml = nextBooking
@@ -2677,6 +2744,71 @@ app.get("/api/wallet/apple/status", async (_req, res) => {
     signerKey: APPLE_SIGNER_KEY_BASE64 ? "✅ set" : "❌ (web pass mode)",
     wwdrCert: APPLE_WWDR_CERT_BASE64 ? "✅ set" : "❌ (web pass mode)",
   });
+});
+
+// GET /api/wallet/apple/debug — detailed cert diagnostics (admin only)
+app.get("/api/wallet/apple/debug", authMiddleware, async (req, res) => {
+  // Check if user is admin
+  try {
+    const userRes = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
+    if (userRes.rows[0]?.role !== "admin") return res.status(403).json({ message: "Solo admin" });
+  } catch { return res.status(403).json({ message: "Error" }); }
+
+  const checks = {
+    configured: isAppleWalletConfigured(),
+    envVars: {
+      APPLE_TEAM_ID: APPLE_TEAM_ID ? `✅ "${APPLE_TEAM_ID}"` : "❌ not set",
+      APPLE_PASS_TYPE_ID: APPLE_PASS_TYPE_ID ? `✅ "${APPLE_PASS_TYPE_ID}"` : "❌ not set",
+      APPLE_SIGNER_CERT_BASE64: APPLE_SIGNER_CERT_BASE64 ? `✅ (${APPLE_SIGNER_CERT_BASE64.length} chars)` : "❌ not set",
+      APPLE_SIGNER_KEY_BASE64: APPLE_SIGNER_KEY_BASE64 ? `✅ (${APPLE_SIGNER_KEY_BASE64.length} chars)` : "❌ not set",
+      APPLE_WWDR_CERT_BASE64: APPLE_WWDR_CERT_BASE64 ? `✅ (${APPLE_WWDR_CERT_BASE64.length} chars)` : "❌ not set",
+      APPLE_CERT_PASSWORD: APPLE_CERT_PASSWORD ? "✅ set" : "⬜ not set (OK if key has no password)",
+    },
+    assetDir: findAssetDir(),
+    assetsFound: {
+      "ophelia-logo.png": fs.existsSync(path.join(findAssetDir(), "ophelia-logo.png")),
+      "ophelia-logo-full.png": fs.existsSync(path.join(findAssetDir(), "ophelia-logo-full.png")),
+    },
+    opensslVersion: "unknown",
+    certDecode: {},
+    keyValidation: "not tested",
+  };
+
+  // Check openssl
+  try {
+    checks.opensslVersion = execSync("openssl version", { encoding: "utf8" }).trim();
+  } catch (e) {
+    checks.opensslVersion = "❌ openssl not found: " + e.message;
+  }
+
+  // Check cert decoding
+  if (APPLE_SIGNER_CERT_BASE64) {
+    try {
+      const pem = decodeBase64ToPem(APPLE_SIGNER_CERT_BASE64, "CERTIFICATE");
+      checks.certDecode.signerCert = `✅ decoded (${pem.length} chars), starts: ${pem.substring(0, 40)}...`;
+    } catch (e) { checks.certDecode.signerCert = "❌ " + e.message; }
+  }
+  if (APPLE_SIGNER_KEY_BASE64) {
+    try {
+      const pem = decodeBase64ToPem(APPLE_SIGNER_KEY_BASE64, "PRIVATE KEY");
+      checks.certDecode.signerKey = `✅ decoded (${pem.length} chars), starts: ${pem.substring(0, 40)}...`;
+      // Validate key
+      try {
+        crypto.createPrivateKey(pem);
+        checks.keyValidation = "✅ key is valid";
+      } catch (keyErr) {
+        checks.keyValidation = "❌ " + keyErr.message;
+      }
+    } catch (e) { checks.certDecode.signerKey = "❌ " + e.message; }
+  }
+  if (APPLE_WWDR_CERT_BASE64) {
+    try {
+      const pem = decodeBase64ToPem(APPLE_WWDR_CERT_BASE64, "CERTIFICATE");
+      checks.certDecode.wwdr = `✅ decoded (${pem.length} chars), starts: ${pem.substring(0, 40)}...`;
+    } catch (e) { checks.certDecode.wwdr = "❌ " + e.message; }
+  }
+
+  return res.json(checks);
 });
 
 // Apple Wallet Web Service endpoints (protocol V1)

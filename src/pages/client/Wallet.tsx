@@ -64,7 +64,6 @@ const Wallet = () => {
   const handleAppleWalletDownload = async () => {
     setAppleLoading(true);
     try {
-      // First check content-type with a HEAD-like request, then handle accordingly
       const resp = await api.get("/wallet/apple/pkpass", { responseType: "blob" });
       const contentType = resp.headers?.["content-type"] || "";
 
@@ -75,13 +74,17 @@ const Wallet = () => {
         const a = document.createElement("a");
         a.href = url;
         a.download = "ophelia-pass.pkpass";
+        a.style.display = "none";
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        // Small delay before cleanup to ensure download starts
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 500);
         toast({ title: "¡Pase descargado!", description: "Ábrelo para agregarlo a Apple Wallet." });
       } else if (contentType.includes("text/html")) {
-        // Server returned a full HTML web pass — write it into a new window
+        // Server returned a full HTML web pass
         const htmlText = await resp.data.text();
         const newWindow = window.open("", "_blank");
         if (newWindow) {
@@ -93,21 +96,59 @@ const Wallet = () => {
             description: "Se abrió tu pase digital. Puedes guardarlo desde el menú de tu navegador.",
           });
         } else {
-          // Popup blocked — fallback: replace current page with a link
           toast({
             title: "Ventana bloqueada",
             description: "Permite las ventanas emergentes e intenta de nuevo.",
             variant: "destructive",
           });
         }
+      } else if (contentType.includes("application/json")) {
+        // Server returned a JSON error — try to parse it from blob
+        const text = await resp.data.text();
+        try {
+          const json = JSON.parse(text);
+          console.error("Apple Wallet server error:", json);
+          if (json.fallback === "webpass") {
+            // Retry requesting the web pass HTML directly
+            toast({
+              title: "Certificados no válidos",
+              description: "Se abrirá tu pase digital web como alternativa.",
+            });
+            // Fallback: open webpass version
+            openWebPass();
+          } else {
+            toast({
+              title: "Error",
+              description: json.message || "No se pudo generar el pase.",
+              variant: "destructive",
+            });
+          }
+        } catch {
+          toast({ title: "Error", description: "Respuesta inesperada del servidor.", variant: "destructive" });
+        }
       } else {
-        toast({
-          title: "Pase Web",
-          description: "No se pudo generar el pase. Intenta de nuevo más tarde.",
-        });
+        toast({ title: "Error", description: "No se pudo generar el pase. Intenta de nuevo.", variant: "destructive" });
       }
     } catch (err: any) {
       console.error("Apple Wallet error:", err);
+      // If 500 response with JSON body (axios wraps blob errors)
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          console.error("Apple Wallet server error detail:", json);
+          if (json.fallback === "webpass") {
+            toast({
+              title: "Pase .pkpass no disponible",
+              description: "Se abrirá tu pase digital web.",
+            });
+            openWebPass();
+            return;
+          }
+        } catch {
+          // ignore parse error
+        }
+      }
       toast({
         title: "Error",
         description: "No se pudo descargar el pase. Intenta de nuevo.",
@@ -115,6 +156,71 @@ const Wallet = () => {
       });
     } finally {
       setAppleLoading(false);
+    }
+  };
+
+  /** Open the web pass fallback in a new window */
+  const openWebPass = async () => {
+    try {
+      // Request web pass HTML — server returns it when certs are not configured
+      // We force this by going through the status endpoint to know, then open the pass page
+      const walletData = wallet;
+      if (!walletData) return;
+
+      const userName = walletData.display_name || walletData.email || "Miembro";
+      const points = walletData.points ?? 0;
+      const qrCode = walletData.qr_code || "";
+
+      // Build a local web pass
+      const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Ophelia Club</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.pass{width:100%;max-width:380px;border-radius:24px;overflow:hidden;background:linear-gradient(160deg,#1a0b26 0%,#2d0a40 50%,#1a0b26 100%);box-shadow:0 20px 60px rgba(225,92,184,.2)}
+.header{padding:24px 24px 16px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:18px;font-weight:800;background:linear-gradient(135deg,#E15CB8,#CA71E1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.badge{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:rgba(202,113,225,.7);border:1px solid rgba(202,113,225,.3);padding:4px 10px;border-radius:20px}
+.name{text-align:center;font-size:16px;font-weight:700;padding:0 24px 4px}
+.points-section{text-align:center;padding:8px 24px 24px}
+.points{font-size:72px;font-weight:900;background:linear-gradient(135deg,#E15CB8,#CA71E1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.points-label{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#CA71E1;margin-bottom:4px}
+.qr-section{display:flex;justify-content:center;padding:0 24px 24px}
+.qr-wrap{background:#fff;border-radius:20px;padding:16px}
+.qr-wrap img{width:160px;height:160px;display:block}
+.qr-hint{text-align:center;font-size:11px;color:rgba(255,255,255,.35);padding:0 24px 20px}
+.footer{text-align:center;padding:0 24px 24px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:12px 20px;border-radius:14px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#E15CB8,#CA71E1);color:#fff}
+</style>
+</head>
+<body>
+<div class="pass">
+<div class="header"><div class="logo">Ophelia Studio</div><div class="badge">Club</div></div>
+<div class="name">${userName}</div>
+<div class="points-section">
+<div class="points-label">Puntos acumulados</div>
+<div class="points">${points}</div>
+</div>
+<div class="qr-section"><div class="qr-wrap"><img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrCode)}&bgcolor=FFFFFF&color=1a0b26" alt="QR" /></div></div>
+<div class="qr-hint">Muestra este código en recepción</div>
+<div class="footer"><button class="btn" onclick="window.print()">Imprimir pase</button></div>
+</div>
+</body>
+</html>`;
+      const newWindow = window.open("", "_blank");
+      if (newWindow) {
+        newWindow.document.open();
+        newWindow.document.write(html);
+        newWindow.document.close();
+      }
+    } catch (e) {
+      console.error("Web pass error:", e);
     }
   };
 
