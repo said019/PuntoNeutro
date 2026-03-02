@@ -64,7 +64,7 @@ const Wallet = () => {
   const handleAppleWalletDownload = async () => {
     setAppleLoading(true);
     try {
-      // Try to get pkpass — the server returns either a .pkpass blob or JSON webPass data
+      // First check content-type with a HEAD-like request, then handle accordingly
       const resp = await api.get("/wallet/apple/pkpass", { responseType: "blob" });
       const contentType = resp.headers?.["content-type"] || "";
 
@@ -81,16 +81,26 @@ const Wallet = () => {
         URL.revokeObjectURL(url);
         toast({ title: "¡Pase descargado!", description: "Ábrelo para agregarlo a Apple Wallet." });
       } else if (contentType.includes("text/html")) {
-        // Server returned a full HTML web pass page — open in new tab
-        const htmlBlob = new Blob([resp.data], { type: "text/html" });
-        const url = URL.createObjectURL(htmlBlob);
-        window.open(url, "_blank");
-        toast({
-          title: "¡Pase Web abierto!",
-          description: "Se abrió tu pase digital en una nueva pestaña. Puedes guardarlo como acceso directo en tu pantalla de inicio.",
-        });
+        // Server returned a full HTML web pass — write it into a new window
+        const htmlText = await resp.data.text();
+        const newWindow = window.open("", "_blank");
+        if (newWindow) {
+          newWindow.document.open();
+          newWindow.document.write(htmlText);
+          newWindow.document.close();
+          toast({
+            title: "¡Pase Web abierto!",
+            description: "Se abrió tu pase digital. Puedes guardarlo desde el menú de tu navegador.",
+          });
+        } else {
+          // Popup blocked — fallback: replace current page with a link
+          toast({
+            title: "Ventana bloqueada",
+            description: "Permite las ventanas emergentes e intenta de nuevo.",
+            variant: "destructive",
+          });
+        }
       } else {
-        // Unknown response type
         toast({
           title: "Pase Web",
           description: "No se pudo generar el pase. Intenta de nuevo más tarde.",
