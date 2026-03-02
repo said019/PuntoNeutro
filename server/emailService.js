@@ -443,6 +443,39 @@ async function sendPasswordResetEmail(opts) {
   await sendEmail({ to, subject: "🔐 Restablecer contraseña — Ophelia Studio", html });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── 7. RECHAZO DE COMPROBANTE ─────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * @param {object} opts
+ * @param {string} opts.to
+ * @param {string} opts.name
+ * @param {string} opts.reason
+ */
+async function sendOrderRejected(opts) {
+  const { to, name, reason } = opts;
+  const content = `
+    ${h1(`Comprobante no aprobado 😔`)}
+    ${p(`Hola ${name.split(" ")[0]}, revisamos tu comprobante de pago y lamentablemente <strong>no pudo ser aprobado</strong>.`)}
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
+           style="background:rgba(225,92,184,.08);border-left:3px solid #E15CB8;border-radius:0 8px 8px 0;margin:16px 0;">
+      <tr><td style="padding:16px 20px;">
+        <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#ECD6FB;">
+          <strong style="color:#E15CB8;">Motivo:</strong><br>${reason}
+        </p>
+      </td></tr>
+    </table>
+    ${p("Si crees que hubo un error, por favor contáctanos directamente por WhatsApp o responde este correo. ¡Estamos para ayudarte! 💜")}
+  `;
+  const html = baseLayout({
+    preheader: "Tu comprobante de pago fue revisado — Ophelia Studio",
+    content,
+    ctaUrl: `https://wa.me/521${process.env.STUDIO_PHONE || ""}`,
+    ctaText: "Contactar por WhatsApp",
+  });
+  await sendEmail({ to, subject: "Comprobante de pago no aprobado — Ophelia Studio", html });
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 export {
   sendMembershipActivated,
@@ -451,4 +484,5 @@ export {
   sendWeeklyReminder,
   sendRenewalReminder,
   sendPasswordResetEmail,
+  sendOrderRejected,
 };

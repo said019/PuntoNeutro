@@ -11,30 +11,40 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Send, Users, MessageSquare, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { Loader2, Send, Users, MessageSquare, RefreshCw, Wifi, WifiOff, Pencil } from "lucide-react";
 
-// Generic settings section
-const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: { key: string; label: string; type?: string }[] }) => {
+// Generic settings section — reads { data: <value_object> } from server
+const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: { key: string; label: string; type?: string; multiline?: boolean }[] }) => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [values, setValues] = useState<Record<string, any>>({});
+  const [loaded, setLoaded] = useState(false);
 
   const { data } = useQuery({
     queryKey: ["settings", settingKey],
     queryFn: async () => (await api.get(`/settings/${settingKey}`)).data,
+    staleTime: Infinity, // don't re-fetch unless explicitly invalidated
   });
 
-  const [values, setValues] = useState<Record<string, any>>({});
-
   useEffect(() => {
-    if (data?.value ?? data?.data?.value) {
-      setValues(data?.value ?? data?.data?.value ?? {});
+    // Server returns { data: <value_object> } where <value_object> is the saved JSON
+    const raw = data?.data ?? data?.value ?? data?.data?.value;
+    if (raw && typeof raw === "object" && !loaded) {
+      setValues(raw);
+      setLoaded(true);
     }
-  }, [data]);
+  }, [data, loaded]);
 
   const updateMutation = useMutation({
     mutationFn: () => api.put(`/settings/${settingKey}`, { value: values }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["settings", settingKey] }); toast({ title: "Configuración guardada" }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings", settingKey] });
+      setLoaded(false); // allow re-sync after save
+      toast({ title: "✅ Configuración guardada" });
+    },
+    onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
 
   return (
@@ -44,13 +54,15 @@ const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: {
           <Label>{f.label}</Label>
           {f.type === "boolean"
             ? <div className="flex items-center gap-3"><Switch checked={!!values[f.key]} onCheckedChange={(v) => setValues((p) => ({ ...p, [f.key]: v }))} /></div>
-            : <Input type={f.type ?? "text"} value={values[f.key] ?? ""} onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))} />
+            : f.multiline
+              ? <Textarea rows={5} value={values[f.key] ?? ""} onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))} />
+              : <Input type={f.type ?? "text"} value={values[f.key] ?? ""} onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))} />
           }
         </div>
       ))}
       <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
         {updateMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
-        Guardar
+        Guardar cambios
       </Button>
     </div>
   );
@@ -75,7 +87,12 @@ const WhatsAppSettings = () => {
 
   const connectMutation = useMutation({
     mutationFn: () => api.post("/evolution/connect"),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["evolution-status"] }); refetch(); },
+    onSuccess: (res: any) => {
+      const d = res?.data?.data ?? res?.data ?? {};
+      // Immediately inject the QR code returned by connect into the status cache
+      qc.setQueryData(["evolution-status"], { data: { connected: false, state: "qr_pending", qrCode: d.qrCode ?? null, instanceExists: true } });
+      refetch();
+    },
     onError: () => toast({ title: "Error al conectar", variant: "destructive" }),
   });
 
@@ -241,6 +258,156 @@ const WhatsAppSettings = () => {
   );
 };
 
+// ── Notification Templates Section ─────────────────────────────────────────
+const NOTIFICATION_TEMPLATES = [
+  { key: "booking_confirmed",     label: "✅ Reserva confirmada",         icon: "📅", hint: "Se envía al confirmar una reserva. Vars: {name}, {class}, {date}, {time}" },
+  { key: "booking_cancelled",     label: "❌ Reserva cancelada",          icon: "🚫", hint: "Se envía al cancelar. Vars: {name}, {class}, {date}, {creditRestored}" },
+  { key: "membership_activated",  label: "🎉 Membresía activada",         icon: "🏋️", hint: "Se envía al activar membresía. Vars: {name}, {plan}, {startDate}, {endDate}" },
+  { key: "transfer_rejected",     label: "⚠️ Transferencia rechazada",    icon: "💳", hint: "Se envía cuando se rechaza un comprobante. Vars: {name}, {reason}" },
+  { key: "class_reminder",        label: "⏰ Recordatorio de clase",       icon: "🔔", hint: "Se envía horas antes de la clase. Vars: {name}, {class}, {time}" },
+  { key: "renewal_reminder",      label: "🔄 Recordatorio de renovación", icon: "📆", hint: "Se envía cuando la membresía está por vencer. Vars: {name}, {plan}, {expiresAt}" },
+  { key: "welcome",               label: "👋 Bienvenida",                 icon: "🌟", hint: "Se envía al registrarse. Vars: {name}" },
+  { key: "password_reset",        label: "🔐 Recuperación de contraseña", icon: "🔑", hint: "Se envía para restablecer contraseña. Vars: {name}, {link}" },
+];
+
+const NotificationTemplates = () => {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editSubject, setEditSubject] = useState("");
+
+  const { data: tplData } = useQuery({
+    queryKey: ["settings", "notification_templates"],
+    queryFn: async () => (await api.get("/settings/notification_templates")).data,
+    staleTime: Infinity,
+  });
+
+  const { data: configData, refetch: refetchConfig } = useQuery({
+    queryKey: ["settings", "notification_settings"],
+    queryFn: async () => (await api.get("/settings/notification_settings")).data,
+    staleTime: Infinity,
+  });
+
+  const [config, setConfig] = useState<Record<string, any>>({});
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  useEffect(() => {
+    const raw = configData?.data ?? configData?.value;
+    if (raw && !configLoaded) { setConfig(raw); setConfigLoaded(true); }
+  }, [configData, configLoaded]);
+
+  const templates: Record<string, { subject?: string; body: string }> = tplData?.data ?? {};
+
+  const saveTplMutation = useMutation({
+    mutationFn: ({ key, subject, body }: { key: string; subject: string; body: string }) => {
+      const updated = { ...templates, [key]: { subject, body } };
+      return api.put("/settings/notification_templates", { value: updated });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings", "notification_templates"] });
+      toast({ title: "✅ Plantilla guardada" });
+      setEditingKey(null);
+    },
+    onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
+  });
+
+  const saveConfigMutation = useMutation({
+    mutationFn: () => api.put("/settings/notification_settings", { value: config }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings", "notification_settings"] });
+      setConfigLoaded(false);
+      refetchConfig();
+      toast({ title: "✅ Configuración guardada" });
+    },
+  });
+
+  const openEdit = (key: string) => {
+    const tpl = templates[key];
+    setEditText(tpl?.body ?? "");
+    setEditSubject(tpl?.subject ?? "");
+    setEditingKey(key);
+  };
+
+  const currentTpl = NOTIFICATION_TEMPLATES.find((t) => t.key === editingKey);
+
+  return (
+    <div className="space-y-6 max-w-xl">
+      {/* Config toggles */}
+      <div className="rounded-xl border p-4 space-y-3">
+        <h3 className="font-semibold text-sm">Canales activos</h3>
+        {[
+          { key: "email_reminders", label: "Recordatorios por email" },
+          { key: "whatsapp_reminders", label: "Recordatorios por WhatsApp" },
+        ].map((f) => (
+          <div key={f.key} className="flex items-center gap-3">
+            <Switch checked={!!config[f.key]} onCheckedChange={(v) => setConfig((p) => ({ ...p, [f.key]: v }))} />
+            <Label>{f.label}</Label>
+          </div>
+        ))}
+        <div className="space-y-1 pt-1">
+          <Label>Horas antes del recordatorio</Label>
+          <Input type="number" className="w-28" value={config.reminder_hours_before ?? 2} onChange={(e) => setConfig((p) => ({ ...p, reminder_hours_before: Number(e.target.value) }))} />
+        </div>
+        <Button size="sm" onClick={() => saveConfigMutation.mutate()} disabled={saveConfigMutation.isPending}>
+          {saveConfigMutation.isPending ? <Loader2 className="animate-spin mr-1" size={12} /> : null}Guardar
+        </Button>
+      </div>
+
+      {/* Templates list */}
+      <div className="space-y-2">
+        <h3 className="font-semibold text-sm mb-3">Plantillas de mensajes</h3>
+        {NOTIFICATION_TEMPLATES.map((t) => {
+          const tpl = templates[t.key];
+          return (
+            <div key={t.key} className="flex items-start justify-between gap-3 p-3 rounded-xl border border-border bg-card">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">{t.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {tpl?.body ? tpl.body.slice(0, 80) + (tpl.body.length > 80 ? "…" : "") : <span className="italic opacity-60">Sin personalizar (usa plantilla por defecto)</span>}
+                </p>
+              </div>
+              <Button size="icon" variant="ghost" className="shrink-0" onClick={() => openEdit(t.key)}>
+                <Pencil size={13} />
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editingKey} onOpenChange={(v) => !v && setEditingKey(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar plantilla · {currentTpl?.label}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">{currentTpl?.hint}</p>
+            <div className="space-y-1">
+              <Label>Asunto (email)</Label>
+              <Input value={editSubject} onChange={(e) => setEditSubject(e.target.value)} placeholder="Asunto del email..." />
+            </div>
+            <div className="space-y-1">
+              <Label>Cuerpo del mensaje (WhatsApp / Email)</Label>
+              <Textarea rows={6} value={editText} onChange={(e) => setEditText(e.target.value)} placeholder="Escribe el mensaje aquí..." />
+              <p className="text-xs text-muted-foreground">{editText.length} caracteres</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingKey(null)}>Cancelar</Button>
+            <Button
+              onClick={() => editingKey && saveTplMutation.mutate({ key: editingKey, subject: editSubject, body: editText })}
+              disabled={saveTplMutation.isPending}
+            >
+              {saveTplMutation.isPending ? <Loader2 className="animate-spin mr-1" size={12} /> : null}Guardar plantilla
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
 const SettingsPage = () => (
   <AuthGuard>
     <AdminLayout>
@@ -249,7 +416,6 @@ const SettingsPage = () => (
         <Tabs defaultValue="general">
           <TabsList className="flex-wrap h-auto gap-1 mb-6">
             <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="studio">Estudio</TabsTrigger>
             <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
             <TabsTrigger value="policies">Políticas</TabsTrigger>
             <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
@@ -259,46 +425,29 @@ const SettingsPage = () => (
             <SettingsSection
               settingKey="general_settings"
               fields={[
-                { key: "timezone", label: "Zona horaria" },
-                { key: "currency", label: "Moneda" },
-                { key: "date_format", label: "Formato de fecha" },
-                { key: "language", label: "Idioma" },
+                { key: "studio_name", label: "Nombre del estudio" },
+                { key: "address", label: "Dirección" },
+                { key: "phone", label: "Teléfono de contacto" },
+                { key: "instagram", label: "Instagram (@usuario)" },
+                { key: "facebook", label: "Facebook (URL o usuario)" },
+                { key: "timezone", label: "Zona horaria (ej: America/Mexico_City)" },
+                { key: "currency", label: "Moneda (ej: MXN)" },
                 { key: "maintenance_mode", label: "Modo mantenimiento", type: "boolean" },
               ]}
             />
           </TabsContent>
 
-          <TabsContent value="studio">
-            <SettingsSection
-              settingKey="studio_settings"
-              fields={[
-                { key: "name", label: "Nombre del estudio" },
-                { key: "logo", label: "URL del logo" },
-                { key: "address", label: "Dirección" },
-                { key: "phone", label: "Teléfono" },
-                { key: "instagram", label: "Instagram" },
-                { key: "facebook", label: "Facebook" },
-              ]}
-            />
-          </TabsContent>
-
           <TabsContent value="notifications">
-            <SettingsSection
-              settingKey="notification_settings"
-              fields={[
-                { key: "email_reminders", label: "Recordatorios por email", type: "boolean" },
-                { key: "whatsapp_reminders", label: "Recordatorios por WhatsApp", type: "boolean" },
-                { key: "reminder_hours_before", label: "Horas antes del recordatorio", type: "number" },
-              ]}
-            />
+            <NotificationTemplates />
           </TabsContent>
 
           <TabsContent value="policies">
             <SettingsSection
               settingKey="policies_settings"
               fields={[
-                { key: "cancellation_policy", label: "Política de cancelación" },
-                { key: "terms_of_service", label: "Términos de servicio" },
+                { key: "cancellation_policy", label: "Política de cancelación", multiline: true },
+                { key: "terms_of_service", label: "Términos de servicio", multiline: true },
+                { key: "privacy_policy", label: "Política de privacidad", multiline: true },
               ]}
             />
           </TabsContent>

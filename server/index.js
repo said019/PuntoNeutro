@@ -1175,6 +1175,10 @@ app.get("/api/classes", async (req, res) => {
     // Normalise: expose start_time / end_time as full ISO strings for front-end consumers
     const rows = r.rows.map((row) => ({
       ...row,
+      // Ensure date is always a plain YYYY-MM-DD string (pg returns Date objects for DATE columns)
+      date: row.date instanceof Date
+        ? row.date.toISOString().slice(0, 10)
+        : (typeof row.date === "string" ? row.date.slice(0, 10) : row.date),
       start_time: row.start_time_full ?? row.start_time,
       end_time: row.end_time_full ?? row.end_time,
     }));
@@ -3864,6 +3868,22 @@ app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
       await pool.query("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,$2,$3,$4)", [order.id, item.productId, item.qty, pRes.rows[0].price]);
       await pool.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [item.qty, item.productId]);
     }
+
+    // Award loyalty points for POS purchase
+    if (userId && total > 0) {
+      try {
+        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+        const pts = Math.floor(total * (cfg.points_per_peso ?? 1));
+        if (cfg.enabled !== false && pts > 0) {
+          await pool.query(
+            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
+            [userId, pts, `Compra POS — $${total}`]
+          );
+        }
+      } catch (e) { /* loyalty error shouldn't fail POS sale */ }
+    }
+
     return res.status(201).json({ data: order });
   } catch (err) { console.error("pos/checkout error:", err); return res.status(500).json({ message: "Error interno" }); }
 });
@@ -4195,22 +4215,51 @@ app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
 app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
   try {
     // Try creating the instance
+    let createData = null;
     try {
-      await evolutionApi.post("/instance/create", {
+      const createRes = await evolutionApi.post("/instance/create", {
         instanceName: EVOLUTION_INSTANCE,
         qrcode: true,
         integration: "WHATSAPP-BAILEYS",
       });
+      createData = createRes.data;
     } catch (createErr) {
-      // 409 = already exists, ignore
+      // 409 = already exists, ignore; otherwise log
       if (createErr.response?.status !== 409) {
         console.error("[EVOLUTION CREATE]", createErr.response?.data || createErr.message);
       }
     }
 
-    // Get QR
-    const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
-    const qrCode = qrRes.data?.code || qrRes.data?.qrcode?.base64 || null;
+    // Extract QR from create response (Evolution v2 returns it inline)
+    let qrCode =
+      createData?.qrcode?.base64 ||
+      createData?.qrCode?.base64 ||
+      createData?.qr?.base64 ||
+      createData?.base64 ||
+      null;
+
+    // If not in create response, try the connect endpoint
+    if (!qrCode) {
+      try {
+        const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
+        console.log("[EVOLUTION QR RESPONSE]", JSON.stringify(qrRes.data).slice(0, 300));
+        qrCode =
+          qrRes.data?.code ||
+          qrRes.data?.base64 ||
+          qrRes.data?.qrcode?.base64 ||
+          qrRes.data?.qrCode?.base64 ||
+          qrRes.data?.qr?.base64 ||
+          null;
+        // If it's a plain base64 string that doesn't start with data: prefix, add it
+        if (qrCode && !qrCode.startsWith("data:")) {
+          qrCode = `data:image/png;base64,${qrCode}`;
+        }
+      } catch (qrErr) {
+        console.error("[EVOLUTION QR FETCH]", qrErr.response?.data || qrErr.message);
+      }
+    } else if (!qrCode.startsWith("data:")) {
+      qrCode = `data:image/png;base64,${qrCode}`;
+    }
 
     return res.json({ data: { qrCode, state: "qr_pending", message: "Escanea el código QR con WhatsApp" } });
   } catch (err) {
@@ -5078,6 +5127,21 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
       console.error("[Email] membership create query:", emailErr.message);
     }
 
+    // ── Award loyalty points for membership purchase ────────────────────
+    if (userId && parseFloat(plan.price) > 0) {
+      try {
+        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+        const pts = Math.floor(parseFloat(plan.price) * (cfg.points_per_peso ?? 1));
+        if (cfg.enabled !== false && pts > 0) {
+          await pool.query(
+            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
+            [userId, pts, `Membresía asignada — ${plan.name} ($${plan.price})`]
+          );
+        }
+      } catch (e) { /* loyalty error shouldn't fail membership creation */ }
+    }
+
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
     console.error("POST /memberships error:", err);
@@ -5511,12 +5575,54 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
 // PUT /api/admin/orders/:id/reject
 app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
   try {
+    const { notes, reason } = req.body;
+    const rejectionReason = reason || notes || "No especificado";
     const r = await pool.query(
-      "UPDATE orders SET status = 'rejected', verified_at = NOW() WHERE id = $1 RETURNING *",
-      [req.params.id]
+      "UPDATE orders SET status = 'rejected', verified_at = NOW(), notes = $2 WHERE id = $1 RETURNING *, user_id",
+      [req.params.id, rejectionReason]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
-    return res.json({ data: r.rows[0] });
+    const order = r.rows[0];
+
+    // Notify the client about rejection via email and WhatsApp
+    try {
+      const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [order.user_id]);
+      if (uRes.rows.length) {
+        const u = uRes.rows[0];
+        const userName = u.display_name || "Clienta";
+        const rejMsg = `Hola ${userName} 👋\n\nTu comprobante de pago fue revisado y lamentablemente *no pudo ser aprobado*.\n\n📌 Motivo: ${rejectionReason}\n\nSi crees que es un error o tienes dudas, responde este mensaje. ¡Estamos para ayudarte! 💜`;
+
+        // WhatsApp notification
+        if (u.phone) {
+          try {
+            const phone = String(u.phone).replace(/\D/g, "");
+            const wa = phone.length === 10 ? "52" + phone : phone;
+            await evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, {
+              number: wa,
+              textMessage: { text: rejMsg },
+            });
+          } catch (waErr) {
+            console.error("[Reject WhatsApp]", waErr.response?.data || waErr.message);
+          }
+        }
+
+        // Email notification
+        if (u.email) {
+          try {
+            const { sendOrderRejected } = await import("./emailService.js").catch(() => ({}));
+            if (typeof sendOrderRejected === "function") {
+              await sendOrderRejected({ to: u.email, name: userName, reason: rejectionReason });
+            }
+          } catch (emailErr) {
+            console.error("[Reject Email]", emailErr.message);
+          }
+        }
+      }
+    } catch (notifyErr) {
+      console.error("[Reject notify]", notifyErr.message);
+    }
+
+    return res.json({ data: order });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -5527,20 +5633,53 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
 // GET /api/payments
 app.get("/api/payments", adminMiddleware, async (req, res) => {
   try {
-    const { startDate, endDate, limit = 100 } = req.query;
-    let q = `SELECT o.*, u.display_name AS user_name, p.name AS plan_name
-             FROM orders o
-             LEFT JOIN users u ON o.user_id = u.id
-             LEFT JOIN plans p ON o.plan_id = p.id
-             WHERE o.status = 'approved'`;
+    const { startDate, endDate, limit = 200 } = req.query;
+    // Include approved orders AND manually-assigned memberships
+    let q = `
+      SELECT
+        o.id,
+        o.user_id,
+        u.display_name AS user_name,
+        p.name AS plan_name,
+        o.total_amount,
+        o.payment_method AS method,
+        o.status,
+        o.created_at,
+        'order' AS source
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      LEFT JOIN plans p ON o.plan_id = p.id
+      WHERE o.status = 'approved'`;
     const params = [];
     if (startDate) { params.push(startDate); q += ` AND o.created_at >= $${params.length}`; }
     if (endDate) { params.push(endDate); q += ` AND o.created_at <= $${params.length}`; }
-    params.push(parseInt(limit)); q += ` ORDER BY o.created_at DESC LIMIT $${params.length}`;
-    const r = await pool.query(q, params);
+
+    // Also fetch memberships assigned directly (cash/card/transfer)
+    let mq = `
+      SELECT
+        m.id,
+        m.user_id,
+        u.display_name AS user_name,
+        p.name AS plan_name,
+        p.price AS total_amount,
+        m.payment_method AS method,
+        m.status,
+        m.created_at,
+        'membership' AS source
+      FROM memberships m
+      LEFT JOIN users u ON m.user_id = u.id
+      LEFT JOIN plans p ON m.plan_id = p.id
+      WHERE m.status = 'active'`;
+    if (startDate) { mq += ` AND m.created_at >= '${startDate}'`; }
+    if (endDate) { mq += ` AND m.created_at <= '${endDate}'`; }
+
+    const combined = `(${q}) UNION ALL (${mq}) ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+    params.push(parseInt(limit));
+    const r = await pool.query(combined, params);
     const total = r.rows.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
-    return res.json({ data: r.rows.map(o => ({ ...o, userName: o.user_name, planName: o.plan_name })), total });
+    return res.json({ data: r.rows.map((o) => ({ ...o, userName: o.user_name, planName: o.plan_name })), total });
   } catch (err) {
+    console.error("[GET /payments]", err);
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -5699,6 +5838,22 @@ app.post("/api/pos/sale", adminMiddleware, async (req, res) => {
       );
       await pool.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [item.qty, item.productId]);
     }
+
+    // Award loyalty points for POS purchase
+    if (userId && total > 0) {
+      try {
+        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+        const pts = Math.floor(total * (cfg.points_per_peso ?? 1));
+        if (cfg.enabled !== false && pts > 0) {
+          await pool.query(
+            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
+            [userId, pts, `Venta POS — $${total}`]
+          );
+        }
+      } catch (e) { /* loyalty error shouldn't fail POS sale */ }
+    }
+
     return res.status(201).json({ data: order });
   } catch (err) {
     console.error("POST /pos/sale error:", err);
@@ -5736,6 +5891,54 @@ app.post("/api/admin/loyalty/adjust", adminMiddleware, async (req, res) => {
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/loyalty/recalculate/:userId — award missing membership points retroactively
+app.post("/api/admin/loyalty/recalculate/:userId", adminMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    // Get loyalty config
+    const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+    const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+    const ppp = Number(cfg.points_per_peso ?? 1);
+    if (cfg.enabled === false) return res.json({ data: { awarded: 0, message: "Loyalty desactivado en configuración" } });
+
+    // Get all active/expired memberships for this user
+    const mRes = await pool.query(
+      `SELECT m.id, p.price, p.name
+       FROM memberships m
+       JOIN plans p ON m.plan_id = p.id
+       WHERE m.user_id = $1 AND m.status IN ('active','expired')`,
+      [userId]
+    );
+    if (!mRes.rows.length) return res.json({ data: { awarded: 0, message: "No hay membresías para recalcular" } });
+
+    // Check which memberships already have a loyalty transaction
+    const txRes = await pool.query(
+      "SELECT description FROM loyalty_transactions WHERE user_id=$1 AND type='earn'",
+      [userId]
+    );
+    const existingDescs = new Set(txRes.rows.map((r) => r.description));
+
+    let awarded = 0;
+    for (const m of mRes.rows) {
+      const desc = `Membresía asignada — ${m.name} ($${m.price})`;
+      // Skip if already awarded for this membership (by description match)
+      if (existingDescs.has(desc)) continue;
+      const pts = Math.floor(parseFloat(m.price) * ppp);
+      if (pts <= 0) continue;
+      await pool.query(
+        "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
+        [userId, pts, desc]
+      );
+      awarded += pts;
+    }
+
+    return res.json({ data: { awarded, message: awarded > 0 ? `Se otorgaron ${awarded} puntos retroactivos` : "Todos los puntos ya estaban registrados" } });
+  } catch (err) {
+    console.error("[Recalculate loyalty]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -5792,7 +5995,108 @@ app.delete("/api/instructors/:id", adminMiddleware, async (req, res) => {
   }
 });
 
-// ─── Reports ─────────────────────────────────────────────────────────────────
+// POST /api/instructors/:id/photo — upload instructor photo to Google Drive
+app.post("/api/instructors/:id/photo", adminMiddleware, upload.single("photo"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
+    const instructorId = req.params.id;
+
+    const isDriveConfigured = Boolean(
+      process.env.GOOGLE_DRIVE_FOLDER_ID &&
+      process.env.GOOGLE_CLIENT_ID &&
+      process.env.GOOGLE_CLIENT_SECRET &&
+      process.env.GOOGLE_REFRESH_TOKEN
+    );
+
+    let photoUrl;
+    if (isDriveConfigured) {
+      const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+          grant_type: "refresh_token",
+        }),
+      });
+      const { access_token } = await tokenResp.json();
+
+      const boundary = "instructor_photo_" + Date.now();
+      const metadata = JSON.stringify({
+        name: `instructor_${instructorId}_${Date.now()}.${req.file.originalname.split(".").pop()}`,
+        parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
+      });
+      const body = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${req.file.mimetype}\r\n\r\n`),
+        req.file.buffer,
+        Buffer.from(`\r\n--${boundary}--`),
+      ]);
+
+      const uploadResp = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+        body,
+      });
+      const uploadJson = await uploadResp.json();
+      if (!uploadJson.id) throw new Error("Error al subir imagen a Drive");
+
+      await fetch(`https://www.googleapis.com/drive/v3/files/${uploadJson.id}/permissions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "reader", type: "anyone" }),
+      });
+
+      photoUrl = `/api/drive/image/${uploadJson.id}`;
+    } else {
+      photoUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+    }
+
+    const r = await pool.query(
+      "UPDATE instructors SET photo_url=$1, updated_at=NOW() WHERE id=$2 RETURNING *",
+      [photoUrl, instructorId]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Instructor no encontrado" });
+    return res.json({ data: camelRow(r.rows[0]) });
+  } catch (err) {
+    console.error("Instructor photo upload error:", err);
+    return res.status(500).json({ message: err.message || "Error al subir foto" });
+  }
+});
+
+// POST /api/instructors/:id/magic-link — generate a one-time login link for an instructor
+app.post("/api/instructors/:id/magic-link", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM instructors WHERE id = $1", [req.params.id]);
+    if (!r.rows.length) return res.status(404).json({ message: "Instructor no encontrado" });
+    const ins = r.rows[0];
+    // Find or create a user account for this instructor
+    let userRow = null;
+    if (ins.email) {
+      const uRes = await pool.query("SELECT * FROM users WHERE email = $1 LIMIT 1", [ins.email]);
+      if (uRes.rows.length) {
+        userRow = uRes.rows[0];
+      } else {
+        // Create a user for the instructor
+        const newU = await pool.query(
+          `INSERT INTO users (email, display_name, role, is_verified) VALUES ($1, $2, 'instructor', true) RETURNING *`,
+          [ins.email, ins.display_name]
+        );
+        userRow = newU.rows[0];
+      }
+    }
+    if (!userRow) return res.status(400).json({ message: "El instructor necesita un email para generar magic link" });
+    // Generate a short-lived JWT
+    const token = jwt.sign({ userId: userRow.id, role: userRow.role, type: "magic_link" }, JWT_SECRET, { expiresIn: "24h" });
+    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+    const link = `${baseUrl}/auth/magic?token=${token}`;
+    return res.json({ data: { link } });
+  } catch (err) {
+    console.error("magic-link error:", err);
+    return res.status(500).json({ message: "Error al generar magic link" });
+  }
+});
+
 
 // GET /api/admin/reports?startDate=&endDate=
 app.get("/api/admin/reports", adminMiddleware, async (req, res) => {

@@ -274,7 +274,9 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
           const dayStr = format(day, "yyyy-MM-dd");
           const dayClasses = classes
             .filter((c) => {
-              const d = c.date ?? c.start_time?.split("T")[0];
+              // date field is always YYYY-MM-DD after server normalisation
+              const d = (c.date as string)?.slice(0, 10)
+                ?? (c.start_time as string)?.slice(0, 10);
               return d === dayStr;
             })
             .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));

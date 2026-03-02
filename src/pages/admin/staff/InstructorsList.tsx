@@ -52,26 +52,36 @@ const InstructorsList = () => {
   const createMutation = useMutation({
     mutationFn: (d: InstructorFormData) => api.post("/instructors", { ...d, specialties: d.specialties?.split(",").map((s) => s.trim()) ?? [] }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructor creado" }); setOpen(false); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al crear", variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: Instructor & { specialties: string }) => api.put(`/instructors/${id}`, { ...d, specialties: typeof d.specialties === "string" ? d.specialties.split(",").map((s) => s.trim()) : d.specialties }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructor actualizado" }); setOpen(false); },
+    mutationFn: (payload: { id: string; displayName: string; email: string; bio?: string; specialties?: string; isActive: boolean }) => {
+      const { id, specialties, ...rest } = payload;
+      return api.put(`/instructors/${id}`, {
+        ...rest,
+        specialties: specialties ? specialties.split(",").map((s) => s.trim()) : [],
+      });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "✅ Instructor actualizado" }); setOpen(false); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al actualizar", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/instructors/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructor eliminado" }); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al eliminar", variant: "destructive" }),
   });
 
   const magicLinkMutation = useMutation({
     mutationFn: (id: string) => api.post(`/instructors/${id}/magic-link`),
     onSuccess: (res: any) => {
-      if (res.data?.link) {
-        navigator.clipboard.writeText(res.data.link);
-        toast({ title: "Magic link copiado al portapapeles" });
+      if (res.data?.data?.link) {
+        navigator.clipboard.writeText(res.data.data.link);
+        toast({ title: "✅ Magic link copiado al portapapeles" });
       }
     },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al generar link", variant: "destructive" }),
   });
 
   const uploadPhotoMutation = useMutation({
@@ -80,7 +90,8 @@ const InstructorsList = () => {
       fd.append("photo", file);
       return api.post(`/instructors/${id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Foto actualizada" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "✅ Foto actualizada" }); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al subir foto", variant: "destructive" }),
   });
 
   const openEdit = (i: Instructor) => {
@@ -166,7 +177,9 @@ const InstructorsList = () => {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>{editing ? "Editar instructor" : "Nuevo instructor"}</DialogTitle></DialogHeader>
-            <form onSubmit={form.handleSubmit((d) => editing ? updateMutation.mutate({ ...d, id: editing.id, specialties: d.specialties ?? "" } as any) : createMutation.mutate(d))} className="space-y-4">
+            <form onSubmit={form.handleSubmit((d) => editing
+              ? updateMutation.mutate({ id: editing.id, displayName: d.displayName, email: d.email, bio: d.bio, specialties: d.specialties, isActive: d.isActive })
+              : createMutation.mutate(d))} className="space-y-4">
               <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("displayName")} /></div>
               <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
               <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
@@ -177,7 +190,10 @@ const InstructorsList = () => {
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button type="submit">{editing ? "Actualizar" : "Crear"}</Button>
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {(createMutation.isPending || updateMutation.isPending) && <span className="mr-2 animate-spin">⏳</span>}
+                  {editing ? "Actualizar datos" : "Crear"}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>

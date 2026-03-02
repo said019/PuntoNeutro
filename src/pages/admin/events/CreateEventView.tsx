@@ -87,9 +87,14 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
     setForm((p) => ({ ...p, [key]: value }));
 
   // Instructors list
-  const { data: instructors = [] } = useQuery({
+  const { data: instructors = [], isError: instructorsError } = useQuery({
     queryKey: ["instructors"],
-    queryFn: async () => (await api.get("/instructors")).data?.data ?? [],
+    queryFn: async () => {
+      const res = await api.get("/instructors");
+      const list = res.data?.data ?? res.data ?? [];
+      return Array.isArray(list) ? list : [];
+    },
+    staleTime: 60_000,
   });
 
   // Validate per-step
@@ -206,20 +211,25 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
 
           <div>
             <label className={labelCls}>Instructor/a</label>
-            {instructors.length > 0 ? (
+            {instructors.length > 0 && (
               <select
-                className={inputCls}
-                value={form.instructor_name}
-                onChange={(e) => set("instructor_name", e.target.value)}
+                className={cn(inputCls, "mb-2")}
+                value={instructors.some((i: any) => (i.displayName || i.display_name) === form.instructor_name) ? form.instructor_name : ""}
+                onChange={(e) => { if (e.target.value) set("instructor_name", e.target.value); }}
               >
-                <option value="">Selecciona un instructor</option>
-                {instructors.map((ins: { id: string; display_name: string }) => (
-                  <option key={ins.id} value={ins.display_name}>{ins.display_name}</option>
-                ))}
+                <option value="">— Seleccionar instructor —</option>
+                {instructors.map((ins: any) => {
+                  const name = ins.displayName || ins.display_name || ins.name || "";
+                  return <option key={ins.id} value={name}>{name}</option>;
+                })}
               </select>
-            ) : (
-              <input className={inputCls} placeholder="Nombre del instructor" value={form.instructor_name} onChange={(e) => set("instructor_name", e.target.value)} />
             )}
+            <input
+              className={inputCls}
+              placeholder={instructors.length > 0 ? "O escribe el nombre manualmente" : "Nombre del instructor"}
+              value={form.instructor_name}
+              onChange={(e) => set("instructor_name", e.target.value)}
+            />
           </div>
         </div>
       )}

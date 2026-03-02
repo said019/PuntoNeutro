@@ -1,15 +1,24 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
 
 const ClientDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [adjPoints, setAdjPoints] = useState("");
+  const [adjReason, setAdjReason] = useState("");
 
   const { data: user, isLoading } = useQuery({
     queryKey: ["client", id],
@@ -35,10 +44,34 @@ const ClientDetail = () => {
     enabled: !!id,
   });
 
-  const { data: loyalty } = useQuery({
+  const { data: loyalty, refetch: refetchLoyalty } = useQuery({
     queryKey: ["client-loyalty", id],
     queryFn: async () => (await api.get(`/loyalty/points/${id}`)).data,
     enabled: !!id,
+  });
+
+  const adjustMutation = useMutation({
+    mutationFn: ({ points, reason, type }: { points: number; reason: string; type: "earn" | "redeem" }) =>
+      api.post("/admin/loyalty/adjust", { userId: id, points, reason, type }),
+    onSuccess: () => {
+      refetchLoyalty();
+      qc.invalidateQueries({ queryKey: ["client-loyalty", id] });
+      toast({ title: "✅ Puntos ajustados" });
+      setAdjPoints("");
+      setAdjReason("");
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al ajustar puntos", variant: "destructive" }),
+  });
+
+  const recalcMutation = useMutation({
+    mutationFn: () => api.post(`/admin/loyalty/recalculate/${id}`),
+    onSuccess: (res: any) => {
+      refetchLoyalty();
+      qc.invalidateQueries({ queryKey: ["client-loyalty", id] });
+      const msg = res?.data?.data?.message ?? "Recalculado";
+      toast({ title: `✅ ${msg}` });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al recalcular", variant: "destructive" }),
   });
 
   const u = user?.data ?? user;
@@ -121,9 +154,59 @@ const ClientDetail = () => {
               </Table>
             </TabsContent>
 
-            <TabsContent value="loyalty" className="mt-4">
-              <div className="text-4xl font-bold mb-2">{loyalty?.points ?? 0}</div>
-              <p className="text-muted-foreground text-sm">puntos acumulados</p>
+            <TabsContent value="loyalty" className="mt-4 space-y-6">
+              <div className="flex items-end gap-4">
+                <div>
+                  <div className="text-4xl font-bold">{(loyalty as any)?.data?.balance ?? (loyalty as any)?.balance ?? (loyalty as any)?.points ?? 0}</div>
+                  <p className="text-muted-foreground text-sm">puntos acumulados</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={recalcMutation.isPending}
+                  onClick={() => recalcMutation.mutate()}
+                >
+                  {recalcMutation.isPending ? "Recalculando…" : "🔄 Recalcular desde membresías"}
+                </Button>
+              </div>
+              <div className="rounded-xl border p-4 space-y-3 max-w-sm">
+                <p className="text-sm font-semibold">Ajustar puntos manualmente</p>
+                <div className="space-y-1">
+                  <Label>Puntos (número positivo)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="Ej: 150"
+                    value={adjPoints}
+                    onChange={(e) => setAdjPoints(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Motivo</Label>
+                  <Input
+                    placeholder="Ej: Membresía no contabilizada"
+                    value={adjReason}
+                    onChange={(e) => setAdjReason(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    disabled={!adjPoints || adjustMutation.isPending}
+                    onClick={() => adjustMutation.mutate({ points: Math.abs(Number(adjPoints)), reason: adjReason || "Ajuste manual", type: "earn" })}
+                  >
+                    + Agregar puntos
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!adjPoints || adjustMutation.isPending}
+                    onClick={() => adjustMutation.mutate({ points: Math.abs(Number(adjPoints)), reason: adjReason || "Ajuste manual", type: "redeem" })}
+                  >
+                    − Deducir puntos
+                  </Button>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>

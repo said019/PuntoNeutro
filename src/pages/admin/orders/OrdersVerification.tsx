@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { X, ZoomIn } from "lucide-react";
 
 const STATUS_BADGE: Record<string, "default" | "outline" | "destructive" | "secondary"> = {
   pending_payment: "outline",
@@ -41,11 +43,35 @@ interface Order {
   notes?: string;
 }
 
+// ── Lightbox ─────────────────────────────────────────────
+const Lightbox = ({ src, onClose }: { src: string; onClose: () => void }) => (
+  <div
+    className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4"
+    onClick={onClose}
+  >
+    <button
+      className="absolute top-4 right-4 text-white/60 hover:text-white bg-white/10 rounded-full p-2"
+      onClick={onClose}
+    >
+      <X size={20} />
+    </button>
+    <img
+      src={src}
+      alt="Comprobante"
+      className="max-w-full max-h-full rounded-xl object-contain shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    />
+  </div>
+);
+
 const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Order | null>(null);
   const [notes, setNotes] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<{ data: Order[] }>({
     queryKey,
@@ -55,16 +81,27 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
 
   const approveMutation = useMutation({
     mutationFn: ({ id, notes }: { id: string; notes: string }) => api.put(`/admin/orders/${id}/verify`, { notes }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["orders"] }); toast({ title: "Orden aprobada" }); setSelected(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["orders"] }); toast({ title: "✅ Orden aprobada" }); setSelected(null); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al aprobar", variant: "destructive" }),
   });
 
   const rejectMutation = useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes: string }) => api.put(`/admin/orders/${id}/reject`, { notes }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["orders"] }); toast({ title: "Orden rechazada" }); setSelected(null); },
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.put(`/admin/orders/${id}/reject`, { notes: reason, reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      toast({ title: "Orden rechazada · cliente notificado" });
+      setSelected(null);
+      setShowRejectDialog(false);
+      setRejectReason("");
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al rechazar", variant: "destructive" }),
   });
 
   return (
     <>
+      {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
+
       <div className="rounded-xl border border-border overflow-hidden">
         <Table>
           <TableHeader>
@@ -88,7 +125,7 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
                   <TableCell><Badge variant={STATUS_BADGE[o.status] ?? "outline"}>{STATUS_LABEL[o.status] ?? o.status}</Badge></TableCell>
                   <TableCell className="text-sm">{new Date(o.createdAt).toLocaleDateString("es-MX")}</TableCell>
                   <TableCell>
-                    <Button size="sm" variant="outline" onClick={() => { setSelected(o); setNotes(""); }}>
+                    <Button size="sm" variant="outline" onClick={() => { setSelected(o); setNotes(""); setRejectReason(""); }}>
                       Ver detalle
                     </Button>
                   </TableCell>
@@ -112,36 +149,80 @@ const OrdersTable = ({ url, queryKey }: { url: string; queryKey: string[] }) => 
               </div>
               {selected.proofUrl && (
                 <div>
-                  <Label className="mb-2 block">Comprobante</Label>
+                  <Label className="mb-2 block">Comprobante de pago</Label>
                   {selected.proofUrl.endsWith(".pdf")
                     ? <a href={selected.proofUrl} target="_blank" rel="noreferrer" className="text-primary text-sm underline">Ver PDF</a>
                     : (
-                      <a href={selected.proofUrl} target="_blank" rel="noreferrer" title="Click para ver en tamaño completo">
+                      <div className="relative group cursor-pointer" onClick={() => setLightboxSrc(selected.proofUrl!)}>
                         <img
                           src={selected.proofUrl}
                           alt="Comprobante"
-                          className="max-h-64 rounded-lg object-contain border border-border cursor-pointer hover:opacity-80 transition-opacity"
+                          className="max-h-56 w-full rounded-lg object-contain border border-border"
                         />
-                        <p className="text-xs text-muted-foreground mt-1">Click en la imagen para verla en tamaño completo</p>
-                      </a>
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                          <ZoomIn size={24} className="text-white" />
+                          <span className="text-white text-sm ml-2">Ver completo</span>
+                        </div>
+                      </div>
                     )
                   }
                 </div>
               )}
               <div className="space-y-1">
-                <Label>Notas del admin</Label>
+                <Label>Notas del admin (internas)</Label>
                 <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opcional..." />
               </div>
               <DialogFooter>
                 {selected.status === "pending_verification" && (
                   <>
-                    <Button variant="destructive" onClick={() => rejectMutation.mutate({ id: selected.id, notes })}>Rechazar</Button>
-                    <Button onClick={() => approveMutation.mutate({ id: selected.id, notes })}>Aprobar</Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setShowRejectDialog(true)}
+                    >
+                      Rechazar
+                    </Button>
+                    <Button
+                      onClick={() => approveMutation.mutate({ id: selected.id, notes })}
+                      disabled={approveMutation.isPending}
+                    >
+                      {approveMutation.isPending ? "Aprobando…" : "✅ Aprobar"}
+                    </Button>
                   </>
                 )}
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject reason dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>⚠️ Rechazar transferencia</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Escribe el motivo del rechazo. Se le notificará al cliente por email y WhatsApp.
+            </p>
+            <div className="space-y-1">
+              <Label>Motivo del rechazo *</Label>
+              <Textarea
+                rows={3}
+                placeholder="Ej: El comprobante no es legible, el monto no coincide, imagen borrosa…"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRejectDialog(false)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={!rejectReason.trim() || rejectMutation.isPending}
+              onClick={() => selected && rejectMutation.mutate({ id: selected.id, reason: rejectReason })}
+            >
+              {rejectMutation.isPending ? "Rechazando…" : "Confirmar rechazo"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

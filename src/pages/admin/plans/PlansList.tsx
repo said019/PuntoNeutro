@@ -97,16 +97,23 @@ const PlansList = () => {
   const createMutation = useMutation({
     mutationFn: (d: PlanFormData) => api.post("/plans", serializePlan(d)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); toast({ title: "Plan creado" }); closeDialog(); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al crear", variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, ...d }: Plan) => api.put(`/plans/${id}`, serializePlan(d)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); toast({ title: "Plan actualizado" }); closeDialog(); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al actualizar", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/plans/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); toast({ title: "Plan eliminado" }); },
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["plans"] });
+      const msg = res?.data?.message ?? "Plan eliminado";
+      toast({ title: msg });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al eliminar", variant: "destructive" }),
   });
 
   const openCreate = () => { form.reset(EMPTY); setEditing(null); setOpen(true); };

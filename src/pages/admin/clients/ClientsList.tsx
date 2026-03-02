@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus, Search, UserPlus, CreditCard, Banknote, Building2 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
+import { DatePicker } from "@/components/ui/date-picker";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 const editSchema = z.object({
@@ -263,7 +264,7 @@ const ClientsList = () => {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Fecha de nacimiento</Label>
-                  <Input type="date" className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("dateOfBirth")} />
+                  <DatePicker value={editForm.watch("dateOfBirth")} onChange={(v) => editForm.setValue("dateOfBirth", v)} />
                 </div>
               </div>
               <div className="space-y-1">
@@ -343,7 +344,7 @@ const ClientsList = () => {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-white/60 text-xs">Fecha de nacimiento</Label>
-                    <Input type="date" className="bg-white/[0.04] border-white/[0.08] text-white" {...manualForm.register("dateOfBirth")} />
+                    <DatePicker value={manualForm.watch("dateOfBirth")} onChange={(v) => manualForm.setValue("dateOfBirth", v)} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-white/60 text-xs">Notas de salud</Label>
@@ -420,11 +421,7 @@ const ClientsList = () => {
                   {selectedPlanId && selectedPlanId !== "none" && (
                     <div className="space-y-1">
                       <Label className="text-white/60 text-xs">Fecha de inicio</Label>
-                      <Input
-                        type="date"
-                        className="bg-white/[0.04] border-white/[0.08] text-white"
-                        {...manualForm.register("startDate")}
-                      />
+                      <DatePicker value={manualForm.watch("startDate")} onChange={(v) => manualForm.setValue("startDate", v)} />
                     </div>
                   )}
                 </div>

@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const STATUS_OPTIONS = ["active", "pending_payment", "pending_activation", "expired", "cancelled"] as const;
 type MembershipStatus = (typeof STATUS_OPTIONS)[number];
@@ -235,7 +236,7 @@ const MembershipsList = () => {
               </div>
               <div className="space-y-1">
                 <Label>Fecha de inicio</Label>
-                <Input type="date" {...form.register("startDate")} />
+                <DatePicker value={form.watch("startDate")} onChange={(v) => form.setValue("startDate", v)} />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
