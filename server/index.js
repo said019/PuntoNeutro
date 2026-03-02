@@ -11,6 +11,7 @@ import { fileURLToPath } from "url";
 import multer from "multer";
 import axios from "axios";
 import crypto from "crypto";
+import archiver from "archiver";
 import {
   sendMembershipActivated,
   sendBookingConfirmed,
@@ -2124,15 +2125,295 @@ const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || "";
 const APPLE_PASS_TYPE_ID = process.env.APPLE_PASS_TYPE_ID || "";
 const APPLE_KEY_ID = process.env.APPLE_KEY_ID || "";
 const APPLE_APNS_KEY_BASE64 = process.env.APPLE_APNS_KEY_BASE64 || "";
-const APPLE_AUTH_TOKEN = process.env.APPLE_AUTH_TOKEN || "";
+const APPLE_AUTH_TOKEN = process.env.APPLE_AUTH_TOKEN || crypto.randomBytes(32).toString("hex");
+// Signing certificates (PEM base64-encoded in env vars)
+const APPLE_SIGNER_CERT_BASE64 = process.env.APPLE_SIGNER_CERT_BASE64 || "";
+const APPLE_SIGNER_KEY_BASE64 = process.env.APPLE_SIGNER_KEY_BASE64 || "";
+const APPLE_WWDR_CERT_BASE64 = process.env.APPLE_WWDR_CERT_BASE64 || "";
+const APPLE_CERT_PASSWORD = process.env.APPLE_CERT_PASSWORD || "";
 
 function isAppleWalletConfigured() {
-  return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_KEY_ID && APPLE_APNS_KEY_BASE64 && APPLE_AUTH_TOKEN);
+  return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_SIGNER_CERT_BASE64 && APPLE_SIGNER_KEY_BASE64 && APPLE_WWDR_CERT_BASE64);
 }
 
+/**
+ * Generate a .pkpass file as a Buffer for a given user.
+ * Apple .pkpass = ZIP containing: pass.json, manifest.json, signature, icon.png, logo.png, strip.png
+ */
+async function generateApplePkpass({ userId, userName, points, qrCode, membership, nextBooking }) {
+  const serialNumber = `ophelia_${userId.replace(/-/g, "")}`;
+  const hasMembership = !!membership;
+  const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
+  const isPackage = hasMembership && !isUnlimited && membership.class_limit > 1;
+
+  // Pass header
+  let passHeader = "Ophelia Club";
+  if (hasMembership) {
+    if (isUnlimited) passHeader = "Membresía";
+    else if (isPackage) passHeader = "Paquete";
+    else passHeader = "Clase Individual";
+  }
+
+  // Build secondary/auxiliary fields
+  const secondaryFields = [];
+  const auxiliaryFields = [];
+  const backFields = [];
+
+  if (hasMembership) {
+    secondaryFields.push({
+      key: "plan",
+      label: "PLAN",
+      value: membership.plan_name || "Plan Activo",
+      changeMessage: "Tu plan cambió a %@",
+    });
+    if (membership.end_date) {
+      const endDate = new Date(membership.end_date);
+      const daysLeft = Math.max(0, Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24)));
+      auxiliaryFields.push({
+        key: "vigencia",
+        label: "VIGENTE HASTA",
+        value: `${endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })} (${daysLeft}d)`,
+      });
+    }
+    if (isUnlimited) {
+      auxiliaryFields.push({ key: "clases", label: "CLASES", value: "♾️ Ilimitadas" });
+    } else if (membership.class_limit) {
+      auxiliaryFields.push({
+        key: "clases",
+        label: "CLASES",
+        value: `${membership.classes_remaining ?? 0} / ${membership.class_limit} restantes`,
+        changeMessage: "Clases restantes: %@",
+      });
+    }
+  } else {
+    secondaryFields.push({ key: "estado", label: "ESTADO", value: "Sin membresía activa" });
+  }
+
+  if (nextBooking) {
+    const bookingDate = new Date(nextBooking.date);
+    const dateStr = bookingDate.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+    const timeStr = nextBooking.start_time ? String(nextBooking.start_time).substring(0, 5) : "";
+    backFields.push({
+      key: "next_class",
+      label: "PRÓXIMA CLASE",
+      value: `${nextBooking.class_name || "Clase"} — ${dateStr} ${timeStr}${nextBooking.instructor_name ? ` — ${nextBooking.instructor_name}` : ""}`,
+      changeMessage: "%@",
+    });
+  }
+
+  backFields.push(
+    { key: "puntos", label: "PUNTOS OPHELIA CLUB", value: `${points.toLocaleString("es-MX")} pts` },
+    { key: "web", label: "RESERVAR EN LÍNEA", value: `${SITE_URL}/app/bookings` },
+    { key: "terms", label: "TÉRMINOS", value: "Válido para clases de trampolín. Presenta tu pase en recepción." }
+  );
+
+  // Build pass.json
+  const passJson = {
+    formatVersion: 1,
+    passTypeIdentifier: APPLE_PASS_TYPE_ID,
+    serialNumber,
+    teamIdentifier: APPLE_TEAM_ID,
+    organizationName: "Ophelia Jump Studio",
+    description: `${passHeader} — Ophelia Jump Studio`,
+    logoText: "Ophelia Studio",
+    foregroundColor: "rgb(255, 255, 255)",
+    backgroundColor: "rgb(26, 11, 38)",
+    labelColor: "rgb(202, 113, 225)",
+    generic: {
+      headerFields: [
+        { key: "points", label: "PUNTOS", value: points, textAlignment: "PKTextAlignmentRight", changeMessage: "Ahora tienes %@ puntos" },
+      ],
+      primaryFields: [
+        { key: "member", label: passHeader.toUpperCase(), value: userName },
+      ],
+      secondaryFields,
+      auxiliaryFields,
+      backFields,
+    },
+    barcode: {
+      message: qrCode,
+      format: "PKBarcodeFormatQR",
+      messageEncoding: "iso-8859-1",
+      altText: "Escanea en recepción",
+    },
+    barcodes: [
+      {
+        message: qrCode,
+        format: "PKBarcodeFormatQR",
+        messageEncoding: "iso-8859-1",
+        altText: "Escanea en recepción",
+      },
+    ],
+    webServiceURL: `${SITE_URL}/api/wallet`,
+    authenticationToken: APPLE_AUTH_TOKEN,
+    relevantDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+  };
+
+  // Read image assets from public/ folder
+  const publicDir = path.join(__dirname, "..", "public");
+  const iconBuffer = fs.existsSync(path.join(publicDir, "ophelia-logo.png"))
+    ? fs.readFileSync(path.join(publicDir, "ophelia-logo.png"))
+    : null;
+  const logoBuffer = fs.existsSync(path.join(publicDir, "ophelia-logo-full.png"))
+    ? fs.readFileSync(path.join(publicDir, "ophelia-logo-full.png"))
+    : null;
+
+  // Build file map for the pass
+  const files = {};
+  const passJsonBuffer = Buffer.from(JSON.stringify(passJson));
+  files["pass.json"] = passJsonBuffer;
+  if (iconBuffer) {
+    files["icon.png"] = iconBuffer;
+    files["icon@2x.png"] = iconBuffer;
+  }
+  if (logoBuffer) {
+    files["logo.png"] = logoBuffer;
+    files["logo@2x.png"] = logoBuffer;
+  }
+
+  // Build manifest.json (SHA1 hashes of each file)
+  const manifest = {};
+  for (const [name, buf] of Object.entries(files)) {
+    manifest[name] = crypto.createHash("sha1").update(buf).digest("hex");
+  }
+  const manifestBuffer = Buffer.from(JSON.stringify(manifest));
+  files["manifest.json"] = manifestBuffer;
+
+  // Sign manifest with Apple certificates to create PKCS#7 signature
+  const signerCertPem = Buffer.from(APPLE_SIGNER_CERT_BASE64, "base64").toString("utf8");
+  const signerKeyPem = Buffer.from(APPLE_SIGNER_KEY_BASE64, "base64").toString("utf8");
+  const wwdrPem = Buffer.from(APPLE_WWDR_CERT_BASE64, "base64").toString("utf8");
+
+  // Use openssl to create detached PKCS#7 signature
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pkpass-"));
+  const manifestPath = path.join(tmpDir, "manifest.json");
+  const certPath = path.join(tmpDir, "signer.pem");
+  const keyPath = path.join(tmpDir, "signer.key");
+  const wwdrPath = path.join(tmpDir, "wwdr.pem");
+  const sigPath = path.join(tmpDir, "signature");
+
+  fs.writeFileSync(manifestPath, manifestBuffer);
+  fs.writeFileSync(certPath, signerCertPem);
+  fs.writeFileSync(keyPath, signerKeyPem);
+  fs.writeFileSync(wwdrPath, wwdrPem);
+
+  const { execSync } = await import("child_process");
+  const opensslCmd = `openssl smime -binary -sign -certfile "${wwdrPath}" -signer "${certPath}" -inkey "${keyPath}" -in "${manifestPath}" -out "${sigPath}" -outform DER -passin pass:${APPLE_CERT_PASSWORD || ""}`;
+  try {
+    execSync(opensslCmd, { stdio: "pipe" });
+  } catch (opensslErr) {
+    // Clean up temp files
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    throw new Error(`OpenSSL signing failed: ${opensslErr.stderr?.toString() || opensslErr.message}`);
+  }
+
+  const signatureBuffer = fs.readFileSync(sigPath);
+  files["signature"] = signatureBuffer;
+
+  // Clean up temp files
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+
+  // Create ZIP (.pkpass)
+  return new Promise((resolve, reject) => {
+    const archive = archiver("zip", { store: true }); // no compression for .pkpass
+    const chunks = [];
+    archive.on("data", (chunk) => chunks.push(chunk));
+    archive.on("end", () => resolve(Buffer.concat(chunks)));
+    archive.on("error", reject);
+
+    for (const [name, buf] of Object.entries(files)) {
+      archive.append(buf, { name });
+    }
+    archive.finalize();
+  });
+}
+
+// ── Apple Wallet endpoints ─────────────────────────────────────────────────
+
+// GET /api/wallet/apple/pkpass — generate and download .pkpass for logged-in user
+app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
+  if (!isAppleWalletConfigured()) {
+    return res.status(503).json({ message: "Apple Wallet no configurado — se necesitan certificados de Apple Developer" });
+  }
+  try {
+    // Get user info (same queries as Google Wallet)
+    const userRes = await pool.query("SELECT id, name, email, full_name, display_name FROM users WHERE id = $1", [req.userId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
+    const user = userRes.rows[0];
+    const userName = user.full_name || user.display_name || user.name || user.email;
+
+    const pointsRes = await pool.query(
+      "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
+      [req.userId]
+    );
+    const points = parseInt(pointsRes.rows[0].total);
+
+    let membership = null;
+    try {
+      const memRes = await pool.query(
+        `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.end_date,
+                m.plan_name_override, m.class_limit_override,
+                p.name AS plan_name, p.class_limit AS plan_class_limit
+         FROM memberships m
+         LEFT JOIN plans p ON m.plan_id = p.id
+         WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
+         ORDER BY m.end_date DESC LIMIT 1`,
+        [req.userId]
+      );
+      if (memRes.rows.length > 0) {
+        const m = memRes.rows[0];
+        membership = {
+          plan_name: m.plan_name_override || m.plan_name || "Plan Activo",
+          class_limit: m.class_limit_override ?? m.plan_class_limit,
+          classes_remaining: m.classes_remaining,
+          start_date: m.start_date,
+          end_date: m.end_date,
+        };
+      }
+    } catch (e) { console.error("Apple Wallet: membership query error:", e.message); }
+
+    let nextBooking = null;
+    try {
+      const bookRes = await pool.query(
+        `SELECT c.date, c.start_time, ct.name AS class_name,
+                COALESCE(i.display_name, i.full_name) AS instructor_name
+         FROM bookings b
+         JOIN classes c ON b.class_id = c.id
+         JOIN class_types ct ON c.class_type_id = ct.id
+         LEFT JOIN instructors i ON c.instructor_id = i.id
+         WHERE b.user_id = $1 AND b.status IN ('confirmed','waitlist') AND c.date >= CURRENT_DATE
+         ORDER BY c.date ASC, c.start_time ASC LIMIT 1`,
+        [req.userId]
+      );
+      if (bookRes.rows.length > 0) nextBooking = bookRes.rows[0];
+    } catch (e) { console.error("Apple Wallet: booking query error:", e.message); }
+
+    const qrCode = Buffer.from(req.userId).toString("base64");
+    const pkpassBuffer = await generateApplePkpass({ userId: req.userId, userName, points, qrCode, membership, nextBooking });
+
+    res.setHeader("Content-Type", "application/vnd.apple.pkpass");
+    res.setHeader("Content-Disposition", `attachment; filename=ophelia-pass.pkpass`);
+    return res.send(pkpassBuffer);
+  } catch (err) {
+    console.error("Apple Wallet pkpass error:", err.message);
+    return res.status(500).json({ message: "Error generando pase de Apple Wallet" });
+  }
+});
+
+// GET /api/wallet/apple/status — check Apple Wallet config
+app.get("/api/wallet/apple/status", async (_req, res) => {
+  return res.json({
+    configured: isAppleWalletConfigured(),
+    teamId: APPLE_TEAM_ID ? "✅ set" : "❌ missing",
+    passTypeId: APPLE_PASS_TYPE_ID || "N/A",
+    signerCert: APPLE_SIGNER_CERT_BASE64 ? "✅ set" : "❌ missing",
+    signerKey: APPLE_SIGNER_KEY_BASE64 ? "✅ set" : "❌ missing",
+    wwdrCert: APPLE_WWDR_CERT_BASE64 ? "✅ set" : "❌ missing",
+    authToken: APPLE_AUTH_TOKEN ? "✅ set" : "❌ missing",
+  });
+});
+
 // Apple Wallet Web Service endpoints (protocol V1)
-// These allow iOS to register devices, check for updates, and download updated passes
-// Note: .pkpass generation requires a signing certificate (.p12) not provided yet
 
 // POST /api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serial
 app.post("/api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serial", async (req, res) => {
@@ -2176,8 +2457,53 @@ app.get("/api/wallet/v1/devices/:deviceId/registrations/:passTypeId", async (req
 
 // GET /api/wallet/v1/passes/:passTypeId/:serial — download updated pass
 app.get("/api/wallet/v1/passes/:passTypeId/:serial", async (req, res) => {
-  // .pkpass generation requires signing certificate - placeholder for now
-  return res.status(501).json({ message: "Pass generation not yet configured — signing certificate needed" });
+  if (!isAppleWalletConfigured()) {
+    return res.status(501).json({ message: "Apple Wallet signing not configured" });
+  }
+  const { serial } = req.params;
+  // serial = ophelia_<userId without dashes>
+  const userId = serial.replace("ophelia_", "").replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, "$1-$2-$3-$4-$5");
+  try {
+    const userRes = await pool.query("SELECT id, name, email, full_name, display_name FROM users WHERE id = $1", [userId]);
+    if (userRes.rows.length === 0) return res.status(404).send();
+    const user = userRes.rows[0];
+    const userName = user.full_name || user.display_name || user.name || user.email;
+    const pointsRes = await pool.query(
+      "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
+      [userId]
+    );
+    const points = parseInt(pointsRes.rows[0].total);
+    let membership = null;
+    try {
+      const memRes = await pool.query(
+        `SELECT m.id, m.classes_remaining, m.start_date, m.end_date, m.plan_name_override, m.class_limit_override,
+                p.name AS plan_name, p.class_limit AS plan_class_limit
+         FROM memberships m LEFT JOIN plans p ON m.plan_id = p.id
+         WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
+         ORDER BY m.end_date DESC LIMIT 1`, [userId]);
+      if (memRes.rows.length > 0) {
+        const m = memRes.rows[0];
+        membership = { plan_name: m.plan_name_override || m.plan_name || "Plan Activo", class_limit: m.class_limit_override ?? m.plan_class_limit, classes_remaining: m.classes_remaining, start_date: m.start_date, end_date: m.end_date };
+      }
+    } catch (_) {}
+    let nextBooking = null;
+    try {
+      const bookRes = await pool.query(
+        `SELECT c.date, c.start_time, ct.name AS class_name, COALESCE(i.display_name, i.full_name) AS instructor_name
+         FROM bookings b JOIN classes c ON b.class_id = c.id JOIN class_types ct ON c.class_type_id = ct.id LEFT JOIN instructors i ON c.instructor_id = i.id
+         WHERE b.user_id = $1 AND b.status IN ('confirmed','waitlist') AND c.date >= CURRENT_DATE
+         ORDER BY c.date ASC, c.start_time ASC LIMIT 1`, [userId]);
+      if (bookRes.rows.length > 0) nextBooking = bookRes.rows[0];
+    } catch (_) {}
+    const qrCode = Buffer.from(userId).toString("base64");
+    const pkpassBuffer = await generateApplePkpass({ userId, userName, points, qrCode, membership, nextBooking });
+    res.setHeader("Content-Type", "application/vnd.apple.pkpass");
+    res.setHeader("Last-Modified", new Date().toUTCString());
+    return res.send(pkpassBuffer);
+  } catch (err) {
+    console.error("Apple V1 pass download error:", err.message);
+    return res.status(500).send();
+  }
 });
 
 // DELETE /api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serial
@@ -2203,19 +2529,6 @@ app.delete("/api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serial",
 app.post("/api/wallet/v1/log", (req, res) => {
   console.log("Apple Wallet log:", JSON.stringify(req.body));
   return res.status(200).send();
-});
-
-// GET /api/wallet/apple/status — check Apple Wallet config
-app.get("/api/wallet/apple/status", async (_req, res) => {
-  return res.json({
-    configured: isAppleWalletConfigured(),
-    teamId: APPLE_TEAM_ID ? "✅ set" : "❌ missing",
-    passTypeId: APPLE_PASS_TYPE_ID || "N/A",
-    keyId: APPLE_KEY_ID ? "✅ set" : "❌ missing",
-    apnsKey: APPLE_APNS_KEY_BASE64 ? "✅ set" : "❌ missing",
-    authToken: APPLE_AUTH_TOKEN ? "✅ set" : "❌ missing",
-    note: "Para generar .pkpass se necesita el certificado de firma (.p12) del Pass Type ID",
-  });
 });
 
 // ─── Routes: /api/videos ────────────────────────────────────────────────────

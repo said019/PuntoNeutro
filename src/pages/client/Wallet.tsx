@@ -4,14 +4,17 @@ import api from "@/lib/api";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { History, Gift, QrCode, Smartphone, ExternalLink } from "lucide-react";
+import { History, Gift, QrCode, Smartphone, ExternalLink, Download } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import opheliaLogo from "@/assets/ophelia-logo-full.png";
+import { useState } from "react";
 
 const Wallet = () => {
   const { toast } = useToast();
+  const [appleLoading, setAppleLoading] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ["wallet-pass"],
     queryFn: async () => (await api.get("/wallet/pass")).data,
@@ -30,6 +33,43 @@ const Wallet = () => {
   });
 
   const googleSaveUrl = gwData?.saveUrl || null;
+
+  // Apple Wallet status
+  const { data: appleStatus } = useQuery({
+    queryKey: ["apple-wallet-status"],
+    queryFn: async () => {
+      const resp = await api.get("/wallet/apple/status");
+      return resp.data;
+    },
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const appleConfigured = appleStatus?.configured ?? false;
+
+  const handleAppleWalletDownload = async () => {
+    setAppleLoading(true);
+    try {
+      const resp = await api.get("/wallet/apple/pkpass", { responseType: "blob" });
+      const blob = new Blob([resp.data], { type: "application/vnd.apple.pkpass" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ophelia-pass.pkpass";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "¡Pase descargado!", description: "Ábrelo para agregarlo a Apple Wallet." });
+    } catch (err: any) {
+      const msg = err?.response?.status === 503
+        ? "Apple Wallet aún no está configurado. Contacta al administrador."
+        : "Error al descargar el pase. Intenta de nuevo.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setAppleLoading(false);
+    }
+  };
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
@@ -123,12 +163,34 @@ const Wallet = () => {
               )}
 
               {/* Apple Wallet */}
-              <div className="flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black/50 border border-white/5 opacity-60 cursor-not-allowed">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" fill="#888"/>
-                </svg>
-                <span className="text-white/50 font-medium text-sm">Apple Wallet — próximamente</span>
-              </div>
+              {appleConfigured ? (
+                <button
+                  onClick={handleAppleWalletDownload}
+                  disabled={appleLoading}
+                  className={cn(
+                    "flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black border border-white/15 hover:border-white/30 transition-all shadow-md",
+                    appleLoading && "opacity-60 cursor-wait"
+                  )}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" fill="white"/>
+                  </svg>
+                  <span className="text-white font-semibold text-sm">
+                    {appleLoading ? "Descargando…" : "Agregar a Apple Wallet"}
+                  </span>
+                  {!appleLoading && <Download size={14} className="text-white/50" />}
+                </button>
+              ) : (
+                <button
+                  onClick={() => toast({ title: "No disponible", description: "Apple Wallet se está configurando. Pronto estará listo.", variant: "destructive" })}
+                  className="flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" fill="#888"/>
+                  </svg>
+                  <span className="text-white/70 font-medium text-sm">Apple Wallet — configurando</span>
+                </button>
+              )}
             </div>
           </div>
 
