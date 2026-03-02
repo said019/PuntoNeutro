@@ -110,7 +110,7 @@ const VideoUpload = () => {
     onError: () => toast({ title: "Error al actualizar video", variant: "destructive" }),
   });
 
-  // Direct-to-Drive upload: init session on server, upload directly to googleapis.com
+  // Chunked upload via server proxy to Google Drive (avoids CORS)
   const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const videoFile = e.target.files?.[0];
     if (!videoFile) return;
@@ -128,49 +128,53 @@ const VideoUpload = () => {
     setUploadedEmbedUrl(null);
 
     try {
-      // Step 1: Get resumable upload URL from our server (small JSON request)
+      // Step 1: Init resumable session on server (small JSON request)
       const initResp = await api.post("/drive/init-upload", {
         fileName: `video_${Date.now()}_${videoFile.name}`,
         mimeType: videoFile.type || "video/mp4",
         fileSize: videoFile.size,
       });
-      const { uploadUrl } = initResp.data?.data || initResp.data || {};
-      if (!uploadUrl) throw new Error("No se obtuvo URL de subida");
+      const { sessionId } = initResp.data?.data || initResp.data || {};
+      if (!sessionId) throw new Error("No se obtuvo sesión de subida");
 
-      // Step 2: Upload directly to Google Drive via XHR (for progress)
-      const driveFileId = await new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", uploadUrl);
-        xhr.setRequestHeader("Content-Type", videoFile.type || "video/mp4");
+      // Step 2: Upload file in ~5 MB chunks via server proxy (avoids CORS)
+      const CHUNK_SIZE = 5 * 1024 * 1024;
+      let offset = 0;
+      let driveFileId = "";
+      while (offset < videoFile.size) {
+        const end = Math.min(offset + CHUNK_SIZE, videoFile.size);
+        const chunk = videoFile.slice(offset, end);
+        const contentRange = `bytes ${offset}-${end - 1}/${videoFile.size}`;
 
-        xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 90));
-        };
+        const resp = await api.put(`/drive/upload-chunk/${sessionId}`, chunk, {
+          headers: {
+            "Content-Type": videoFile.type || "video/mp4",
+            "Content-Range": contentRange,
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+        });
 
-        xhr.onload = () => {
-          if (xhr.status === 200 || xhr.status === 201) {
-            try {
-              const result = JSON.parse(xhr.responseText);
-              resolve(result.id);
-            } catch {
-              reject(new Error("Respuesta inválida de Google Drive"));
-            }
-          } else {
-            reject(new Error(`Error de Google Drive: ${xhr.status}`));
-          }
-        };
+        if (resp.data?.done) {
+          driveFileId = resp.data.data?.id;
+          break;
+        }
+        if (resp.data?.range) {
+          offset = parseInt(resp.data.range.split("-")[1], 10) + 1;
+        } else {
+          offset = end;
+        }
+        setUploadProgress(Math.round((offset / videoFile.size) * 90));
+      }
 
-        xhr.onerror = () => reject(new Error("Error de red al subir a Google Drive"));
-        xhr.send(videoFile);
-      });
-
+      if (!driveFileId) throw new Error("Upload terminó sin obtener file ID");
       setUploadProgress(93);
 
       // Step 3: Make file public
       await api.post(`/drive/make-public/${driveFileId}`);
       setUploadProgress(96);
 
-      // Step 4: Upload thumbnail if provided (small file)
+      // Step 4: Upload thumbnail if provided (small file — also via chunked proxy)
       const thumbFile = thumbInputRef.current?.files?.[0];
       let thumbnailUrl = `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w640`;
       let thumbnailDriveId = "";
@@ -180,18 +184,21 @@ const VideoUpload = () => {
           mimeType: thumbFile.type || "image/jpeg",
           fileSize: thumbFile.size,
         });
-        const thumbUploadUrl = thumbInit.data?.data?.uploadUrl;
-        if (thumbUploadUrl) {
-          const thumbResp = await fetch(thumbUploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": thumbFile.type || "image/jpeg" },
-            body: thumbFile,
+        const thumbSessionId = thumbInit.data?.data?.sessionId;
+        if (thumbSessionId) {
+          // Thumbnail is small, send as single chunk
+          const thumbChunk = thumbFile.slice(0, thumbFile.size);
+          const thumbResp = await api.put(`/drive/upload-chunk/${thumbSessionId}`, thumbChunk, {
+            headers: {
+              "Content-Type": thumbFile.type || "image/jpeg",
+              "Content-Range": `bytes 0-${thumbFile.size - 1}/${thumbFile.size}`,
+            },
+            maxBodyLength: Infinity,
           });
-          if (thumbResp.ok) {
-            const thumbResult = await thumbResp.json();
-            thumbnailDriveId = thumbResult.id;
-            thumbnailUrl = `https://drive.google.com/thumbnail?id=${thumbResult.id}&sz=w640`;
-            await api.post(`/drive/make-public/${thumbResult.id}`);
+          if (thumbResp.data?.done && thumbResp.data.data?.id) {
+            thumbnailDriveId = thumbResp.data.data.id;
+            thumbnailUrl = `https://drive.google.com/thumbnail?id=${thumbnailDriveId}&sz=w640`;
+            await api.post(`/drive/make-public/${thumbnailDriveId}`);
           }
         }
       }

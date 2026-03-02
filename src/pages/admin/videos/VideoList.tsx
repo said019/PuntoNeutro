@@ -78,7 +78,7 @@ const VideoList = () => {
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
 
-  // Upload video file for a homepage card — direct to Google Drive (bypasses Railway proxy)
+  // Upload video file for a homepage card — chunked upload via server proxy to Google Drive
   const handleCardVideoUpload = async (cardId: number, file: File) => {
     const MAX_MB = 500;
     if (file.size > MAX_MB * 1024 * 1024) {
@@ -88,44 +88,48 @@ const VideoList = () => {
     setUploadingCardId(cardId);
     setUploadProgress(0);
     try {
-      // Step 1: Get resumable upload URL from our server (small JSON request)
+      // Step 1: Init resumable session on server (small JSON request)
       const initResp = await api.post("/drive/init-upload", {
         fileName: `homepage_card_${cardId}_${Date.now()}_${file.name}`,
         mimeType: file.type || "video/mp4",
         fileSize: file.size,
       });
-      const { uploadUrl } = initResp.data?.data || initResp.data || {};
-      if (!uploadUrl) throw new Error("No se obtuvo URL de subida");
+      const { sessionId } = initResp.data?.data || initResp.data || {};
+      if (!sessionId) throw new Error("No se obtuvo sesión de subida");
 
-      // Step 2: Upload file directly to Google Drive in one PUT (for files <500 MB)
-      // Using XHR for progress tracking
-      const driveFileId = await new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", uploadUrl);
-        xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
-        xhr.setRequestHeader("Content-Length", String(file.size));
+      // Step 2: Upload file in ~5 MB chunks via our server proxy (avoids CORS)
+      const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
+      let offset = 0;
+      let driveFileId = "";
+      while (offset < file.size) {
+        const end = Math.min(offset + CHUNK_SIZE, file.size);
+        const chunk = file.slice(offset, end);
+        const contentRange = `bytes ${offset}-${end - 1}/${file.size}`;
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 95)); // 95% = upload, 5% = finalize
-        };
+        const resp = await api.put(`/drive/upload-chunk/${sessionId}`, chunk, {
+          headers: {
+            "Content-Type": file.type || "video/mp4",
+            "Content-Range": contentRange,
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+        });
 
-        xhr.onload = () => {
-          if (xhr.status === 200 || xhr.status === 201) {
-            try {
-              const result = JSON.parse(xhr.responseText);
-              resolve(result.id);
-            } catch {
-              reject(new Error("Respuesta inválida de Google Drive"));
-            }
-          } else {
-            reject(new Error(`Error de Google Drive: ${xhr.status}`));
-          }
-        };
+        if (resp.data?.done) {
+          driveFileId = resp.data.data?.id;
+          break;
+        }
+        // 308 means chunk accepted, continue
+        if (resp.data?.range) {
+          const nextOffset = parseInt(resp.data.range.split("-")[1], 10) + 1;
+          offset = nextOffset;
+        } else {
+          offset = end;
+        }
+        setUploadProgress(Math.round((offset / file.size) * 95));
+      }
 
-        xhr.onerror = () => reject(new Error("Error de red al subir a Google Drive"));
-        xhr.send(file);
-      });
-
+      if (!driveFileId) throw new Error("Upload terminó sin obtener file ID");
       setUploadProgress(97);
 
       // Step 3: Make file public

@@ -836,8 +836,15 @@ async function ensureSchema() {
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 app.use(cors());
-app.use(express.json({ limit: "20mb" }));
-app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+// Skip JSON body parsing for binary upload-chunk endpoint
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/drive/upload-chunk/")) return next();
+  express.json({ limit: "20mb" })(req, res, next);
+});
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/drive/upload-chunk/")) return next();
+  express.urlencoded({ extended: true, limit: "20mb" })(req, res, next);
+});
 
 // ─── Helper: snake_case → camelCase row mapper ──────────────────────────────
 function camelRow(row) {
@@ -4024,10 +4031,9 @@ app.put("/api/homepage-video-cards/:id", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-// ─── Direct-to-Drive Upload (bypasses Railway proxy for large files) ────────
+// ─── Direct-to-Drive Upload (server proxies upload to avoid CORS) ───────────
 
-// POST /api/drive/init-upload — returns a Google Drive resumable session URL
-// The browser then uploads the file directly to googleapis.com
+// POST /api/drive/init-upload — creates a Google Drive resumable session, returns sessionId
 app.post("/api/drive/init-upload", adminMiddleware, async (req, res) => {
   try {
     const { fileName, mimeType, fileSize } = req.body;
@@ -4067,16 +4073,65 @@ app.post("/api/drive/init-upload", adminMiddleware, async (req, res) => {
       return res.status(500).json({ message: "No se obtuvo URL de subida de Google Drive" });
     }
 
-    return res.json({
-      data: {
-        uploadUrl,          // browser sends PUT chunks here
-        accessToken,        // browser needs this for the PUT requests
-        folderId,
-      },
-    });
+    // Store session in memory (short-lived) for the chunk upload endpoint
+    const sessionId = crypto.randomBytes(16).toString("hex");
+    driveUploadSessions.set(sessionId, { uploadUrl, accessToken, mimeType, fileSize: Number(fileSize) || 0, createdAt: Date.now() });
+    // Clean up old sessions after 2 hours
+    setTimeout(() => driveUploadSessions.delete(sessionId), 2 * 60 * 60 * 1000);
+
+    return res.json({ data: { sessionId } });
   } catch (err) {
     console.error("Drive init-upload error:", err?.response?.data || err.message);
     return res.status(500).json({ message: "Error al iniciar subida: " + (err?.response?.data?.error?.message || err.message) });
+  }
+});
+
+// In-memory map to store active Drive upload sessions
+const driveUploadSessions = new Map();
+
+// PUT /api/drive/upload-chunk/:sessionId — proxy a chunk from browser to Google Drive
+// The browser sends chunks of ~5MB via this endpoint; the server forwards them to Drive.
+// This avoids CORS issues (browser → our server → googleapis.com)
+app.put("/api/drive/upload-chunk/:sessionId", adminMiddleware, async (req, res) => {
+  const session = driveUploadSessions.get(req.params.sessionId);
+  if (!session) return res.status(404).json({ message: "Sesión de upload no encontrada o expirada" });
+
+  const contentRange = req.headers["content-range"] || "";
+  const contentLength = req.headers["content-length"] || "";
+  const contentType = req.headers["content-type"] || session.mimeType;
+
+  try {
+    // Collect the chunk from the browser request
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const body = Buffer.concat(chunks);
+
+    // Forward to Google Drive
+    const driveResp = await axios.put(session.uploadUrl, body, {
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": String(body.length),
+        ...(contentRange ? { "Content-Range": contentRange } : {}),
+      },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+      validateStatus: (s) => s === 200 || s === 201 || s === 308,
+    });
+
+    if (driveResp.status === 200 || driveResp.status === 201) {
+      // Upload complete — return the file data
+      driveUploadSessions.delete(req.params.sessionId);
+      return res.json({ done: true, data: driveResp.data });
+    }
+
+    // 308 Resume Incomplete — return range info so browser knows where to continue
+    const range = driveResp.headers.range || "";
+    return res.json({ done: false, range });
+  } catch (err) {
+    console.error("Drive upload-chunk error:", err?.response?.data || err.message);
+    return res.status(500).json({ message: "Error al subir chunk: " + (err?.response?.data?.error?.message || err.message) });
   }
 });
 
