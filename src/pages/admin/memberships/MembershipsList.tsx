@@ -17,8 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Search, X } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
+import { useDebounce } from "@/hooks/use-debounce";
 
 const STATUS_OPTIONS = ["active", "pending_payment", "pending_activation", "expired", "cancelled"] as const;
 type MembershipStatus = (typeof STATUS_OPTIONS)[number];
@@ -52,6 +53,13 @@ interface Membership {
   endDate?: string;
   classesRemaining?: number | null;
   classLimit?: number | null;
+}
+
+interface ClientOption {
+  id: string;
+  displayName: string;
+  email?: string;
+  phone?: string | null;
 }
 
 const membershipSchema = z.object({
@@ -168,13 +176,35 @@ const MembershipsList = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState<ClientOption | null>(null);
+  const debouncedUserSearch = useDebounce(userSearch, 250);
 
-  const form = useForm<MembershipFormData>({ resolver: zodResolver(membershipSchema), defaultValues: { startDate: new Date().toISOString().split("T")[0] } });
+  const form = useForm<MembershipFormData>({
+    resolver: zodResolver(membershipSchema),
+    defaultValues: { userId: "", startDate: new Date().toISOString().split("T")[0] },
+  });
 
   const createMutation = useMutation({
     mutationFn: (d: MembershipFormData) => api.post("/memberships", d),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["memberships"] }); toast({ title: "Membresía asignada" }); setOpen(false); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["memberships"] });
+      toast({ title: "Membresía asignada" });
+      setOpen(false);
+      setSelectedUser(null);
+      setUserSearch("");
+      form.reset({ userId: "", startDate: new Date().toISOString().split("T")[0] });
+    },
   });
+
+  const { data: usersData, isFetching: searchingUsers } = useQuery<{ data: ClientOption[] }>({
+    queryKey: ["membership-users-search", debouncedUserSearch],
+    enabled: open,
+    queryFn: async () => (
+      await api.get(`/users?role=client${debouncedUserSearch ? `&search=${encodeURIComponent(debouncedUserSearch)}` : ""}`)
+    ).data,
+  });
+  const userOptions = Array.isArray(usersData?.data) ? usersData.data : [];
 
   const { data: plansData } = useQuery<{ data: { id: string; name: string }[] }>({
     queryKey: ["plans"],
@@ -204,13 +234,75 @@ const MembershipsList = () => {
           </Tabs>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) {
+              setSelectedUser(null);
+              setUserSearch("");
+              form.reset({ userId: "", startDate: new Date().toISOString().split("T")[0] });
+            }
+          }}
+        >
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>Asignar membresía</DialogTitle></DialogHeader>
             <form onSubmit={form.handleSubmit((d) => createMutation.mutate(d))} className="space-y-4">
               <div className="space-y-1">
-                <Label>ID de cliente</Label>
-                <Input {...form.register("userId")} placeholder="UUID del cliente" />
+                <Label>Cliente</Label>
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                  <Input
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    className="pl-8"
+                    placeholder="Buscar por nombre, email o teléfono"
+                  />
+                </div>
+                {selectedUser && (
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                    <div>
+                      <p className="font-medium">{selectedUser.displayName}</p>
+                      <p className="text-xs text-muted-foreground">{selectedUser.email ?? "—"}{selectedUser.phone ? ` · ${selectedUser.phone}` : ""}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedUser(null);
+                        form.setValue("userId", "", { shouldValidate: true });
+                      }}
+                    >
+                      <X size={14} />
+                    </Button>
+                  </div>
+                )}
+                {!selectedUser && (
+                  <div className="max-h-40 overflow-auto rounded-md border border-border">
+                    {searchingUsers ? (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">Buscando…</p>
+                    ) : userOptions.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">Sin resultados</p>
+                    ) : (
+                      userOptions.map((u) => (
+                        <button
+                          type="button"
+                          key={u.id}
+                          className="w-full px-3 py-2 text-left hover:bg-white/5 border-b last:border-b-0 border-border"
+                          onClick={() => {
+                            setSelectedUser(u);
+                            form.setValue("userId", u.id, { shouldValidate: true });
+                            setUserSearch(u.displayName ?? "");
+                          }}
+                        >
+                          <p className="text-sm font-medium">{u.displayName}</p>
+                          <p className="text-xs text-muted-foreground">{u.email ?? "—"}{u.phone ? ` · ${u.phone}` : ""}</p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>Plan</Label>

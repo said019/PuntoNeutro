@@ -109,8 +109,8 @@ type TypeFormData = z.infer<typeof typeSchema>;
 
 /* ── Instructor schemas ── */
 const instructorSchema = z.object({
-  displayName: z.string().min(1, "Nombre requerido"),
-  email: z.string().email("Email inválido"),
+  displayName: z.string().trim().min(1, "Nombre requerido"),
+  email: z.string().trim().email("Email inválido"),
   bio: z.string().optional(),
   specialties: z.string().optional(),
   isActive: z.boolean().default(true),
@@ -118,8 +118,44 @@ const instructorSchema = z.object({
 type InstructorFormData = z.infer<typeof instructorSchema>;
 interface Instructor extends Omit<InstructorFormData, "specialties"> {
   id: string;
-  specialties: string[];
+  specialties?: string[] | string | null;
   photoUrl?: string;
+}
+
+function normalizeSpecialties(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item).trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+    } catch (_) {
+      // fallback parsing below
+    }
+    return value
+      .replace(/^\{|\}$/g, "")
+      .split(",")
+      .map((item) => item.replace(/^"+|"+$/g, "").trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function instructorPayload(d: InstructorFormData) {
+  return {
+    displayName: d.displayName.trim(),
+    email: d.email.trim().toLowerCase(),
+    bio: d.bio?.trim() || null,
+    specialties: normalizeSpecialties(d.specialties),
+    isActive: d.isActive,
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -917,25 +953,38 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
   const form = useForm<InstructorFormData>({ resolver: zodResolver(instructorSchema), defaultValues: { isActive: true } });
 
   const createMutation = useMutation({
-    mutationFn: (d: InstructorFormData) =>
-      api.post("/instructors", { ...d, specialties: d.specialties?.split(",").map((s) => s.trim()) ?? [] }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora creada" }); setOpen(false); },
+    mutationFn: (d: InstructorFormData) => api.post("/instructors", instructorPayload(d)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["instructors"] });
+      toast({ title: "Instructora creada" });
+      setOpen(false);
+      setEditing(null);
+    },
+    onError: (e: any) => {
+      toast({ title: e?.response?.data?.message ?? "Error al crear instructora", variant: "destructive" });
+    },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: Instructor & { specialties: string }) =>
-      api.put(`/instructors/${id}`, {
-        ...d,
-        specialties: typeof d.specialties === "string"
-          ? d.specialties.split(",").map((s) => s.trim())
-          : d.specialties,
-      }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora actualizada" }); setOpen(false); },
+    mutationFn: ({ id, ...d }: { id: string } & InstructorFormData) =>
+      api.put(`/instructors/${id}`, instructorPayload(d)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["instructors"] });
+      toast({ title: "Instructora actualizada" });
+      setOpen(false);
+      setEditing(null);
+    },
+    onError: (e: any) => {
+      toast({ title: e?.response?.data?.message ?? "Error al actualizar instructora", variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/instructors/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora eliminada" }); },
+    onError: (e: any) => {
+      toast({ title: e?.response?.data?.message ?? "Error al eliminar instructora", variant: "destructive" });
+    },
   });
 
   const uploadPhotoMutation = useMutation({
@@ -945,18 +994,28 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
       return api.post(`/instructors/${id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Foto actualizada" }); },
+    onError: (e: any) => {
+      toast({ title: e?.response?.data?.message ?? "Error al subir foto", variant: "destructive" });
+    },
   });
 
   const openEdit = (i: Instructor) => {
-    form.reset({ ...i, specialties: i.specialties?.join(", ") ?? "" });
+    form.reset({
+      displayName: i.displayName ?? "",
+      email: i.email ?? "",
+      bio: i.bio ?? "",
+      specialties: normalizeSpecialties(i.specialties).join(", "),
+      isActive: i.isActive ?? true,
+    });
     setEditing(i);
     setOpen(true);
   };
   const openCreate = () => {
-    form.reset({ isActive: true });
+    form.reset({ displayName: "", email: "", bio: "", specialties: "", isActive: true });
     setEditing(null);
     setOpen(true);
   };
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <>
@@ -980,6 +1039,8 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f && uploadTarget) uploadPhotoMutation.mutate({ id: uploadTarget, file: f });
+          e.target.value = "";
+          setUploadTarget(null);
         }}
       />
 
@@ -1017,7 +1078,7 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
                   </TableCell>
                   <TableCell className="font-medium">{ins.displayName}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{ins.email}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{ins.specialties?.join(", ")}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
                   <TableCell>
                     <Badge
                       variant={ins.isActive ? "default" : "secondary"}
@@ -1050,34 +1111,65 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
       </div>
 
       {/* CRUD dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          setOpen(nextOpen);
+          if (!nextOpen) setEditing(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar instructora" : "Nueva instructora"}</DialogTitle>
           </DialogHeader>
           <form
-            onSubmit={form.handleSubmit((d) =>
-              editing
-                ? updateMutation.mutate({ ...d, id: editing.id, specialties: d.specialties ?? "" } as any)
-                : createMutation.mutate(d)
+            noValidate
+            onSubmit={form.handleSubmit(
+              (d) => {
+                if (editing) {
+                  updateMutation.mutate({ ...d, id: editing.id });
+                  return;
+                }
+                createMutation.mutate(d);
+              },
+              (errors) => {
+                const first = Object.values(errors)[0];
+                toast({
+                  title: first?.message ? String(first.message) : "Revisa los campos del formulario",
+                  variant: "destructive",
+                });
+              },
             )}
             className="space-y-4"
           >
-            <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("displayName")} /></div>
-            <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
+            <div className="space-y-1">
+              <Label>Nombre</Label>
+              <Input {...form.register("displayName")} />
+              {form.formState.errors.displayName && (
+                <p className="text-xs text-destructive">{String(form.formState.errors.displayName.message)}</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label>Email</Label>
+              <Input type="email" {...form.register("email")} />
+              {form.formState.errors.email && (
+                <p className="text-xs text-destructive">{String(form.formState.errors.email.message)}</p>
+              )}
+            </div>
             <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
             <div className="space-y-1">
               <Label>Especialidades (separadas por coma)</Label>
               <Input {...form.register("specialties")} placeholder="Ej: Jumping, Pilates, Cardio" />
             </div>
             <div className="flex items-center gap-3">
-              <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
+              <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v, { shouldDirty: true })} />
               <Label>Activa</Label>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white">
-                {editing ? "Actualizar" : "Crear"}
+              <Button type="submit" disabled={isSaving} className="bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white">
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSaving ? "Guardando..." : editing ? "Actualizar" : "Crear"}
               </Button>
             </DialogFooter>
           </form>

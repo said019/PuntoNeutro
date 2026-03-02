@@ -85,22 +85,19 @@ const CashAssignment = () => {
   const [step, setStep] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
-  const [selectedUser, setSelectedUser] = useState<{ id: string; displayName: string; email?: string } | null>(null);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; displayName: string; email?: string; phone?: string | null } | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<{ id: string; name: string; price: number } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
-  const { data: usersData, isLoading: usersLoading } = useQuery<{ data: { id: string; displayName: string; email: string }[] }>({
-    queryKey: ["users-search"],
-    queryFn: async () => (await api.get(`/users?role=client`)).data,
+  const { data: usersData, isLoading: usersLoading } = useQuery<{ data: { id: string; displayName: string; email: string; phone?: string | null }[] }>({
+    queryKey: ["users-search", debouncedSearch],
+    queryFn: async () => (
+      await api.get(`/users?role=client${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`)
+    ).data,
   });
 
   const allUsers = Array.isArray(usersData?.data) ? usersData.data : [];
-  const filteredUsers = debouncedSearch
-    ? allUsers.filter(u =>
-        u.displayName?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        u.email?.toLowerCase().includes(debouncedSearch.toLowerCase())
-      )
-    : allUsers;
+  const filteredUsers = allUsers;
 
   const { data: plansData } = useQuery<{ data: { id: string; name: string; price: number; classLimit?: number | null; durationDays?: number; classCategory?: string }[] }>({
     queryKey: ["plans"],
@@ -140,7 +137,7 @@ const CashAssignment = () => {
                 className="pl-9 bg-white/[0.04] border-white/10 focus:border-[#E15CB8]/50 focus:ring-[#E15CB8]/20 text-white placeholder:text-white/25 rounded-xl"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Nombre o email de la clienta…"
+                placeholder="Nombre, email o teléfono…"
                 autoFocus
               />
             </div>
@@ -164,7 +161,10 @@ const CashAssignment = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-white/90 truncate">{u.displayName}</p>
-                  <p className="text-xs text-white/35 truncate">{u.email}</p>
+                  <p className="text-xs text-white/35 truncate">
+                    {u.email}
+                    {u.phone ? ` · ${u.phone}` : ""}
+                  </p>
                 </div>
                 <ArrowRight size={14} className="text-white/20 group-hover:text-[#E15CB8]/60 transition-colors shrink-0" />
               </button>

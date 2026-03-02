@@ -29,8 +29,24 @@ const instructorSchema = z.object({
 type InstructorFormData = z.infer<typeof instructorSchema>;
 interface Instructor extends Omit<InstructorFormData, "specialties"> {
   id: string;
-  specialties: string[];
+  specialties?: string[] | string | null;
   photoUrl?: string;
+}
+
+function normalizeSpecialties(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((s) => String(s).trim()).filter(Boolean);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map((s) => String(s).trim()).filter(Boolean);
+    } catch (_) {
+      // fallback to comma-separated text
+    }
+    return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
 }
 
 const InstructorsList = () => {
@@ -95,7 +111,10 @@ const InstructorsList = () => {
   });
 
   const openEdit = (i: Instructor) => {
-    form.reset({ ...i, specialties: i.specialties?.join(", ") });
+    form.reset({
+      ...i,
+      specialties: normalizeSpecialties(i.specialties).join(", "),
+    });
     setEditing(i);
     setOpen(true);
   };
@@ -154,7 +173,7 @@ const InstructorsList = () => {
                       </TableCell>
                       <TableCell className="font-medium">{ins.displayName}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{ins.email}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{ins.specialties?.join(", ")}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
                       <TableCell><Badge variant={ins.isActive ? "default" : "secondary"}>{ins.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
                       <TableCell>
                         <DropdownMenu>

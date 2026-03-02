@@ -6,12 +6,16 @@ import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft, ChevronRight, Users, CheckCircle2,
-  Clock, ArrowLeft, UserCheck, UserX, Calendar,
+  Clock, ArrowLeft, UserCheck, UserX, Calendar, Plus, Search,
 } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface RosterEntry {
@@ -24,6 +28,13 @@ interface RosterEntry {
   phone: string | null;
   planName: string | null;
   classesRemaining: number | null;
+}
+
+interface ClientOption {
+  id: string;
+  displayName: string;
+  email?: string;
+  phone?: string | null;
 }
 
 // ── Status config ──────────────────────────────────────────────────────────────
@@ -39,6 +50,9 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void }) => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
+  const debouncedMemberSearch = useDebounce(memberSearch, 250);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["roster", classId],
@@ -48,6 +62,14 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
 
   const classInfo = data?.data?.class ?? null;
   const roster: RosterEntry[] = data?.data?.roster ?? [];
+  const { data: usersData, isFetching: searchingUsers } = useQuery<{ data: ClientOption[] }>({
+    queryKey: ["booking-assign-users", classId, debouncedMemberSearch],
+    enabled: assignOpen,
+    queryFn: async () => (
+      await api.get(`/users?role=client${debouncedMemberSearch ? `&search=${encodeURIComponent(debouncedMemberSearch)}` : ""}`)
+    ).data,
+  });
+  const userOptions = Array.isArray(usersData?.data) ? usersData.data : [];
 
   const checkinMutation = useMutation({
     mutationFn: (id: string) => api.put(`/bookings/${id}/check-in`),
@@ -65,6 +87,20 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
       toast({ title: "Marcado como no asistió" });
     },
     onError: () => toast({ title: "Error", variant: "destructive" }),
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: (userId: string) => api.post("/admin/bookings/assign", { classId, userId }),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["roster", classId] });
+      const msg = res?.data?.message ?? "Reserva asignada";
+      toast({ title: msg });
+      setAssignOpen(false);
+      setMemberSearch("");
+    },
+    onError: (e: any) => {
+      toast({ title: e?.response?.data?.message ?? "Error al asignar reserva", variant: "destructive" });
+    },
   });
 
   const checkedIn = roster.filter((r) => r.status === "checked_in").length;
@@ -109,6 +145,16 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
             >
               <Clock size={11} /> Actualizar
             </button>
+          </div>
+
+          <div className="mt-3">
+            <Button
+              size="sm"
+              onClick={() => setAssignOpen(true)}
+              className="bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white"
+            >
+              <Plus size={14} className="mr-1" /> Asignar miembro
+            </Button>
           </div>
 
           {/* Stats */}
@@ -217,6 +263,54 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
             })
         }
       </div>
+
+      <Dialog
+        open={assignOpen}
+        onOpenChange={(next) => {
+          setAssignOpen(next);
+          if (!next) setMemberSearch("");
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Asignar reserva a miembro</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
+              <Input
+                className="pl-8"
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                placeholder="Buscar por nombre, email o teléfono"
+              />
+            </div>
+            <div className="max-h-72 overflow-auto rounded-xl border border-border">
+              {searchingUsers ? (
+                <p className="px-3 py-2 text-xs text-muted-foreground">Buscando…</p>
+              ) : userOptions.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-muted-foreground">Sin resultados</p>
+              ) : (
+                userOptions.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    disabled={assignMutation.isPending}
+                    onClick={() => assignMutation.mutate(u.id)}
+                    className="w-full px-3 py-2.5 text-left hover:bg-white/5 border-b last:border-b-0 border-border disabled:opacity-60"
+                  >
+                    <p className="text-sm font-medium">{u.displayName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {u.email ?? "—"}
+                      {u.phone ? ` · ${u.phone}` : ""}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

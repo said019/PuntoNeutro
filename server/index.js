@@ -596,7 +596,10 @@ async function ensureSchema() {
     `).catch(() => { });
     // ── discount_codes: normalise discount_type values ────────────────────
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS plan_id UUID REFERENCES plans(id) ON DELETE SET NULL`).catch(() => { });
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_discount_codes_plan ON discount_codes(plan_id)`).catch(() => { });
+    await pool.query(`UPDATE discount_codes SET discount_type = 'percent' WHERE discount_type IN ('percentage', 'porcentaje', '%')`).catch(() => { });
     // ── bookings: add checked_in_at column ────────────────────────────────
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
     // ── Settings table ─────────────────────────────────────────────────────
@@ -883,6 +886,75 @@ function camelRow(row) {
   return out;
 }
 function camelRows(rows) { return rows.map(camelRow); }
+
+function normalizeDiscountType(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (raw === "percent" || raw === "percentage" || raw === "%") return "percent";
+  if (raw === "fixed" || raw === "amount" || raw === "monto") return "fixed";
+  return null;
+}
+
+function calculateDiscountAmount(type, value, subtotal) {
+  const safeSubtotal = Number(subtotal || 0);
+  const safeValue = Number(value || 0);
+  if (safeSubtotal <= 0 || safeValue <= 0) return 0;
+  const normalized = normalizeDiscountType(type);
+  const amount = normalized === "percent"
+    ? safeSubtotal * (safeValue / 100)
+    : safeValue;
+  return Math.max(0, Math.min(amount, safeSubtotal));
+}
+
+function serializeSpecialtiesForDb(value) {
+  if (value === undefined || value === null) return null;
+  if (Array.isArray(value)) {
+    const items = value.map((v) => String(v).trim()).filter(Boolean);
+    return items.length ? JSON.stringify(items) : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    // Already JSON string? keep as-is if parseable.
+    if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
+      try {
+        JSON.parse(trimmed);
+        return trimmed;
+      } catch (_) {
+        // fall through and normalize as csv list
+      }
+    }
+    const items = trimmed.split(",").map((v) => v.trim()).filter(Boolean);
+    return JSON.stringify(items);
+  }
+  return JSON.stringify(value);
+}
+
+function normalizeQrDataUrl(raw) {
+  if (!raw) return null;
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("data:image/")) return trimmed;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `data:image/png;base64,${trimmed}`;
+}
+
+function pickEvolutionQrPayload(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  return (
+    payload?.code ||
+    payload?.base64 ||
+    payload?.qrcode?.base64 ||
+    payload?.qrcode?.code ||
+    payload?.qrCode?.base64 ||
+    payload?.qrCode?.code ||
+    payload?.qr?.base64 ||
+    payload?.qr?.code ||
+    payload?.instance?.qrcode?.base64 ||
+    payload?.instance?.qrCode?.base64 ||
+    null
+  );
+}
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
 function signToken(userId) {
@@ -1620,16 +1692,19 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       const dcRes = await pool.query(
         `SELECT * FROM discount_codes WHERE code = $1 AND is_active = true
          AND (expires_at IS NULL OR expires_at > NOW())
+         AND (plan_id IS NULL OR plan_id = $2)
          AND (max_uses IS NULL OR uses_count < max_uses)`,
-        [discountCode.toUpperCase()]
+        [discountCode.toUpperCase(), planId]
       );
-      if (dcRes.rows.length > 0) {
-        const dc = dcRes.rows[0];
-        discount = dc.discount_type === "percent"
-          ? subtotal * (parseFloat(dc.discount_value) / 100)
-          : parseFloat(dc.discount_value);
-        discount = Math.min(discount, subtotal);
+      if (!dcRes.rows.length) {
+        return res.status(400).json({ message: "Código de descuento no válido para este plan" });
       }
+      const dc = dcRes.rows[0];
+      const minOrderAmount = Number(dc.min_order_amount || 0);
+      if (minOrderAmount > subtotal) {
+        return res.status(400).json({ message: `Compra mínima requerida: $${minOrderAmount.toFixed(2)} MXN` });
+      }
+      discount = calculateDiscountAmount(dc.discount_type, dc.discount_value, subtotal);
     }
     const total = subtotal - discount;
     // Bank info from system settings or defaults
@@ -1722,14 +1797,17 @@ app.post("/api/discount-codes/validate", authMiddleware, async (req, res) => {
     const r = await pool.query(
       `SELECT * FROM discount_codes WHERE code = $1 AND is_active = true
        AND (expires_at IS NULL OR expires_at > NOW())
+       AND (plan_id IS NULL OR plan_id = $2)
        AND (max_uses IS NULL OR uses_count < max_uses)`,
-      [code.toUpperCase()]
+      [code.toUpperCase(), planId || null]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "Código no válido o expirado" });
     const dc = r.rows[0];
-    const discount = dc.discount_type === "percent"
-      ? originalPrice * (parseFloat(dc.discount_value) / 100)
-      : parseFloat(dc.discount_value);
+    const minOrderAmount = Number(dc.min_order_amount || 0);
+    if (minOrderAmount > originalPrice) {
+      return res.status(400).json({ message: `Compra mínima requerida: $${minOrderAmount.toFixed(2)} MXN` });
+    }
+    const discount = calculateDiscountAmount(dc.discount_type, dc.discount_value, originalPrice);
     return res.json({
       data: {
         code: dc.code,
@@ -3849,12 +3927,20 @@ app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
       subtotal += parseFloat(pRes.rows[0].price) * item.qty;
     }
     if (discountCode) {
-      const dcRes = await pool.query("SELECT * FROM discount_codes WHERE code=$1 AND is_active=true", [discountCode.toUpperCase()]);
+      const dcRes = await pool.query(
+        `SELECT * FROM discount_codes
+         WHERE code = $1 AND is_active = true
+           AND (expires_at IS NULL OR expires_at > NOW())
+           AND (plan_id IS NULL)
+           AND (max_uses IS NULL OR uses_count < max_uses)`,
+        [discountCode.toUpperCase()]
+      );
       if (dcRes.rows.length) {
         const dc = dcRes.rows[0];
-        discountAmount = dc.discount_type === "percentage" || dc.discount_type === "percent"
-          ? subtotal * (parseFloat(dc.discount_value) / 100)
-          : parseFloat(dc.discount_value);
+        const minOrderAmount = Number(dc.min_order_amount || 0);
+        if (subtotal >= minOrderAmount) {
+          discountAmount = calculateDiscountAmount(dc.discount_type, dc.discount_value, subtotal);
+        }
       }
     }
     const total = Math.max(0, subtotal - discountAmount);
@@ -4177,7 +4263,11 @@ app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
       const listRes = await evolutionApi.get("/instance/fetchInstances");
       const instances = listRes.data?.data || listRes.data || [];
       instanceExists = Array.isArray(instances)
-        ? instances.some((i) => i.instance?.instanceName === EVOLUTION_INSTANCE || i.name === EVOLUTION_INSTANCE)
+        ? instances.some((i) =>
+          i.instance?.instanceName === EVOLUTION_INSTANCE ||
+          i.instanceName === EVOLUTION_INSTANCE ||
+          i.name === EVOLUTION_INSTANCE
+        )
         : false;
     } catch (_) { instanceExists = false; }
 
@@ -4192,7 +4282,7 @@ app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
     if (state === "connecting" || state === "qr") {
       try {
         const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
-        qrCode = qrRes.data?.code || qrRes.data?.qrcode?.base64 || null;
+        qrCode = normalizeQrDataUrl(pickEvolutionQrPayload(qrRes.data));
       } catch (_) { }
     }
 
@@ -4232,33 +4322,17 @@ app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
 
     // Extract QR from create response (Evolution v2 returns it inline)
     let qrCode =
-      createData?.qrcode?.base64 ||
-      createData?.qrCode?.base64 ||
-      createData?.qr?.base64 ||
-      createData?.base64 ||
-      null;
+      normalizeQrDataUrl(pickEvolutionQrPayload(createData));
 
     // If not in create response, try the connect endpoint
     if (!qrCode) {
       try {
         const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
         console.log("[EVOLUTION QR RESPONSE]", JSON.stringify(qrRes.data).slice(0, 300));
-        qrCode =
-          qrRes.data?.code ||
-          qrRes.data?.base64 ||
-          qrRes.data?.qrcode?.base64 ||
-          qrRes.data?.qrCode?.base64 ||
-          qrRes.data?.qr?.base64 ||
-          null;
-        // If it's a plain base64 string that doesn't start with data: prefix, add it
-        if (qrCode && !qrCode.startsWith("data:")) {
-          qrCode = `data:image/png;base64,${qrCode}`;
-        }
+        qrCode = normalizeQrDataUrl(pickEvolutionQrPayload(qrRes.data));
       } catch (qrErr) {
         console.error("[EVOLUTION QR FETCH]", qrErr.response?.data || qrErr.message);
       }
-    } else if (!qrCode.startsWith("data:")) {
-      qrCode = `data:image/png;base64,${qrCode}`;
     }
 
     return res.json({ data: { qrCode, state: "qr_pending", message: "Escanea el código QR con WhatsApp" } });
@@ -5007,9 +5081,17 @@ app.get("/api/users", adminMiddleware, async (req, res) => {
     let q = `SELECT id, display_name, email, phone, role, created_at FROM users WHERE 1=1`;
     const params = [];
     if (role) { params.push(role); q += ` AND role = $${params.length}`; }
-    if (search) {
-      params.push(`%${search}%`);
-      q += ` AND (display_name ILIKE $${params.length} OR email ILIKE $${params.length})`;
+    const searchValue = String(search ?? "").trim();
+    if (searchValue) {
+      params.push(`%${searchValue}%`);
+      const textIdx = params.length;
+      const digitSearch = searchValue.replace(/\D/g, "");
+      let phoneClause = "";
+      if (digitSearch) {
+        params.push(`%${digitSearch}%`);
+        phoneClause = ` OR regexp_replace(COALESCE(phone, ''), '\\D', '', 'g') LIKE $${params.length}`;
+      }
+      q += ` AND (display_name ILIKE $${textIdx} OR email ILIKE $${textIdx}${phoneClause})`;
     }
     q += " ORDER BY display_name ASC LIMIT 200";
     const r = await pool.query(q, params);
@@ -5318,6 +5400,124 @@ app.get("/api/bookings", adminMiddleware, async (req, res) => {
     return res.json({ data: r.rows.map(b => ({ ...b, userName: b.user_name, className: b.class_name, startTime: b.start_time })) });
   } catch (err) {
     console.error("GET /bookings error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/bookings/assign — admin assigns a class booking to a specific member
+app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
+  const { classId, userId } = req.body;
+  if (!classId || !userId) return res.status(400).json({ message: "classId y userId requeridos" });
+  try {
+    const memRes = await pool.query(
+      `SELECT m.id, m.classes_remaining, COALESCE(p.class_category, 'all') AS class_category
+       FROM memberships m
+       LEFT JOIN plans p ON m.plan_id = p.id
+       WHERE m.user_id = $1 AND m.status = 'active' AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
+       ORDER BY m.created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+    if (memRes.rows.length === 0) {
+      return res.status(403).json({ message: "La clienta no tiene membresía activa para reservar esta clase" });
+    }
+    const membership = memRes.rows[0];
+
+    const classRes = await pool.query(
+      `SELECT c.id, c.max_capacity, c.current_bookings, c.status, ct.category AS class_category
+       FROM classes c
+       JOIN class_types ct ON c.class_type_id = ct.id
+       WHERE c.id = $1`,
+      [classId]
+    );
+    if (classRes.rows.length === 0) return res.status(404).json({ message: "Clase no encontrada" });
+    const cls = classRes.rows[0];
+    if (cls.status === "cancelled") return res.status(400).json({ message: "Esta clase fue cancelada" });
+
+    const memCategory = membership.class_category ?? "all";
+    const clsCategory = cls.class_category;
+    if (clsCategory && memCategory !== "mixto" && memCategory !== "all" && memCategory !== clsCategory) {
+      const label = clsCategory === "jumping" ? "Jumping" : "Pilates";
+      return res.status(403).json({
+        message: `La membresía de la clienta no incluye clases de ${label}.`,
+      });
+    }
+
+    if (
+      membership.classes_remaining !== null &&
+      membership.classes_remaining < 9999 &&
+      membership.classes_remaining <= 0
+    ) {
+      return res.status(403).json({
+        message: "La clienta ya no tiene clases disponibles en su membresía.",
+      });
+    }
+
+    const dupRes = await pool.query(
+      "SELECT id FROM bookings WHERE class_id = $1 AND user_id = $2 AND status != 'cancelled'",
+      [classId, userId]
+    );
+    if (dupRes.rows.length > 0) return res.status(409).json({ message: "La clienta ya tiene una reserva para esta clase" });
+
+    const isWaitlist = cls.current_bookings >= cls.max_capacity;
+    const bookingStatus = isWaitlist ? "waitlist" : "confirmed";
+    const result = await pool.query(
+      `INSERT INTO bookings (class_id, user_id, membership_id, status)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [classId, userId, membership.id, bookingStatus]
+    );
+
+    if (!isWaitlist) {
+      await pool.query(
+        "UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1",
+        [classId]
+      );
+      if (membership.classes_remaining !== null && membership.classes_remaining < 9999) {
+        await pool.query(
+          "UPDATE memberships SET classes_remaining = classes_remaining - 1 WHERE id = $1",
+          [membership.id]
+        );
+      }
+    }
+
+    try {
+      const userRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [userId]);
+      const classFullRes = await pool.query(
+        `SELECT c.date, c.start_time, ct.name AS class_type_name,
+                i.display_name AS instructor_name
+         FROM classes c
+         JOIN class_types ct ON c.class_type_id = ct.id
+         LEFT JOIN instructors i ON c.instructor_id = i.id
+         WHERE c.id = $1`,
+        [classId]
+      );
+      const memAfter = await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id]);
+      const classesLeft = memAfter.rows[0]?.classes_remaining ?? null;
+
+      if (userRes.rows[0] && classFullRes.rows[0]) {
+        const u = userRes.rows[0];
+        const cl = classFullRes.rows[0];
+        sendBookingConfirmed({
+          to: u.email,
+          name: u.display_name || "Alumna",
+          className: cl.class_type_name,
+          date: cl.date,
+          startTime: cl.start_time,
+          instructor: cl.instructor_name,
+          classesLeft,
+          isWaitlist,
+        }).catch((e) => console.error("[Email] booking confirmed (admin):", e.message));
+      }
+    } catch (emailErr) {
+      console.error("[Email] booking confirmed (admin) query error:", emailErr.message);
+    }
+
+    const message = isWaitlist
+      ? "Clienta agregada a lista de espera"
+      : "Reserva asignada correctamente";
+    return res.status(201).json({ message, data: { booking: result.rows[0], isWaitlist } });
+  } catch (err) {
+    console.error("POST /admin/bookings/assign error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -5634,6 +5834,11 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
 app.get("/api/payments", adminMiddleware, async (req, res) => {
   try {
     const { startDate, endDate, limit = 200 } = req.query;
+    const params = [];
+    let startIdx = null;
+    let endIdx = null;
+    if (startDate) { params.push(startDate); startIdx = params.length; }
+    if (endDate) { params.push(endDate); endIdx = params.length; }
     // Include approved orders AND manually-assigned memberships
     let q = `
       SELECT
@@ -5643,16 +5848,15 @@ app.get("/api/payments", adminMiddleware, async (req, res) => {
         p.name AS plan_name,
         o.total_amount,
         o.payment_method AS method,
-        o.status,
+        o.status::text AS status,
         o.created_at,
         'order' AS source
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN plans p ON o.plan_id = p.id
       WHERE o.status = 'approved'`;
-    const params = [];
-    if (startDate) { params.push(startDate); q += ` AND o.created_at >= $${params.length}`; }
-    if (endDate) { params.push(endDate); q += ` AND o.created_at <= $${params.length}`; }
+    if (startIdx) q += ` AND o.created_at >= $${startIdx}`;
+    if (endIdx) q += ` AND o.created_at <= $${endIdx}`;
 
     // Also fetch memberships assigned directly (cash/card/transfer)
     let mq = `
@@ -5663,15 +5867,15 @@ app.get("/api/payments", adminMiddleware, async (req, res) => {
         p.name AS plan_name,
         p.price AS total_amount,
         m.payment_method AS method,
-        m.status,
+        m.status::text AS status,
         m.created_at,
         'membership' AS source
       FROM memberships m
       LEFT JOIN users u ON m.user_id = u.id
       LEFT JOIN plans p ON m.plan_id = p.id
       WHERE m.status = 'active'`;
-    if (startDate) { mq += ` AND m.created_at >= '${startDate}'`; }
-    if (endDate) { mq += ` AND m.created_at <= '${endDate}'`; }
+    if (startIdx) mq += ` AND m.created_at >= $${startIdx}`;
+    if (endIdx) mq += ` AND m.created_at <= $${endIdx}`;
 
     const combined = `(${q}) UNION ALL (${mq}) ORDER BY created_at DESC LIMIT $${params.length + 1}`;
     params.push(parseInt(limit));
@@ -5689,8 +5893,13 @@ app.get("/api/payments", adminMiddleware, async (req, res) => {
 // GET /api/discount-codes
 app.get("/api/discount-codes", adminMiddleware, async (req, res) => {
   try {
-    const r = await pool.query("SELECT * FROM discount_codes ORDER BY created_at DESC");
-    return res.json({ data: r.rows });
+    const r = await pool.query(
+      `SELECT dc.*, p.name AS plan_name
+       FROM discount_codes dc
+       LEFT JOIN plans p ON p.id = dc.plan_id
+       ORDER BY dc.created_at DESC`
+    );
+    return res.json({ data: camelRows(r.rows) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -5699,14 +5908,38 @@ app.get("/api/discount-codes", adminMiddleware, async (req, res) => {
 // POST /api/discount-codes
 app.post("/api/discount-codes", adminMiddleware, async (req, res) => {
   try {
-    const { code, discountType = "percentage", discountValue, maxUses, expiresAt, minOrderAmount = 0, isActive = true } = req.body;
+    const {
+      code,
+      discountType = "percent",
+      discountValue,
+      maxUses,
+      expiresAt,
+      minOrderAmount,
+      minPurchaseAmount,
+      planId,
+      isActive = true,
+    } = req.body;
     if (!code || !discountValue) return res.status(400).json({ message: "Código y valor requeridos" });
+    const normalizedType = normalizeDiscountType(discountType);
+    if (!normalizedType) return res.status(400).json({ message: "Tipo de descuento inválido" });
+    const normalizedMinOrder = Number(minOrderAmount ?? minPurchaseAmount ?? 0) || 0;
+    if (planId) {
+      const planExists = await pool.query("SELECT id FROM plans WHERE id = $1", [planId]);
+      if (!planExists.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
+    }
     const r = await pool.query(
-      `INSERT INTO discount_codes (code, discount_type, discount_value, max_uses, expires_at, min_order_amount, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [code.toUpperCase(), discountType, discountValue, maxUses || null, expiresAt || null, minOrderAmount, isActive]
+      `INSERT INTO discount_codes (code, discount_type, discount_value, max_uses, expires_at, min_order_amount, plan_id, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [code.toUpperCase(), normalizedType, discountValue, maxUses || null, expiresAt || null, normalizedMinOrder, planId || null, isActive]
     );
-    return res.status(201).json({ data: r.rows[0] });
+    const enriched = await pool.query(
+      `SELECT dc.*, p.name AS plan_name
+       FROM discount_codes dc
+       LEFT JOIN plans p ON p.id = dc.plan_id
+       WHERE dc.id = $1`,
+      [r.rows[0].id]
+    );
+    return res.status(201).json({ data: camelRow(enriched.rows[0]) });
   } catch (err) {
     if (err.code === "23505") return res.status(409).json({ message: "Código ya existe" });
     return res.status(500).json({ message: "Error interno" });
@@ -5716,15 +5949,29 @@ app.post("/api/discount-codes", adminMiddleware, async (req, res) => {
 // PUT /api/discount-codes/:id
 app.put("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
   try {
-    const { code, discountType, discountValue, maxUses, expiresAt, minOrderAmount, isActive } = req.body;
+    const { code, discountType, discountValue, maxUses, expiresAt, minOrderAmount, minPurchaseAmount, planId, isActive } = req.body;
+    const normalizedType = normalizeDiscountType(discountType);
+    if (!normalizedType) return res.status(400).json({ message: "Tipo de descuento inválido" });
+    const normalizedMinOrder = Number(minOrderAmount ?? minPurchaseAmount ?? 0) || 0;
+    if (planId) {
+      const planExists = await pool.query("SELECT id FROM plans WHERE id = $1", [planId]);
+      if (!planExists.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
+    }
     const r = await pool.query(
       `UPDATE discount_codes SET code=$1, discount_type=$2, discount_value=$3, max_uses=$4,
-       expires_at=$5, min_order_amount=$6, is_active=$7, updated_at=NOW()
-       WHERE id=$8 RETURNING *`,
-      [code?.toUpperCase(), discountType, discountValue, maxUses || null, expiresAt || null, minOrderAmount || 0, isActive !== false, req.params.id]
+       expires_at=$5, min_order_amount=$6, plan_id=$7, is_active=$8, updated_at=NOW()
+       WHERE id=$9 RETURNING *`,
+      [code?.toUpperCase(), normalizedType, discountValue, maxUses || null, expiresAt || null, normalizedMinOrder, planId || null, isActive !== false, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Código no encontrado" });
-    return res.json({ data: r.rows[0] });
+    const enriched = await pool.query(
+      `SELECT dc.*, p.name AS plan_name
+       FROM discount_codes dc
+       LEFT JOIN plans p ON p.id = dc.plan_id
+       WHERE dc.id = $1`,
+      [r.rows[0].id]
+    );
+    return res.json({ data: camelRow(enriched.rows[0]) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -5814,11 +6061,20 @@ app.post("/api/pos/sale", adminMiddleware, async (req, res) => {
     }
     // Apply discount code
     if (discountCode) {
-      const dcRes = await pool.query("SELECT * FROM discount_codes WHERE code = $1 AND is_active = true", [discountCode.toUpperCase()]);
+      const dcRes = await pool.query(
+        `SELECT * FROM discount_codes
+         WHERE code = $1 AND is_active = true
+           AND (expires_at IS NULL OR expires_at > NOW())
+           AND (plan_id IS NULL)
+           AND (max_uses IS NULL OR uses_count < max_uses)`,
+        [discountCode.toUpperCase()]
+      );
       if (dcRes.rows.length) {
         const dc = dcRes.rows[0];
-        if (dc.discount_type === "percentage") discountAmount = subtotal * (parseFloat(dc.discount_value) / 100);
-        else discountAmount = parseFloat(dc.discount_value);
+        const minOrderAmount = Number(dc.min_order_amount || 0);
+        if (subtotal >= minOrderAmount) {
+          discountAmount = calculateDiscountAmount(dc.discount_type, dc.discount_value, subtotal);
+        }
       }
     }
     const total = Math.max(0, subtotal - discountAmount);
@@ -5960,9 +6216,10 @@ app.post("/api/instructors", adminMiddleware, async (req, res) => {
   try {
     const { displayName, email, phone, bio, specialties, isActive = true } = req.body;
     if (!displayName) return res.status(400).json({ message: "Nombre requerido" });
+    const specialtiesValue = serializeSpecialtiesForDb(specialties);
     const r = await pool.query(
       "INSERT INTO instructors (display_name, email, phone, bio, specialties, is_active) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
-      [displayName, email || null, phone || null, bio || null, specialties || null, isActive]
+      [displayName, email || null, phone || null, bio || null, specialtiesValue, isActive]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) {
@@ -5974,9 +6231,10 @@ app.post("/api/instructors", adminMiddleware, async (req, res) => {
 app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
   try {
     const { displayName, email, phone, bio, specialties, isActive } = req.body;
+    const specialtiesValue = serializeSpecialtiesForDb(specialties);
     const r = await pool.query(
       "UPDATE instructors SET display_name=$1, email=$2, phone=$3, bio=$4, specialties=$5, is_active=$6, updated_at=NOW() WHERE id=$7 RETURNING *",
-      [displayName, email || null, phone || null, bio || null, specialties || null, isActive !== false, req.params.id]
+      [displayName, email || null, phone || null, bio || null, specialtiesValue, isActive !== false, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Instructor no encontrado" });
     return res.json({ data: camelRow(r.rows[0]) });
