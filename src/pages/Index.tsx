@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import Schedule from "@/components/Schedule";
+import { Dumbbell, Music, Waves, Flame, Zap, Heart, Activity, Sparkles, type LucideIcon } from "lucide-react";
 import ophelia14 from "@/assets/ophelia-14.jpg";
 import ophelia15 from "@/assets/ophelia-15.jpg";
 import ophelia28 from "@/assets/ophelia-28.jpg";
@@ -81,6 +82,26 @@ const TESTIMONIOS = [
   { name: "Valeria P.", stars: 5, text: "Probe mil clases y ninguna me engancho como el jumping. Es adictivo en el mejor sentido, cada clase es diferente y divertidisima.", avatar: "VP" },
   { name: "Fernanda T.", stars: 5, text: "Las instructoras son excelentes, siempre atentas a la tecnica. Me encanta que hay clases para todos los niveles. Ophelia es mi lugar favorito.", avatar: "FT" },
 ];
+
+/** Map emoji field to a Lucide icon based on the stored value or the card title */
+const ICON_MAP: Record<string, LucideIcon> = {
+  dumbbell: Dumbbell, music: Music, waves: Waves, flame: Flame,
+  zap: Zap, heart: Heart, activity: Activity, sparkles: Sparkles,
+  // Emoji fallbacks for backwards compat
+  "🏋️": Dumbbell, "🏋": Dumbbell, "💃": Music, "🧘": Waves,
+  "🔥": Flame, "⚡": Zap, "❤️": Heart, "💪": Activity, "✨": Sparkles,
+};
+function getCardIcon(emoji?: string, title?: string): LucideIcon {
+  if (emoji && ICON_MAP[emoji]) return ICON_MAP[emoji];
+  // Infer from title keywords
+  const t = (title || "").toLowerCase();
+  if (t.includes("fitness") || t.includes("tone") || t.includes("strong")) return Dumbbell;
+  if (t.includes("dance") || t.includes("music")) return Music;
+  if (t.includes("pilates") || t.includes("flow") || t.includes("mindful")) return Waves;
+  if (t.includes("hot") || t.includes("burn")) return Flame;
+  if (t.includes("jump") || t.includes("cardio")) return Zap;
+  return Activity;
+}
 
 /** Convert old Google Drive preview URLs to our proxy format */
 function normalizeVideoUrl(url?: string | null): string | null {
@@ -563,7 +584,7 @@ const Index = () => {
                   </div>
                   <div className="p-5">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xl">{v.emoji}</span>
+                      {(() => { const Icon = getCardIcon(v.emoji, v.title); return <Icon size={20} className="text-primary flex-shrink-0" />; })()}
                       <h3 className="font-syne font-bold text-[1rem] text-foreground">{v.title}</h3>
                     </div>
                     <p className="text-[0.82rem] text-muted-foreground leading-[1.6]">{v.description}</p>

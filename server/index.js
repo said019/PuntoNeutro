@@ -564,11 +564,22 @@ async function ensureSchema() {
     await pool.query(`
       INSERT INTO homepage_video_cards (sort_order, title, description, emoji)
       SELECT * FROM (VALUES
-        (1, 'Jumping Fitness', 'Cardio de alta intensidad en trampolín con música que te hará volar.', '🏋️'),
-        (2, 'Jumping Dance',   'Coreografías sobre el trampolín que combinan ritmo y diversión.',     '💃'),
-        (3, 'Pilates Flow',    'Secuencias fluidas para fortalecer tu core y mejorar postura.',        '🧘')
+        (1, 'Jumping Fitness', 'Cardio de alta intensidad en trampolín con música que te hará volar.', 'dumbbell'),
+        (2, 'Jumping Dance',   'Coreografías sobre el trampolín que combinan ritmo y diversión.',     'music'),
+        (3, 'Pilates Flow',    'Secuencias fluidas para fortalecer tu core y mejorar postura.',        'waves')
       ) AS v(sort_order, title, description, emoji)
       WHERE NOT EXISTS (SELECT 1 FROM homepage_video_cards LIMIT 1);
+    `).catch(() => { });
+    // Migrate old emoji values to icon keys
+    await pool.query(`
+      UPDATE homepage_video_cards SET emoji = CASE emoji
+        WHEN '🏋️' THEN 'dumbbell' WHEN '🏋' THEN 'dumbbell'
+        WHEN '💃' THEN 'music' WHEN '🧘' THEN 'waves'
+        WHEN '🔥' THEN 'flame' WHEN '⚡' THEN 'zap'
+        WHEN '❤️' THEN 'heart' WHEN '💪' THEN 'activity'
+        WHEN '✨' THEN 'sparkles' WHEN '🎬' THEN 'activity'
+        ELSE emoji END
+      WHERE emoji NOT IN ('dumbbell','music','waves','flame','zap','heart','activity','sparkles');
     `).catch(() => { });
     // ── discount_codes: normalise discount_type values ────────────────────
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });

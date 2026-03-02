@@ -10,9 +10,32 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Pencil, Check, X, Upload, Trash2, Loader2, Video, Image } from "lucide-react";
+import { Plus, Search, Pencil, Check, X, Upload, Trash2, Loader2, Video, Image as ImageIcon, Dumbbell, Music, Waves, Flame, Zap, Heart, Activity, Sparkles, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "@/hooks/use-debounce";
+
+/** Available icon choices for video cards */
+const ICON_OPTIONS: { value: string; label: string; Icon: LucideIcon }[] = [
+  { value: "dumbbell", label: "Pesas",     Icon: Dumbbell },
+  { value: "music",    label: "Música",    Icon: Music },
+  { value: "waves",    label: "Flow",      Icon: Waves },
+  { value: "flame",    label: "Fuego",     Icon: Flame },
+  { value: "zap",      label: "Energía",   Icon: Zap },
+  { value: "heart",    label: "Corazón",   Icon: Heart },
+  { value: "activity", label: "Actividad", Icon: Activity },
+  { value: "sparkles", label: "Brillo",    Icon: Sparkles },
+];
+
+function getIconComponent(emoji?: string): LucideIcon {
+  const found = ICON_OPTIONS.find(o => o.value === emoji);
+  if (found) return found.Icon;
+  // Fallback for old emoji values
+  const EMOJI_MAP: Record<string, LucideIcon> = {
+    "🏋️": Dumbbell, "🏋": Dumbbell, "💃": Music, "🧘": Waves,
+    "🔥": Flame, "⚡": Zap, "❤️": Heart, "💪": Activity, "✨": Sparkles, "🎬": Activity,
+  };
+  return EMOJI_MAP[emoji || ""] || Activity;
+}
 
 interface VideoItem {
   id: string;
@@ -206,7 +229,15 @@ const VideoList = () => {
 
   const startEdit = (card: HomepageCard) => {
     setEditingCard(card.id);
-    setCardDraft({ title: card.title, description: card.description, emoji: card.emoji });
+    // Map old emoji values to icon keys if needed
+    const emojiToIcon: Record<string, string> = {
+      "🏋️": "dumbbell", "🏋": "dumbbell", "💃": "music", "🧘": "waves",
+      "🔥": "flame", "⚡": "zap", "❤️": "heart", "💪": "activity", "✨": "sparkles", "🎬": "activity",
+    };
+    const iconKey = ICON_OPTIONS.find(o => o.value === card.emoji)
+      ? card.emoji
+      : emojiToIcon[card.emoji] || "activity";
+    setCardDraft({ title: card.title, description: card.description, emoji: iconKey });
   };
 
   const cancelEdit = () => { setEditingCard(null); setCardDraft({}); };
@@ -242,13 +273,25 @@ const VideoList = () => {
                     {editingCard === card.id ? (
                       <>
                         <div className="flex items-center gap-2">
-                          <Input
-                            value={cardDraft.emoji ?? ""}
-                            onChange={(e) => setCardDraft((p) => ({ ...p, emoji: e.target.value }))}
-                            className="w-16 text-center text-lg"
-                            maxLength={4}
-                            placeholder="🎬"
-                          />
+                          <div className="flex gap-1 flex-wrap">
+                            {ICON_OPTIONS.map(({ value, label, Icon }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => setCardDraft((p) => ({ ...p, emoji: value }))}
+                                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-all ${
+                                  cardDraft.emoji === value
+                                    ? "border-primary bg-primary/20 text-primary"
+                                    : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                                }`}
+                                title={label}
+                              >
+                                <Icon size={16} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <Input
                             value={cardDraft.title ?? ""}
                             onChange={(e) => setCardDraft((p) => ({ ...p, title: e.target.value }))}
@@ -279,7 +322,7 @@ const VideoList = () => {
                     ) : (
                       <>
                         <div className="flex items-center gap-2">
-                          <span className="text-2xl">{card.emoji}</span>
+                          {(() => { const Icon = getIconComponent(card.emoji); return <Icon size={20} className="text-primary flex-shrink-0" />; })()}
                           <p className="font-semibold text-sm">{card.title}</p>
                         </div>
                         <p className="text-xs text-muted-foreground leading-relaxed">{card.description}</p>
@@ -369,7 +412,7 @@ const VideoList = () => {
                                   onClick={() => thumbInputRefs.current[card.id]?.click()}
                                   disabled={uploadingThumbId === card.id}
                                 >
-                                  {uploadingThumbId === card.id ? <Loader2 size={11} className="animate-spin" /> : <Image size={11} />}
+                                  {uploadingThumbId === card.id ? <Loader2 size={11} className="animate-spin" /> : <ImageIcon size={11} />}
                                   Cambiar
                                 </Button>
                                 <Button
@@ -399,7 +442,7 @@ const VideoList = () => {
                                 onClick={() => thumbInputRefs.current[card.id]?.click()}
                                 disabled={uploadingThumbId === card.id}
                               >
-                                {uploadingThumbId === card.id ? <Loader2 size={11} className="animate-spin" /> : <Image size={11} />}
+                                {uploadingThumbId === card.id ? <Loader2 size={11} className="animate-spin" /> : <ImageIcon size={11} />}
                                 Subir miniatura
                               </Button>
                               <p className="text-[0.6rem] text-muted-foreground mt-1 text-center">JPG, PNG — máx 10 MB</p>
