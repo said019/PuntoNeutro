@@ -1686,6 +1686,7 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
 
 // ─── Google Wallet helpers ──────────────────────────────────────────────────
 
+const SITE_URL = process.env.SITE_URL || "https://ophelia-studio.com.mx";
 const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
 const GW_SA_EMAIL = process.env.GOOGLE_SA_EMAIL || "";
 const GW_SA_PRIVATE_KEY = (process.env.GOOGLE_SA_PRIVATE_KEY || "").replace(/\\n/g, "\n");
@@ -1726,7 +1727,11 @@ async function ensureGoogleWalletClass() {
       issuerName: GW_ISSUER_NAME,
       programName: GW_PROGRAM_NAME,
       programLogo: {
-        sourceUri: { uri: "https://ophelia-jump-studio-production.up.railway.app/ophelia-logo.png" },
+        sourceUri: { uri: `${SITE_URL}/ophelia-logo.png` },
+        contentDescription: { defaultValue: { language: "es", value: "Ophelia Jump Studio" } },
+      },
+      heroImage: {
+        sourceUri: { uri: `${SITE_URL}/ophelia-logo-full.png` },
         contentDescription: { defaultValue: { language: "es", value: "Ophelia Jump Studio" } },
       },
       hexBackgroundColor: GW_HEX_BG,
@@ -1780,14 +1785,14 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode }) {
     ],
     linksModuleData: {
       uris: [
-        { uri: "https://ophelia-jump-studio-production.up.railway.app/app/wallet", description: "Mi Wallet", id: "wallet_link" },
+        { uri: `${SITE_URL}/app/wallet`, description: "Mi Wallet", id: "wallet_link" },
       ],
     },
   };
   const payload = {
     iss: GW_SA_EMAIL,
     aud: "google",
-    origins: ["https://ophelia-jump-studio-production.up.railway.app"],
+    origins: [SITE_URL],
     typ: "savetowallet",
     payload: {
       loyaltyObjects: [loyaltyObject],
