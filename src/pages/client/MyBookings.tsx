@@ -84,11 +84,20 @@ const MyBookings = () => {
   const [reviewBooking, setReviewBooking] = useState<BookingClient | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const { data: bookingsData, isLoading } = useQuery({
     queryKey: ["my-bookings"],
     queryFn: async () => (await api.get("/bookings/my-bookings")).data,
   });
+
+  // Fetch review tags for the review dialog
+  const { data: tagsData } = useQuery({
+    queryKey: ["public-review-tags"],
+    queryFn: async () => (await api.get("/public/review-tags")).data,
+    staleTime: 1000 * 60 * 10,
+  });
+  const reviewTags: { id: string; name: string; color: string }[] = Array.isArray(tagsData?.data) ? tagsData.data : [];
 
   const bookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
   const now = new Date();
@@ -125,11 +134,17 @@ const MyBookings = () => {
 
   const reviewMutation = useMutation({
     mutationFn: () =>
-      api.post("/reviews", { bookingId: reviewBooking?.id, rating, comment }),
+      api.post("/reviews", { bookingId: reviewBooking?.id, rating, comment, tagIds: selectedTags }),
     onSuccess: () => {
       toast({ title: "¡Gracias por tu reseña!" });
+      qc.invalidateQueries({ queryKey: ["my-bookings"] });
       setReviewBooking(null);
       setComment("");
+      setSelectedTags([]);
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || "No se pudo enviar la reseña.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
 
@@ -191,7 +206,7 @@ const MyBookings = () => {
         </AlertDialog>
 
         {/* Review dialog */}
-        <Dialog open={!!reviewBooking} onOpenChange={() => setReviewBooking(null)}>
+        <Dialog open={!!reviewBooking} onOpenChange={() => { setReviewBooking(null); setSelectedTags([]); setComment(""); setRating(5); }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Dejar reseña — {reviewBooking?.class_type_name}</DialogTitle>
@@ -210,6 +225,35 @@ const MyBookings = () => {
                   ))}
                 </div>
               </div>
+              {reviewTags.length > 0 && (
+                <div className="space-y-1">
+                  <Label>¿Qué te gustó? (opcional)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {reviewTags.map((tag) => {
+                      const isSelected = selectedTags.includes(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedTags((prev) =>
+                              isSelected ? prev.filter((t) => t !== tag.id) : [...prev, tag.id]
+                            )
+                          }
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                            isSelected
+                              ? "border-primary bg-primary/20 text-primary font-semibold"
+                              : "border-border bg-secondary text-muted-foreground hover:border-primary/50"
+                          }`}
+                          style={isSelected && tag.color ? { borderColor: tag.color, color: tag.color, backgroundColor: `${tag.color}20` } : undefined}
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="space-y-1">
                 <Label>Comentario (opcional)</Label>
                 <Textarea

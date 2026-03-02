@@ -125,6 +125,9 @@ const Index = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
 
+  // Instructors from admin
+  const [instructors, setInstructors] = useState<{ id: string; displayName: string; bio?: string; specialties?: string; photoUrl?: string }[]>([]);
+
   const { data: videoCardsData } = useQuery<{ data: { id: number; title: string; description: string; emoji: string; video_url?: string | null; thumbnail_url?: string | null }[] }>({
     queryKey: ["homepage-video-cards"],
     queryFn: async () => (await api.get("/homepage-video-cards")).data,
@@ -155,6 +158,14 @@ const Index = () => {
     api.get<{ data: PackageRow[] }>("/packages").then(({ data }) => {
       const rows = Array.isArray(data?.data) ? data.data : [];
       if (rows.length > 0) setPackages(rows);
+    }).catch(() => {});
+  }, []);
+
+  // Fetch instructors from admin panel
+  useEffect(() => {
+    api.get("/public/instructors").then(({ data }) => {
+      const rows = Array.isArray(data?.data) ? data.data : [];
+      if (rows.length > 0) setInstructors(rows);
     }).catch(() => {});
   }, []);
 
@@ -715,29 +726,52 @@ const Index = () => {
               Certificadas, apasionadas y dedicadas a que cada clase sea tu mejor versión.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {[
-              { label: "Instructora 1", sub: "Jumping & Pilates" },
-              { label: "Instructora 2", sub: "Jumping & Pilates" },
-            ].map((inst, i) => (
-              <div key={i} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 hover:-translate-y-2 transition-all">
-                {/* Photo placeholder — full width, tall */}
+          <div className={`grid grid-cols-1 ${instructors.length === 1 ? "max-w-md mx-auto" : "sm:grid-cols-2"} ${instructors.length >= 3 ? "lg:grid-cols-3" : ""} gap-6`}>
+            {(instructors.length > 0
+              ? instructors.map((inst) => ({
+                  key: inst.id,
+                  label: inst.displayName,
+                  sub: Array.isArray(inst.specialties)
+                    ? (inst.specialties as unknown as string[]).join(" & ")
+                    : typeof inst.specialties === "string" && inst.specialties
+                      ? inst.specialties
+                      : "Instructora",
+                  bio: inst.bio || null,
+                  photoUrl: inst.photoUrl || null,
+                }))
+              : [
+                  { key: "ph1", label: "Instructora 1", sub: "Jumping & Pilates", bio: null, photoUrl: null },
+                  { key: "ph2", label: "Instructora 2", sub: "Jumping & Pilates", bio: null, photoUrl: null },
+                ]
+            ).map((inst) => (
+              <div key={inst.key} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 hover:-translate-y-2 transition-all">
+                {/* Photo */}
                 <div className="h-[380px] lg:h-[460px] bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center relative overflow-hidden">
-                  {/* decorative glow */}
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_60%,hsl(var(--primary)/0.18)_0%,transparent_65%)]" />
-                  <div className="relative flex flex-col items-center gap-4">
-                    <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-[#E15CB8]/25 to-[#CA71E1]/15 border-2 border-[#E15CB8]/30 shadow-[0_0_60px_hsl(var(--primary)/0.2)]">
-                      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-[#E15CB8]/50">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
+                  {inst.photoUrl ? (
+                    <img
+                      src={inst.photoUrl}
+                      alt={inst.label}
+                      className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
+                    />
+                  ) : (
+                    <div className="relative flex flex-col items-center gap-4">
+                      <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-[#E15CB8]/25 to-[#CA71E1]/15 border-2 border-[#E15CB8]/30 shadow-[0_0_60px_hsl(var(--primary)/0.2)]">
+                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-[#E15CB8]/50">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      </div>
+                      <span className="text-[0.65rem] tracking-[0.2em] uppercase text-[#E15CB8]/50 font-medium">Foto próximamente</span>
                     </div>
-                    <span className="text-[0.65rem] tracking-[0.2em] uppercase text-[#E15CB8]/50 font-medium">Foto próximamente</span>
-                  </div>
+                  )}
                 </div>
                 <div className="p-7">
                   <h3 className="font-syne font-bold text-[1.2rem] text-foreground mb-1">{inst.label}</h3>
                   <p className="text-primary text-[0.85rem] tracking-wide font-medium">{inst.sub}</p>
+                  {inst.bio && (
+                    <p className="text-[0.8rem] text-muted-foreground mt-2 leading-relaxed line-clamp-3">{inst.bio}</p>
+                  )}
                 </div>
               </div>
             ))}

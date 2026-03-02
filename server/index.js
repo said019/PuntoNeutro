@@ -485,6 +485,18 @@ async function ensureSchema() {
       );
       CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id);
     `);
+    // Add booking_id, instructor_id, tag_ids columns to reviews if missing
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS booking_id UUID`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS instructor_id UUID`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS tag_ids UUID[] DEFAULT '{}'`).catch(() => {});
+    // ── Review-tag links (many-to-many) ────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS review_tag_links (
+        review_id UUID REFERENCES reviews(id) ON DELETE CASCADE,
+        tag_id    UUID REFERENCES review_tags(id) ON DELETE CASCADE,
+        PRIMARY KEY (review_id, tag_id)
+      );
+    `).catch(() => {});
     // ── Loyalty transactions table ─────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS loyalty_transactions (
@@ -1506,16 +1518,43 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
 
 // POST /api/reviews
 app.post("/api/reviews", authMiddleware, async (req, res) => {
-  const { bookingId, rating, comment } = req.body;
+  const { bookingId, rating, comment, tagIds } = req.body;
   if (!bookingId || !rating) return res.status(400).json({ message: "bookingId y rating requeridos" });
   try {
-    // Verify booking belongs to user
+    // Verify booking belongs to user and was attended
     const bRes = await pool.query(
-      "SELECT b.*, c.id AS class_id FROM bookings b JOIN classes c ON b.class_id = c.id WHERE b.id = $1 AND b.user_id = $2",
+      `SELECT b.id, b.status, c.id AS class_id, c.instructor_id
+       FROM bookings b
+       JOIN classes c ON b.class_id = c.id
+       WHERE b.id = $1 AND b.user_id = $2`,
       [bookingId, req.userId]
     );
     if (bRes.rows.length === 0) return res.status(404).json({ message: "Reserva no encontrada" });
-    return res.json({ message: "Reseña enviada — gracias por tu opinión" });
+    const booking = bRes.rows[0];
+
+    // Check if already reviewed
+    const existing = await pool.query("SELECT id FROM reviews WHERE booking_id = $1", [bookingId]);
+    if (existing.rows.length > 0) return res.status(409).json({ message: "Ya dejaste una reseña para esta clase" });
+
+    // Insert the review
+    const rRes = await pool.query(
+      `INSERT INTO reviews (user_id, booking_id, class_id, instructor_id, rating, comment, tag_ids)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [req.userId, bookingId, booking.class_id, booking.instructor_id || null, rating, comment || null, tagIds || []]
+    );
+    const review = rRes.rows[0];
+
+    // Insert tag links
+    if (Array.isArray(tagIds) && tagIds.length > 0) {
+      for (const tagId of tagIds) {
+        await pool.query(
+          "INSERT INTO review_tag_links (review_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+          [review.id, tagId]
+        ).catch(() => {});
+      }
+    }
+
+    return res.json({ message: "Reseña enviada — gracias por tu opinión", data: review });
   } catch (err) {
     console.error("POST reviews error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -3547,6 +3586,24 @@ app.get("/api/class-types", async (req, res) => {
   try {
     const r = await pool.query("SELECT * FROM class_types WHERE is_active = true ORDER BY sort_order ASC");
     return res.json({ data: camelRows(r.rows) });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// GET /api/public/instructors — public (no auth) active instructors for homepage
+app.get("/api/public/instructors", async (_req, res) => {
+  try {
+    const r = await pool.query(
+      "SELECT id, display_name, bio, specialties, photo_url FROM instructors WHERE is_active = true ORDER BY created_at ASC"
+    );
+    return res.json({ data: camelRows(r.rows) });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// GET /api/public/review-tags — public (no auth) review tags for client review form
+app.get("/api/public/review-tags", async (_req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM review_tags ORDER BY name");
+    return res.json({ data: r.rows });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
