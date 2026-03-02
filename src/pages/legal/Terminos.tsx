@@ -1,8 +1,19 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import opheliaLogo from "@/assets/ophelia-logo-full.png";
+import api from "@/lib/api";
 
 const Terminos = () => {
   const navigate = useNavigate();
+  const [dynamicPolicy, setDynamicPolicy] = useState("");
+
+  useEffect(() => {
+    api.get("/public/settings/policies_settings").then(({ data }) => {
+      const value = data?.data;
+      const text = typeof value?.terms_of_service === "string" ? value.terms_of_service.trim() : "";
+      setDynamicPolicy(text);
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -28,7 +39,17 @@ const Terminos = () => {
           TÉRMINOS Y CONDICIONES
         </h1>
 
-        <div className="prose-ophelia space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
+        {dynamicPolicy ? (
+          <div className="prose-ophelia space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
+            <p className="text-foreground font-medium">
+              Última actualización: {new Date().toLocaleDateString("es-MX")}
+            </p>
+            <div className="rounded-2xl border border-border bg-secondary/40 p-6 whitespace-pre-wrap leading-[1.9]">
+              {dynamicPolicy}
+            </div>
+          </div>
+        ) : (
+          <div className="prose-ophelia space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
           <p className="text-foreground font-medium">
             Última actualización: 26 de febrero de 2026
           </p>
@@ -130,7 +151,8 @@ const Terminos = () => {
             <li><strong className="text-foreground">Teléfono:</strong> +52 442 123 4567</li>
             <li><strong className="text-foreground">Dirección:</strong> San Juan del Río, Querétaro, México</li>
           </ul>
-        </div>
+          </div>
+        )}
       </main>
 
       {/* Footer */}

@@ -15,6 +15,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Send, Users, MessageSquare, RefreshCw, Wifi, WifiOff, Pencil } from "lucide-react";
 
+function normalizeQrDataUrl(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("data:image/")) return trimmed;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `data:image/png;base64,${trimmed}`;
+}
+
 // Generic settings section — reads { data: <value_object> } from server
 const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: { key: string; label: string; type?: string; multiline?: boolean }[] }) => {
   const { toast } = useToast();
@@ -89,11 +98,19 @@ const WhatsAppSettings = () => {
     mutationFn: () => api.post("/evolution/connect"),
     onSuccess: (res: any) => {
       const d = res?.data?.data ?? res?.data ?? {};
+      const qrCode = normalizeQrDataUrl(
+        d.qrCode ??
+        d.base64 ??
+        d.code ??
+        d.qrcode?.base64 ??
+        d.qrcode?.code ??
+        null,
+      );
       // Immediately inject the QR code returned by connect into the status cache
-      qc.setQueryData(["evolution-status"], { data: { connected: false, state: "qr_pending", qrCode: d.qrCode ?? null, instanceExists: true } });
+      qc.setQueryData(["evolution-status"], { data: { connected: false, state: "qr_pending", qrCode, instanceExists: true } });
       refetch();
     },
-    onError: () => toast({ title: "Error al conectar", variant: "destructive" }),
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al conectar", variant: "destructive" }),
   });
 
   const disconnectMutation = useMutation({

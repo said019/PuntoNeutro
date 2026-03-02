@@ -114,12 +114,22 @@ const instructorSchema = z.object({
   bio: z.string().optional(),
   specialties: z.string().optional(),
   isActive: z.boolean().default(true),
+  photoFocusX: z.coerce.number().min(0).max(100).default(50),
+  photoFocusY: z.coerce.number().min(0).max(100).default(50),
 });
 type InstructorFormData = z.infer<typeof instructorSchema>;
 interface Instructor extends Omit<InstructorFormData, "specialties"> {
   id: string;
   specialties?: string[] | string | null;
   photoUrl?: string;
+  photoFocusX?: number;
+  photoFocusY?: number;
+}
+
+function clampFocus(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 function normalizeSpecialties(value: unknown): string[] {
@@ -155,6 +165,8 @@ function instructorPayload(d: InstructorFormData) {
     bio: d.bio?.trim() || null,
     specialties: normalizeSpecialties(d.specialties),
     isActive: d.isActive,
+    photoFocusX: clampFocus(d.photoFocusX),
+    photoFocusY: clampFocus(d.photoFocusY),
   };
 }
 
@@ -950,7 +962,10 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
   });
   const instructors = Array.isArray(data?.data) ? data.data : [];
 
-  const form = useForm<InstructorFormData>({ resolver: zodResolver(instructorSchema), defaultValues: { isActive: true } });
+  const form = useForm<InstructorFormData>({
+    resolver: zodResolver(instructorSchema),
+    defaultValues: { isActive: true, photoFocusX: 50, photoFocusY: 50 },
+  });
 
   const createMutation = useMutation({
     mutationFn: (d: InstructorFormData) => api.post("/instructors", instructorPayload(d)),
@@ -1006,16 +1021,20 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
       bio: i.bio ?? "",
       specialties: normalizeSpecialties(i.specialties).join(", "),
       isActive: i.isActive ?? true,
+      photoFocusX: clampFocus(i.photoFocusX),
+      photoFocusY: clampFocus(i.photoFocusY),
     });
     setEditing(i);
     setOpen(true);
   };
   const openCreate = () => {
-    form.reset({ displayName: "", email: "", bio: "", specialties: "", isActive: true });
+    form.reset({ displayName: "", email: "", bio: "", specialties: "", isActive: true, photoFocusX: 50, photoFocusY: 50 });
     setEditing(null);
     setOpen(true);
   };
   const isSaving = createMutation.isPending || updateMutation.isPending;
+  const focusX = clampFocus(form.watch("photoFocusX"));
+  const focusY = clampFocus(form.watch("photoFocusY"));
 
   return (
     <>
@@ -1161,6 +1180,47 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
               <Label>Especialidades (separadas por coma)</Label>
               <Input {...form.register("specialties")} placeholder="Ej: Jumping, Pilates, Cardio" />
             </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Enfoque horizontal</Label>
+                <span className="text-xs text-muted-foreground">{focusX}%</span>
+              </div>
+              <Input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={focusX}
+                onChange={(e) => form.setValue("photoFocusX", Number(e.target.value), { shouldDirty: true })}
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Enfoque vertical</Label>
+                <span className="text-xs text-muted-foreground">{focusY}%</span>
+              </div>
+              <Input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={focusY}
+                onChange={(e) => form.setValue("photoFocusY", Number(e.target.value), { shouldDirty: true })}
+              />
+            </div>
+            {editing?.photoUrl && (
+              <div className="space-y-1">
+                <Label>Vista previa</Label>
+                <div className="h-36 rounded-xl overflow-hidden border border-border">
+                  <img
+                    src={editing.photoUrl}
+                    alt={editing.displayName}
+                    className="w-full h-full object-cover"
+                    style={{ objectPosition: `${focusX}% ${focusY}%` }}
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v, { shouldDirty: true })} />
               <Label>Activa</Label>

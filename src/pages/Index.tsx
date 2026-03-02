@@ -114,6 +114,12 @@ function normalizeVideoUrl(url?: string | null): string | null {
   return url;
 }
 
+function clampFocus(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
 const Index = () => {
   const [navScrolled, setNavScrolled] = useState(false);
   const [classTypes, setClassTypes] = useState<ClassTypeRow[]>(FALLBACK_CLASS_TYPES);
@@ -126,7 +132,15 @@ const Index = () => {
   const { isAuthenticated, user } = useAuthStore();
 
   // Instructors from admin
-  const [instructors, setInstructors] = useState<{ id: string; displayName: string; bio?: string; specialties?: string; photoUrl?: string }[]>([]);
+  const [instructors, setInstructors] = useState<{
+    id: string;
+    displayName: string;
+    bio?: string;
+    specialties?: string | string[];
+    photoUrl?: string;
+    photoFocusX?: number;
+    photoFocusY?: number;
+  }[]>([]);
 
   const { data: videoCardsData } = useQuery<{ data: { id: number; title: string; description: string; emoji: string; video_url?: string | null; thumbnail_url?: string | null }[] }>({
     queryKey: ["homepage-video-cards"],
@@ -738,10 +752,12 @@ const Index = () => {
                       : "Instructora",
                   bio: inst.bio || null,
                   photoUrl: inst.photoUrl || null,
+                  photoFocusX: clampFocus(inst.photoFocusX),
+                  photoFocusY: clampFocus(inst.photoFocusY),
                 }))
               : [
-                  { key: "ph1", label: "Instructora 1", sub: "Jumping & Pilates", bio: null, photoUrl: null },
-                  { key: "ph2", label: "Instructora 2", sub: "Jumping & Pilates", bio: null, photoUrl: null },
+                  { key: "ph1", label: "Instructora 1", sub: "Jumping & Pilates", bio: null, photoUrl: null, photoFocusX: 50, photoFocusY: 50 },
+                  { key: "ph2", label: "Instructora 2", sub: "Jumping & Pilates", bio: null, photoUrl: null, photoFocusX: 50, photoFocusY: 50 },
                 ]
             ).map((inst) => (
               <div key={inst.key} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 hover:-translate-y-2 transition-all">
@@ -752,7 +768,8 @@ const Index = () => {
                     <img
                       src={inst.photoUrl}
                       alt={inst.label}
-                      className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      style={{ objectPosition: `${clampFocus(inst.photoFocusX)}% ${clampFocus(inst.photoFocusY)}%` }}
                     />
                   ) : (
                     <div className="relative flex flex-col items-center gap-4">

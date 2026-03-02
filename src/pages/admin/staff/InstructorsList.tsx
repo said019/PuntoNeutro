@@ -24,6 +24,8 @@ const instructorSchema = z.object({
   bio: z.string().optional(),
   specialties: z.string().optional(),
   isActive: z.boolean().default(true),
+  photoFocusX: z.coerce.number().min(0).max(100).default(50),
+  photoFocusY: z.coerce.number().min(0).max(100).default(50),
 });
 
 type InstructorFormData = z.infer<typeof instructorSchema>;
@@ -31,6 +33,14 @@ interface Instructor extends Omit<InstructorFormData, "specialties"> {
   id: string;
   specialties?: string[] | string | null;
   photoUrl?: string;
+  photoFocusX?: number;
+  photoFocusY?: number;
+}
+
+function clampFocus(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 function normalizeSpecialties(value: unknown): string[] {
@@ -63,20 +73,30 @@ const InstructorsList = () => {
   });
   const instructors = Array.isArray(data?.data) ? data.data : [];
 
-  const form = useForm<InstructorFormData>({ resolver: zodResolver(instructorSchema) });
+  const form = useForm<InstructorFormData>({
+    resolver: zodResolver(instructorSchema),
+    defaultValues: { isActive: true, photoFocusX: 50, photoFocusY: 50 },
+  });
 
   const createMutation = useMutation({
-    mutationFn: (d: InstructorFormData) => api.post("/instructors", { ...d, specialties: d.specialties?.split(",").map((s) => s.trim()) ?? [] }),
+    mutationFn: (d: InstructorFormData) => api.post("/instructors", {
+      ...d,
+      specialties: d.specialties?.split(",").map((s) => s.trim()).filter(Boolean) ?? [],
+      photoFocusX: clampFocus(d.photoFocusX),
+      photoFocusY: clampFocus(d.photoFocusY),
+    }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructor creado" }); setOpen(false); },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al crear", variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { id: string; displayName: string; email: string; bio?: string; specialties?: string; isActive: boolean }) => {
+    mutationFn: (payload: { id: string; displayName: string; email: string; bio?: string; specialties?: string; isActive: boolean; photoFocusX: number; photoFocusY: number }) => {
       const { id, specialties, ...rest } = payload;
       return api.put(`/instructors/${id}`, {
         ...rest,
-        specialties: specialties ? specialties.split(",").map((s) => s.trim()) : [],
+        specialties: specialties ? specialties.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        photoFocusX: clampFocus(rest.photoFocusX),
+        photoFocusY: clampFocus(rest.photoFocusY),
       });
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "✅ Instructor actualizado" }); setOpen(false); },
@@ -114,16 +134,21 @@ const InstructorsList = () => {
     form.reset({
       ...i,
       specialties: normalizeSpecialties(i.specialties).join(", "),
+      photoFocusX: clampFocus(i.photoFocusX),
+      photoFocusY: clampFocus(i.photoFocusY),
     });
     setEditing(i);
     setOpen(true);
   };
 
   const openCreate = () => {
-    form.reset({ isActive: true });
+    form.reset({ isActive: true, photoFocusX: 50, photoFocusY: 50 });
     setEditing(null);
     setOpen(true);
   };
+
+  const focusX = clampFocus(form.watch("photoFocusX"));
+  const focusY = clampFocus(form.watch("photoFocusY"));
 
   return (
     <AuthGuard>
@@ -197,12 +222,62 @@ const InstructorsList = () => {
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>{editing ? "Editar instructor" : "Nuevo instructor"}</DialogTitle></DialogHeader>
             <form onSubmit={form.handleSubmit((d) => editing
-              ? updateMutation.mutate({ id: editing.id, displayName: d.displayName, email: d.email, bio: d.bio, specialties: d.specialties, isActive: d.isActive })
+              ? updateMutation.mutate({
+                id: editing.id,
+                displayName: d.displayName,
+                email: d.email,
+                bio: d.bio,
+                specialties: d.specialties,
+                isActive: d.isActive,
+                photoFocusX: d.photoFocusX,
+                photoFocusY: d.photoFocusY,
+              })
               : createMutation.mutate(d))} className="space-y-4">
               <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("displayName")} /></div>
               <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
               <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
               <div className="space-y-1"><Label>Especialidades (separadas por coma)</Label><Input {...form.register("specialties")} /></div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Enfoque horizontal</Label>
+                  <span className="text-xs text-muted-foreground">{focusX}%</span>
+                </div>
+                <Input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={focusX}
+                  onChange={(e) => form.setValue("photoFocusX", Number(e.target.value), { shouldDirty: true })}
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Enfoque vertical</Label>
+                  <span className="text-xs text-muted-foreground">{focusY}%</span>
+                </div>
+                <Input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={focusY}
+                  onChange={(e) => form.setValue("photoFocusY", Number(e.target.value), { shouldDirty: true })}
+                />
+              </div>
+              {editing?.photoUrl && (
+                <div className="space-y-1">
+                  <Label>Vista previa</Label>
+                  <div className="h-36 rounded-xl overflow-hidden border border-border">
+                    <img
+                      src={editing.photoUrl}
+                      alt={editing.displayName}
+                      className="w-full h-full object-cover"
+                      style={{ objectPosition: `${focusX}% ${focusY}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
                 <Label>Activo</Label>

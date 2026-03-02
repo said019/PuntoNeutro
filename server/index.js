@@ -472,6 +472,8 @@ async function ensureSchema() {
         updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_x SMALLINT DEFAULT 50`).catch(() => {});
+    await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_y SMALLINT DEFAULT 50`).catch(() => {});
     // ── Reviews table ──────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
@@ -485,6 +487,17 @@ async function ensureSchema() {
       );
       CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id);
     `);
+    // Ensure all review columns exist even if table was created by an older schema
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_id UUID`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS rating SMALLINT`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS class_id UUID`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT false`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+    await pool.query(`UPDATE reviews SET rating = 5 WHERE rating IS NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET DEFAULT 5`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD CONSTRAINT reviews_rating_check CHECK (rating BETWEEN 1 AND 5)`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET NOT NULL`).catch(() => {});
     // Add booking_id, instructor_id, tag_ids columns to reviews if missing
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS booking_id UUID`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS instructor_id UUID`).catch(() => {});
@@ -2407,18 +2420,67 @@ const APPLE_CERT_PASSWORD = process.env.APPLE_CERT_PASSWORD || "";
 // Priority 1: Read from files in wallet-assets/apple-pass/
 // Priority 2: Decode from base64 env vars (APPLE_SIGNER_CERT_BASE64, etc.)
 
-const WALLET_ASSETS_DIR = path.join(__dirname, "..", "wallet-assets", "apple-pass");
-const CERT_FILE_PATHS = {
-  cert: process.env.APPLE_PASS_CERT || path.join(WALLET_ASSETS_DIR, "pass.pem"),
-  key:  process.env.APPLE_PASS_KEY  || path.join(WALLET_ASSETS_DIR, "pass.key"),
-  wwdr: process.env.APPLE_PASS_WWDR || path.join(WALLET_ASSETS_DIR, "wwdr.pem"),
+function safeExists(filePath) {
+  try {
+    return !!filePath && fs.existsSync(filePath);
+  } catch (_) {
+    return false;
+  }
+}
+
+function normalizePemText(value) {
+  if (!value) return "";
+  return String(value)
+    .replace(/\\n/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
+}
+
+function looksLikeBase64(value) {
+  const raw = String(value || "").replace(/\s/g, "");
+  if (raw.length < 100) return false;
+  return /^[A-Za-z0-9+/=]+$/.test(raw);
+}
+
+const WALLET_ASSET_DIR_CANDIDATES = [
+  process.env.APPLE_PASS_CERT_DIR,
+  path.join(__dirname, "..", "wallet-assets", "apple-pass"),
+  path.join(__dirname, "wallet-assets", "apple-pass"),
+  path.join(process.cwd(), "wallet-assets", "apple-pass"),
+  "/app/wallet-assets/apple-pass",
+  "/app/server/wallet-assets/apple-pass",
+].filter(Boolean);
+
+const WALLET_ASSETS_DIR = WALLET_ASSET_DIR_CANDIDATES.find((dir) => safeExists(dir)) || WALLET_ASSET_DIR_CANDIDATES[0];
+
+const CERT_FILE_CANDIDATES = {
+  cert: [
+    process.env.APPLE_PASS_CERT_PATH,
+    process.env.APPLE_PASS_CERT,
+    path.join(WALLET_ASSETS_DIR, "pass.pem"),
+    path.join(WALLET_ASSETS_DIR, "certificate.pem"),
+  ].filter(Boolean),
+  key: [
+    process.env.APPLE_PASS_KEY_PATH,
+    process.env.APPLE_PASS_KEY,
+    path.join(WALLET_ASSETS_DIR, "pass.key"),
+    path.join(WALLET_ASSETS_DIR, "private.key"),
+  ].filter(Boolean),
+  wwdr: [
+    process.env.APPLE_PASS_WWDR_PATH,
+    process.env.APPLE_PASS_WWDR,
+    path.join(WALLET_ASSETS_DIR, "wwdr.pem"),
+    path.join(WALLET_ASSETS_DIR, "AppleWWDRCA.pem"),
+    path.join(WALLET_ASSETS_DIR, "wwdr_rsa.pem"),
+  ].filter(Boolean),
 };
 
 /** Try to load PEM from file, return empty string if not found */
 function loadCertFile(filePath) {
   try {
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, "utf8").trim();
+    if (safeExists(filePath)) {
+      const content = normalizePemText(fs.readFileSync(filePath, "utf8"));
       if (content.includes("-----BEGIN")) {
         console.log(`[Apple Wallet] ✅ Loaded cert from file: ${filePath} (${content.length} chars)`);
         return content;
@@ -2430,28 +2492,62 @@ function loadCertFile(filePath) {
   return "";
 }
 
+function loadFirstCertFile(paths = []) {
+  for (const p of paths) {
+    const cert = loadCertFile(p);
+    if (cert) return cert;
+  }
+  return "";
+}
+
 /** Decode base64 env var to PEM, ensuring proper PEM formatting */
 function decodeBase64ToPem(b64, label = "CERTIFICATE") {
   if (!b64) return "";
-  let raw = Buffer.from(b64, "base64").toString("utf8").trim();
-  if (raw.includes("-----BEGIN")) {
-    raw = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    return raw;
+  try {
+    let raw = Buffer.from(String(b64), "base64").toString("utf8").trim();
+    if (!raw) return "";
+    if (raw.includes("-----BEGIN")) {
+      return normalizePemText(raw);
+    }
+    const cleanB64 = String(b64).replace(/[\s\n\r]/g, "");
+    if (!cleanB64) return "";
+    const lines = cleanB64.match(/.{1,64}/g) || [cleanB64];
+    return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
+  } catch (_) {
+    return "";
   }
-  const cleanB64 = raw.replace(/[\s\n\r]/g, "");
-  const lines = cleanB64.match(/.{1,64}/g) || [cleanB64];
-  return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
 }
 
-// Load certs: try files first, then env vars
-const APPLE_SIGNER_CERT_PEM = loadCertFile(CERT_FILE_PATHS.cert)
-  || decodeBase64ToPem(process.env.APPLE_SIGNER_CERT_BASE64 || "", "CERTIFICATE");
+function loadPemFromEnvValue(value, label = "CERTIFICATE") {
+  const raw = normalizePemText(value || "");
+  if (!raw) return "";
+  if (raw.includes("-----BEGIN")) return raw;
+  if (safeExists(raw)) return loadCertFile(raw);
+  if (looksLikeBase64(raw)) return decodeBase64ToPem(raw, label);
+  return "";
+}
 
-const APPLE_SIGNER_KEY_PEM = loadCertFile(CERT_FILE_PATHS.key)
-  || decodeBase64ToPem(process.env.APPLE_SIGNER_KEY_BASE64 || "", "PRIVATE KEY");
+const CERT_FILE_PATHS = {
+  cert: CERT_FILE_CANDIDATES.cert.find((p) => safeExists(p)) || CERT_FILE_CANDIDATES.cert[0] || "",
+  key: CERT_FILE_CANDIDATES.key.find((p) => safeExists(p)) || CERT_FILE_CANDIDATES.key[0] || "",
+  wwdr: CERT_FILE_CANDIDATES.wwdr.find((p) => safeExists(p)) || CERT_FILE_CANDIDATES.wwdr[0] || "",
+};
 
-const APPLE_WWDR_CERT_PEM = loadCertFile(CERT_FILE_PATHS.wwdr)
-  || decodeBase64ToPem(process.env.APPLE_WWDR_CERT_BASE64 || "", "CERTIFICATE");
+// Load certs: env PEM/path first, then files, then base64 env vars
+const APPLE_SIGNER_CERT_PEM =
+  loadPemFromEnvValue(process.env.APPLE_SIGNER_CERT_PEM || process.env.APPLE_PASS_CERT_PEM || process.env.APPLE_PASS_CERT, "CERTIFICATE")
+  || loadFirstCertFile(CERT_FILE_CANDIDATES.cert)
+  || decodeBase64ToPem(process.env.APPLE_SIGNER_CERT_BASE64 || process.env.APPLE_PASS_CERT_BASE64 || "", "CERTIFICATE");
+
+const APPLE_SIGNER_KEY_PEM =
+  loadPemFromEnvValue(process.env.APPLE_SIGNER_KEY_PEM || process.env.APPLE_PASS_KEY_PEM || process.env.APPLE_PASS_KEY, "PRIVATE KEY")
+  || loadFirstCertFile(CERT_FILE_CANDIDATES.key)
+  || decodeBase64ToPem(process.env.APPLE_SIGNER_KEY_BASE64 || process.env.APPLE_PASS_KEY_BASE64 || "", "PRIVATE KEY");
+
+const APPLE_WWDR_CERT_PEM =
+  loadPemFromEnvValue(process.env.APPLE_WWDR_CERT_PEM || process.env.APPLE_PASS_WWDR_PEM || process.env.APPLE_PASS_WWDR, "CERTIFICATE")
+  || loadFirstCertFile(CERT_FILE_CANDIDATES.wwdr)
+  || decodeBase64ToPem(process.env.APPLE_WWDR_CERT_BASE64 || process.env.APPLE_PASS_WWDR_BASE64 || "", "CERTIFICATE");
 
 function isAppleWalletConfigured() {
   return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_SIGNER_CERT_PEM && APPLE_SIGNER_KEY_PEM && APPLE_WWDR_CERT_PEM);
@@ -2483,9 +2579,10 @@ console.log("[Apple Wallet]",
   "| KEY:", APPLE_SIGNER_KEY_PEM ? `✅ (${APPLE_SIGNER_KEY_PEM.length} chars)` : "❌",
   "| WWDR:", APPLE_WWDR_CERT_PEM ? `✅ (${APPLE_WWDR_CERT_PEM.length} chars)` : "❌");
 console.log("[Apple Wallet] File paths checked:",
-  "cert:", CERT_FILE_PATHS.cert, fs.existsSync(CERT_FILE_PATHS.cert) ? "✅" : "❌",
-  "| key:", CERT_FILE_PATHS.key, fs.existsSync(CERT_FILE_PATHS.key) ? "✅" : "❌",
-  "| wwdr:", CERT_FILE_PATHS.wwdr, fs.existsSync(CERT_FILE_PATHS.wwdr) ? "✅" : "❌");
+  "cert:", CERT_FILE_PATHS.cert, safeExists(CERT_FILE_PATHS.cert) ? "✅" : "❌",
+  "| key:", CERT_FILE_PATHS.key, safeExists(CERT_FILE_PATHS.key) ? "✅" : "❌",
+  "| wwdr:", CERT_FILE_PATHS.wwdr, safeExists(CERT_FILE_PATHS.wwdr) ? "✅" : "❌");
+console.log("[Apple Wallet] Cert dir candidates:", WALLET_ASSET_DIR_CANDIDATES.join(" | "));
 console.log("[Apple Wallet] ASSET_DIR:", findAssetDir());
 
 // Validate certs at startup if configured
@@ -2895,10 +2992,11 @@ app.get("/api/wallet/apple/status", async (_req, res) => {
     signerKey: APPLE_SIGNER_KEY_PEM ? `✅ loaded (${APPLE_SIGNER_KEY_PEM.length} chars)` : "❌ (web pass mode)",
     wwdrCert: APPLE_WWDR_CERT_PEM ? `✅ loaded (${APPLE_WWDR_CERT_PEM.length} chars)` : "❌ (web pass mode)",
     certFiles: {
-      cert: `${CERT_FILE_PATHS.cert} ${fs.existsSync(CERT_FILE_PATHS.cert) ? "✅" : "❌"}`,
-      key: `${CERT_FILE_PATHS.key} ${fs.existsSync(CERT_FILE_PATHS.key) ? "✅" : "❌"}`,
-      wwdr: `${CERT_FILE_PATHS.wwdr} ${fs.existsSync(CERT_FILE_PATHS.wwdr) ? "✅" : "❌"}`,
+      cert: `${CERT_FILE_PATHS.cert} ${safeExists(CERT_FILE_PATHS.cert) ? "✅" : "❌"}`,
+      key: `${CERT_FILE_PATHS.key} ${safeExists(CERT_FILE_PATHS.key) ? "✅" : "❌"}`,
+      wwdr: `${CERT_FILE_PATHS.wwdr} ${safeExists(CERT_FILE_PATHS.wwdr) ? "✅" : "❌"}`,
     },
+    certDirCandidates: WALLET_ASSET_DIR_CANDIDATES,
   });
 });
 
@@ -2918,10 +3016,11 @@ app.get("/api/wallet/apple/debug", authMiddleware, async (req, res) => {
       APPLE_CERT_PASSWORD: APPLE_CERT_PASSWORD ? "✅ set" : "⬜ not set (OK if key has no password)",
     },
     certFiles: {
-      certPath: `${CERT_FILE_PATHS.cert} ${fs.existsSync(CERT_FILE_PATHS.cert) ? "✅ exists" : "❌ not found"}`,
-      keyPath: `${CERT_FILE_PATHS.key} ${fs.existsSync(CERT_FILE_PATHS.key) ? "✅ exists" : "❌ not found"}`,
-      wwdrPath: `${CERT_FILE_PATHS.wwdr} ${fs.existsSync(CERT_FILE_PATHS.wwdr) ? "✅ exists" : "❌ not found"}`,
+      certPath: `${CERT_FILE_PATHS.cert} ${safeExists(CERT_FILE_PATHS.cert) ? "✅ exists" : "❌ not found"}`,
+      keyPath: `${CERT_FILE_PATHS.key} ${safeExists(CERT_FILE_PATHS.key) ? "✅ exists" : "❌ not found"}`,
+      wwdrPath: `${CERT_FILE_PATHS.wwdr} ${safeExists(CERT_FILE_PATHS.wwdr) ? "✅ exists" : "❌ not found"}`,
     },
+    certDirCandidates: WALLET_ASSET_DIR_CANDIDATES,
     loadedPems: {
       signerCert: APPLE_SIGNER_CERT_PEM ? `✅ loaded (${APPLE_SIGNER_CERT_PEM.length} chars), starts: ${APPLE_SIGNER_CERT_PEM.substring(0, 40)}...` : "❌ not loaded",
       signerKey: APPLE_SIGNER_KEY_PEM ? `✅ loaded (${APPLE_SIGNER_KEY_PEM.length} chars), starts: ${APPLE_SIGNER_KEY_PEM.substring(0, 40)}...` : "❌ not loaded",
@@ -3704,7 +3803,7 @@ app.get("/api/class-types", async (req, res) => {
 app.get("/api/public/instructors", async (_req, res) => {
   try {
     const r = await pool.query(
-      "SELECT id, display_name, bio, specialties, photo_url FROM instructors WHERE is_active = true ORDER BY created_at ASC"
+      "SELECT id, display_name, bio, specialties, photo_url, photo_focus_x, photo_focus_y FROM instructors WHERE is_active = true ORDER BY created_at ASC"
     );
     return res.json({ data: camelRows(r.rows) });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
@@ -4213,6 +4312,23 @@ app.get("/api/referrals/stats", adminMiddleware, async (req, res) => {
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
+const PUBLIC_SETTINGS_KEYS = new Set([
+  "policies_settings",
+]);
+
+app.get("/api/public/settings/:key", async (req, res) => {
+  try {
+    const { key } = req.params;
+    if (!PUBLIC_SETTINGS_KEYS.has(key)) {
+      return res.status(403).json({ message: "Configuración no pública" });
+    }
+    const r = await pool.query("SELECT value FROM settings WHERE key=$1", [key]);
+    return res.json({ data: r.rows.length ? r.rows[0].value : null });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
 app.get("/api/settings/:key", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query("SELECT value FROM settings WHERE key=$1", [req.params.key]);
@@ -4239,6 +4355,27 @@ function normalisePhone(raw) {
   if (phone.startsWith("52") && phone.length === 12) return phone; // already 521XXXXXXXXXX or 52XXXXXXXXXX
   if (phone.length === 10) return "52" + phone; // local MX 10 digits
   return phone;
+}
+
+const EVOLUTION_SEND_DELAY_MS = Number(process.env.EVOLUTION_SEND_DELAY_MS || 1200);
+let evolutionSendQueue = Promise.resolve();
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function sendWhatsAppNow(number, text) {
+  const payload = { number, text };
+  return evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, payload);
+}
+
+function queueWhatsAppSend(number, text) {
+  const run = evolutionSendQueue.then(async () => {
+    const jitter = Math.floor(Math.random() * 250);
+    return sendWhatsAppNow(number, text).finally(async () => {
+      await sleep(Math.max(300, EVOLUTION_SEND_DELAY_MS + jitter));
+    });
+  });
+  // Keep queue alive even if one send fails
+  evolutionSendQueue = run.catch(() => {});
+  return run;
 }
 
 // Webhook (no auth) — receives Evolution API events
@@ -4306,6 +4443,8 @@ app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
   try {
     // Try creating the instance
     let createData = null;
+    let createErrStatus = null;
+    let createErrMessage = "";
     try {
       const createRes = await evolutionApi.post("/instance/create", {
         instanceName: EVOLUTION_INSTANCE,
@@ -4314,6 +4453,8 @@ app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
       });
       createData = createRes.data;
     } catch (createErr) {
+      createErrStatus = createErr.response?.status ?? null;
+      createErrMessage = JSON.stringify(createErr.response?.data || createErr.message || "");
       // 409 = already exists, ignore; otherwise log
       if (createErr.response?.status !== 409) {
         console.error("[EVOLUTION CREATE]", createErr.response?.data || createErr.message);
@@ -4333,6 +4474,16 @@ app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
       } catch (qrErr) {
         console.error("[EVOLUTION QR FETCH]", qrErr.response?.data || qrErr.message);
       }
+    }
+
+    if (!qrCode) {
+      const alreadyInUse = /already in use|in use|ya existe/i.test(createErrMessage);
+      if (alreadyInUse || createErrStatus === 403 || createErrStatus === 409) {
+        return res.status(409).json({
+          message: `No se pudo obtener QR para la instancia "${EVOLUTION_INSTANCE}". Ese nombre ya está en uso. Cambia EVOLUTION_INSTANCE_NAME en Railway por un nombre único (ej. ophelia-jump-studio-2026).`,
+        });
+      }
+      return res.status(502).json({ message: "Evolution respondió sin QR. Intenta nuevamente en unos segundos." });
     }
 
     return res.json({ data: { qrCode, state: "qr_pending", message: "Escanea el código QR con WhatsApp" } });
@@ -4363,10 +4514,10 @@ app.post("/api/evolution/send-test", adminMiddleware, async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ message: "Se requiere número de teléfono" });
     const number = normalisePhone(phone);
-    await evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, {
+    await queueWhatsAppSend(
       number,
-      text: "✅ Mensaje de prueba desde Ophelia Jump Studio. ¡WhatsApp conectado correctamente!",
-    });
+      "✅ Mensaje de prueba desde Ophelia Jump Studio. ¡WhatsApp conectado correctamente!",
+    );
     return res.json({ data: { message: "Mensaje de prueba enviado correctamente" } });
   } catch (err) {
     console.error("[EVOLUTION SEND-TEST]", err.response?.data || err.message);
@@ -4380,7 +4531,7 @@ app.post("/api/evolution/send-message", adminMiddleware, async (req, res) => {
     const { phone, message } = req.body;
     if (!phone || !message) return res.status(400).json({ message: "Se requieren teléfono y mensaje" });
     const number = normalisePhone(phone);
-    await evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, { number, text: message });
+    await queueWhatsAppSend(number, message);
     return res.json({ data: { message: "Mensaje enviado", number } });
   } catch (err) {
     console.error("[EVOLUTION SEND-MSG]", err.response?.data || err.message);
@@ -4396,18 +4547,18 @@ app.post("/api/evolution/notify-clients", adminMiddleware, async (req, res) => {
 
     let query;
     if (filter === "members") {
-      query = `SELECT DISTINCT u.id, u.name, u.phone FROM users u
+      query = `SELECT DISTINCT u.id, u.display_name AS name, u.phone FROM users u
                JOIN memberships m ON m.user_id = u.id
                WHERE u.role = 'client' AND u.phone IS NOT NULL AND u.phone != ''
                AND m.status = 'active'`;
     } else if (filter === "active") {
-      query = `SELECT DISTINCT u.id, u.name, u.phone FROM users u
+      query = `SELECT DISTINCT u.id, u.display_name AS name, u.phone FROM users u
                JOIN bookings b ON b.user_id = u.id
                WHERE u.role = 'client' AND u.phone IS NOT NULL AND u.phone != ''
-               AND b.status IN ('confirmed','attended')
+               AND b.status IN ('confirmed','checked_in')
                AND b.created_at > NOW() - INTERVAL '60 days'`;
     } else {
-      query = `SELECT id, name, phone FROM users
+      query = `SELECT id, display_name AS name, phone FROM users
                WHERE role = 'client' AND phone IS NOT NULL AND phone != ''`;
     }
 
@@ -4421,10 +4572,8 @@ app.post("/api/evolution/notify-clients", adminMiddleware, async (req, res) => {
     for (const client of clients) {
       try {
         const number = normalisePhone(client.phone);
-        await evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, { number, text: message });
+        await queueWhatsAppSend(number, message);
         sent++;
-        // Small delay to avoid rate-limiting
-        await new Promise((r) => setTimeout(r, 300));
       } catch (sendErr) {
         failed++;
         errors.push({ name: client.name, phone: client.phone, error: sendErr.response?.data?.message || sendErr.message });
@@ -5797,10 +5946,7 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
           try {
             const phone = String(u.phone).replace(/\D/g, "");
             const wa = phone.length === 10 ? "52" + phone : phone;
-            await evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, {
-              number: wa,
-              textMessage: { text: rejMsg },
-            });
+            await queueWhatsAppSend(wa, rejMsg);
           } catch (waErr) {
             console.error("[Reject WhatsApp]", waErr.response?.data || waErr.message);
           }
@@ -6214,12 +6360,14 @@ app.get("/api/instructors", adminMiddleware, async (req, res) => {
 // POST /api/instructors
 app.post("/api/instructors", adminMiddleware, async (req, res) => {
   try {
-    const { displayName, email, phone, bio, specialties, isActive = true } = req.body;
+    const { displayName, email, phone, bio, specialties, isActive = true, photoFocusX = 50, photoFocusY = 50 } = req.body;
     if (!displayName) return res.status(400).json({ message: "Nombre requerido" });
     const specialtiesValue = serializeSpecialtiesForDb(specialties);
+    const safeFocusX = Math.max(0, Math.min(100, Number(photoFocusX || 50)));
+    const safeFocusY = Math.max(0, Math.min(100, Number(photoFocusY || 50)));
     const r = await pool.query(
-      "INSERT INTO instructors (display_name, email, phone, bio, specialties, is_active) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
-      [displayName, email || null, phone || null, bio || null, specialtiesValue, isActive]
+      "INSERT INTO instructors (display_name, email, phone, bio, specialties, is_active, photo_focus_x, photo_focus_y) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
+      [displayName, email || null, phone || null, bio || null, specialtiesValue, isActive, safeFocusX, safeFocusY]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) {
@@ -6230,11 +6378,13 @@ app.post("/api/instructors", adminMiddleware, async (req, res) => {
 // PUT /api/instructors/:id
 app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
   try {
-    const { displayName, email, phone, bio, specialties, isActive } = req.body;
+    const { displayName, email, phone, bio, specialties, isActive, photoFocusX = 50, photoFocusY = 50 } = req.body;
     const specialtiesValue = serializeSpecialtiesForDb(specialties);
+    const safeFocusX = Math.max(0, Math.min(100, Number(photoFocusX || 50)));
+    const safeFocusY = Math.max(0, Math.min(100, Number(photoFocusY || 50)));
     const r = await pool.query(
-      "UPDATE instructors SET display_name=$1, email=$2, phone=$3, bio=$4, specialties=$5, is_active=$6, updated_at=NOW() WHERE id=$7 RETURNING *",
-      [displayName, email || null, phone || null, bio || null, specialtiesValue, isActive !== false, req.params.id]
+      "UPDATE instructors SET display_name=$1, email=$2, phone=$3, bio=$4, specialties=$5, is_active=$6, photo_focus_x=$7, photo_focus_y=$8, updated_at=NOW() WHERE id=$9 RETURNING *",
+      [displayName, email || null, phone || null, bio || null, specialtiesValue, isActive !== false, safeFocusX, safeFocusY, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Instructor no encontrado" });
     return res.json({ data: camelRow(r.rows[0]) });
@@ -6691,7 +6841,10 @@ app.get("/api/events", async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
     let userId = null;
     if (token) {
-      try { userId = jwt.verify(token, JWT_SECRET).userId; } catch { }
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded?.sub || decoded?.userId || null;
+      } catch { }
     }
     const { type, upcoming } = req.query;
     const conditions = ["e.status = 'published'"];
@@ -6746,8 +6899,8 @@ app.get("/api/events/:id", async (req, res) => {
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        userId = decoded.userId;
-        isAdmin = decoded.role === "admin" || decoded.role === "super_admin";
+        userId = decoded?.sub || decoded?.userId || null;
+        isAdmin = decoded?.role === "admin" || decoded?.role === "super_admin";
       } catch { }
     }
     const evRes = await pool.query("SELECT * FROM events WHERE id = $1", [req.params.id]);
@@ -6796,7 +6949,7 @@ app.post("/api/events", adminMiddleware, async (req, res) => {
         image || null, requirements,
         JSON.stringify(Array.isArray(includes) ? includes.filter(Boolean) : []),
         JSON.stringify(Array.isArray(tags) ? tags.filter(Boolean) : []),
-        status, req.user.userId,
+        status, req.userId,
       ]
     );
     return res.status(201).json(mapEventRow(r.rows[0]));
