@@ -12,6 +12,7 @@ import multer from "multer";
 import axios from "axios";
 import crypto from "crypto";
 import archiver from "archiver";
+import { execSync } from "child_process";
 import {
   sendMembershipActivated,
   sendBookingConfirmed,
@@ -2288,6 +2289,14 @@ const APPLE_CERT_PASSWORD = process.env.APPLE_CERT_PASSWORD || "";
 function isAppleWalletConfigured() {
   return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_SIGNER_CERT_BASE64 && APPLE_SIGNER_KEY_BASE64 && APPLE_WWDR_CERT_BASE64);
 }
+console.log("[Apple Wallet] Config check:",
+  isAppleWalletConfigured() ? "✅ All certs configured — .pkpass mode" : "⚠️ Missing certs — web pass fallback mode",
+  "| TEAM:", APPLE_TEAM_ID ? "✅" : "❌",
+  "| PASS_TYPE:", APPLE_PASS_TYPE_ID ? "✅" : "❌",
+  "| CERT:", APPLE_SIGNER_CERT_BASE64 ? `✅ (${APPLE_SIGNER_CERT_BASE64.length} chars)` : "❌",
+  "| KEY:", APPLE_SIGNER_KEY_BASE64 ? `✅ (${APPLE_SIGNER_KEY_BASE64.length} chars)` : "❌",
+  "| WWDR:", APPLE_WWDR_CERT_BASE64 ? `✅ (${APPLE_WWDR_CERT_BASE64.length} chars)` : "❌"
+);
 
 /** Check if we can at least generate a web pass (always true — no certs needed) */
 function isAppleWebPassAvailable() {
@@ -2455,14 +2464,17 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   fs.writeFileSync(keyPath, signerKeyPem);
   fs.writeFileSync(wwdrPath, wwdrPem);
 
-  const { execSync } = await import("child_process");
-  const opensslCmd = `openssl smime -binary -sign -certfile "${wwdrPath}" -signer "${certPath}" -inkey "${keyPath}" -in "${manifestPath}" -out "${sigPath}" -outform DER -passin pass:${APPLE_CERT_PASSWORD || ""}`;
+  const opensslCmd = `openssl smime -binary -sign -certfile "${wwdrPath}" -signer "${certPath}" -inkey "${keyPath}" -in "${manifestPath}" -out "${sigPath}" -outform DER${APPLE_CERT_PASSWORD ? ` -passin pass:${APPLE_CERT_PASSWORD}` : ""}`;
+  console.log("[Apple Wallet] Signing manifest with openssl...");
   try {
     execSync(opensslCmd, { stdio: "pipe" });
+    console.log("[Apple Wallet] ✅ Signature created successfully");
   } catch (opensslErr) {
+    const errMsg = opensslErr.stderr?.toString() || opensslErr.message;
+    console.error("[Apple Wallet] ❌ OpenSSL signing failed:", errMsg);
     // Clean up temp files
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    throw new Error(`OpenSSL signing failed: ${opensslErr.stderr?.toString() || opensslErr.message}`);
+    throw new Error(`OpenSSL signing failed: ${errMsg}`);
   }
 
   const signatureBuffer = fs.readFileSync(sigPath);
@@ -2547,10 +2559,25 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
 
     // If Apple Developer certs are configured, generate real .pkpass
     if (isAppleWalletConfigured()) {
-      const pkpassBuffer = await generateApplePkpass({ userId: req.userId, userName, points, qrCode, membership, nextBooking });
-      res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-      res.setHeader("Content-Disposition", `attachment; filename=ophelia-pass.pkpass`);
-      return res.send(pkpassBuffer);
+      console.log("[Apple Wallet] ✅ Certs detected — generating real .pkpass for user:", req.userId);
+      try {
+        const pkpassBuffer = await generateApplePkpass({ userId: req.userId, userName, points, qrCode, membership, nextBooking });
+        console.log("[Apple Wallet] ✅ .pkpass generated, size:", pkpassBuffer.length, "bytes");
+        res.setHeader("Content-Type", "application/vnd.apple.pkpass");
+        res.setHeader("Content-Disposition", `attachment; filename="ophelia-pass.pkpass"`);
+        return res.send(pkpassBuffer);
+      } catch (pkpassErr) {
+        console.error("[Apple Wallet] ❌ .pkpass generation failed:", pkpassErr.message);
+        // Fall through to HTML web pass
+      }
+    } else {
+      console.log("[Apple Wallet] ⚠️ Certs not configured — using web pass fallback.",
+        "TEAM:", APPLE_TEAM_ID ? "✅" : "❌",
+        "PASS_TYPE:", APPLE_PASS_TYPE_ID ? "✅" : "❌",
+        "CERT:", APPLE_SIGNER_CERT_BASE64 ? "✅" : "❌",
+        "KEY:", APPLE_SIGNER_KEY_BASE64 ? "✅" : "❌",
+        "WWDR:", APPLE_WWDR_CERT_BASE64 ? "✅" : "❌"
+      );
     }
 
     // Fallback: generate a beautiful standalone HTML pass page
