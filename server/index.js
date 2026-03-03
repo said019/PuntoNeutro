@@ -371,6 +371,9 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_category VARCHAR(20) DEFAULT 'all'`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_non_transferable BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_non_repeatable BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS repeat_key VARCHAR(80)`).catch(() => { });
     // ── Migrate class_types: remove 'mixto' category (now only jumping/pilates) ──
     await pool.query(`
       UPDATE class_types SET category = 'jumping' WHERE category NOT IN ('jumping','pilates');
@@ -416,6 +419,54 @@ async function ensureSchema() {
     await pool.query(`UPDATE plans SET class_category = 'jumping' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%jumping%' OR name ILIKE '%jump%' OR name ILIKE '%strong%' OR name ILIKE '%dance%' OR name ILIKE '%tone%' OR name ILIKE '%mindful jump%')`).catch(() => { });
     await pool.query(`UPDATE plans SET class_category = 'pilates' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%pilates%' OR name ILIKE '%mat%' OR name ILIKE '%flow%' OR name ILIKE '%hot%')`).catch(() => { });
     await pool.query(`UPDATE plans SET class_category = 'mixto'   WHERE (class_category IS NULL OR class_category = 'all') AND name ILIKE '%mixto%'`).catch(() => { });
+    // ── Ensure sample single-session plans exist (MXN 65, non-transferable, non-repeatable) ──
+    const samplePlans = [
+      {
+        name: "Sesión suelta (muestra) Jumping",
+        classCategory: "jumping",
+        sortOrder: 0,
+      },
+      {
+        name: "Sesión suelta (muestra) Pilates",
+        classCategory: "pilates",
+        sortOrder: 0,
+      },
+    ];
+    for (const sp of samplePlans) {
+      const features = JSON.stringify(["1 clase de muestra", "No transferible", "No repetible"]);
+      const updateRes = await pool.query(
+        `UPDATE plans
+           SET price = 65,
+               currency = 'MXN',
+               duration_days = 7,
+               class_limit = 1,
+               class_category = $2,
+               features = $3::jsonb,
+               is_active = true,
+               is_non_transferable = true,
+               is_non_repeatable = true,
+               repeat_key = 'trial_single_session',
+               sort_order = $4,
+               updated_at = NOW()
+         WHERE name = $1`,
+        [sp.name, sp.classCategory, features, sp.sortOrder]
+      );
+      if (updateRes.rowCount === 0) {
+        await pool.query(
+          `INSERT INTO plans
+            (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
+           VALUES
+            ($1, $2, 65, 'MXN', 7, 1, $3, $4::jsonb, true, $5, true, true, 'trial_single_session')`,
+          [
+            sp.name,
+            "Sesión de muestra individual. No transferible y no repetible.",
+            sp.classCategory,
+            features,
+            sp.sortOrder,
+          ]
+        );
+      }
+    }
     // ── Products table ─────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
@@ -968,6 +1019,105 @@ function calculateDiscountAmount(type, value, subtotal) {
     ? safeSubtotal * (safeValue / 100)
     : safeValue;
   return Math.max(0, Math.min(amount, safeSubtotal));
+}
+
+const NON_REPEATABLE_ORDER_BLOCK_STATUSES = ["pending_payment", "pending_verification", "approved"];
+
+function parseBooleanFlag(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    return ["true", "1", "yes", "si", "sí", "t"].includes(v);
+  }
+  return false;
+}
+
+function getPlanRepeatKey(plan) {
+  const raw = plan?.repeat_key ?? plan?.repeatKey;
+  if (raw === null || raw === undefined) return null;
+  const key = String(raw).trim();
+  return key || null;
+}
+
+function getPlanFlags(plan) {
+  return {
+    isNonTransferable: parseBooleanFlag(plan?.is_non_transferable ?? plan?.isNonTransferable),
+    isNonRepeatable: parseBooleanFlag(plan?.is_non_repeatable ?? plan?.isNonRepeatable),
+    repeatKey: getPlanRepeatKey(plan),
+  };
+}
+
+async function findNonRepeatablePlanConflict({
+  userId,
+  plan,
+  excludeOrderId = null,
+  client = null,
+}) {
+  if (!userId || !plan?.id) return null;
+  const { isNonRepeatable, repeatKey } = getPlanFlags(plan);
+  if (!isNonRepeatable) return null;
+
+  const q = client ?? pool;
+  const key = repeatKey || `plan:${plan.id}`;
+
+  const memConflict = await q.query(
+    `SELECT m.id, m.status, p.name AS plan_name
+       FROM memberships m
+       LEFT JOIN plans p ON p.id = m.plan_id
+      WHERE m.user_id = $1
+        AND (
+          m.plan_id = $2
+          OR (COALESCE(p.repeat_key, '') <> '' AND p.repeat_key = $3)
+        )
+      ORDER BY m.created_at DESC
+      LIMIT 1`,
+    [userId, plan.id, key]
+  );
+  if (memConflict.rows.length) {
+    return {
+      source: "membership",
+      message: `La "${plan.name}" es de un solo uso, no transferible y no se puede repetir.`,
+      detail: memConflict.rows[0],
+    };
+  }
+
+  const params = [userId, plan.id, key, NON_REPEATABLE_ORDER_BLOCK_STATUSES];
+  let orderSql = `
+    SELECT o.id, o.status, p.name AS plan_name
+      FROM orders o
+      JOIN plans p ON p.id = o.plan_id
+     WHERE o.user_id = $1
+       AND (
+         o.plan_id = $2
+         OR (COALESCE(p.repeat_key, '') <> '' AND p.repeat_key = $3)
+       )
+       AND o.status = ANY($4::text[])
+  `;
+  if (excludeOrderId) {
+    params.push(excludeOrderId);
+    orderSql += ` AND o.id <> $${params.length}`;
+  }
+  orderSql += " ORDER BY o.created_at DESC LIMIT 1";
+
+  const orderConflict = await q.query(orderSql, params);
+  if (orderConflict.rows.length) {
+    const status = orderConflict.rows[0].status;
+    if (status === "pending_payment" || status === "pending_verification") {
+      return {
+        source: "order",
+        message: "Ya tienes una sesión muestra en proceso. No puede repetirse.",
+        detail: orderConflict.rows[0],
+      };
+    }
+    return {
+      source: "order",
+      message: `La "${plan.name}" ya fue utilizada y no se puede repetir.`,
+      detail: orderConflict.rows[0],
+    };
+  }
+
+  return null;
 }
 
 function serializeSpecialtiesForDb(value) {
@@ -1819,6 +1969,10 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
     if (planRes.rows.length === 0) return res.status(404).json({ message: "Plan no encontrado" });
     const plan = planRes.rows[0];
+    const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId: req.userId, plan });
+    if (nonRepeatableConflict) {
+      return res.status(409).json({ message: nonRepeatableConflict.message });
+    }
     let subtotal = parseFloat(plan.price);
     let discount = 0;
     // Apply discount code
@@ -3697,15 +3851,24 @@ app.delete("/api/admin/schedule-slots/:id", async (req, res) => {
 
 // POST /api/admin/plans
 app.post("/api/admin/plans", async (req, res) => {
-  const { name, description, price, currency, duration_days, class_limit, features, is_active, sort_order } = req.body;
+  const {
+    name, description, price, currency, duration_days, class_limit, class_category,
+    features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
+  } = req.body;
   if (!name?.trim() || price === undefined) return res.status(400).json({ message: "name y price requeridos" });
   try {
+    const validCats = ["jumping", "pilates", "mixto", "all"];
+    const cat = validCats.includes(class_category) ? class_category : "all";
+    const nonTransferable = parseBooleanFlag(is_non_transferable);
+    const nonRepeatable = parseBooleanFlag(is_non_repeatable);
+    const safeRepeatKey = nonRepeatable ? String(repeat_key ?? "").trim() || null : null;
     const r = await pool.query(
-      `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, features, is_active, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      `INSERT INTO plans
+        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
       [name.trim(), description || null, price, currency || "MXN",
       duration_days || 30, class_limit || null,
-      JSON.stringify(features || []), is_active ?? true, sort_order ?? 0]
+      cat, JSON.stringify(features || []), is_active ?? true, sort_order ?? 0, nonTransferable, nonRepeatable, safeRepeatKey]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
@@ -3716,8 +3879,16 @@ app.post("/api/admin/plans", async (req, res) => {
 
 // PUT /api/admin/plans/:id
 app.put("/api/admin/plans/:id", async (req, res) => {
-  const { name, description, price, currency, duration_days, class_limit, features, is_active, sort_order } = req.body;
+  const {
+    name, description, price, currency, duration_days, class_limit, class_category,
+    features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
+  } = req.body;
   try {
+    const validCats = ["jumping", "pilates", "mixto", "all"];
+    const cat = validCats.includes(class_category) ? class_category : null;
+    const nonTransferable = parseBooleanFlag(is_non_transferable);
+    const nonRepeatable = parseBooleanFlag(is_non_repeatable);
+    const safeRepeatKey = nonRepeatable ? String(repeat_key ?? "").trim() || null : null;
     const r = await pool.query(
       `UPDATE plans SET
          name          = COALESCE($1, name),
@@ -3726,15 +3897,19 @@ app.put("/api/admin/plans/:id", async (req, res) => {
          currency      = COALESCE($4, currency),
          duration_days = COALESCE($5, duration_days),
          class_limit   = $6,
-         features      = COALESCE($7, features),
-         is_active     = COALESCE($8, is_active),
-         sort_order    = COALESCE($9, sort_order),
+         class_category= COALESCE($7, class_category),
+         features      = COALESCE($8, features),
+         is_active     = COALESCE($9, is_active),
+         sort_order    = COALESCE($10, sort_order),
+         is_non_transferable = COALESCE($11, is_non_transferable),
+         is_non_repeatable   = COALESCE($12, is_non_repeatable),
+         repeat_key          = CASE WHEN COALESCE($12, is_non_repeatable) = true THEN $13 ELSE NULL END,
          updated_at    = NOW()
-       WHERE id = $10 RETURNING *`,
+       WHERE id = $14 RETURNING *`,
       [name || null, description || null, price ?? null, currency || null,
       duration_days || null, class_limit ?? null,
-      features ? JSON.stringify(features) : null,
-      is_active ?? null, sort_order ?? null, req.params.id]
+      cat, features ? JSON.stringify(features) : null,
+      is_active ?? null, sort_order ?? null, nonTransferable, nonRepeatable, safeRepeatKey, req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
     return res.json({ data: r.rows[0] });
@@ -5449,9 +5624,13 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
   try {
     const { userId, planId, paymentMethod = "efectivo", startDate } = req.body;
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
-    const planRes = await pool.query("SELECT * FROM plans WHERE id = $1", [planId]);
+    const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
     if (!planRes.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     const plan = planRes.rows[0];
+    const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId, plan });
+    if (nonRepeatableConflict) {
+      return res.status(409).json({ message: nonRepeatableConflict.message });
+    }
     const start = startDate ? new Date(startDate) : new Date();
     const end = new Date(start);
     end.setDate(end.getDate() + (plan.duration_days || 30));
@@ -5581,9 +5760,17 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
 // PUT /api/plans/:id
 app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
   try {
-    const { name, description, price, currency, durationDays, classLimit, classCategory, features, isActive, sortOrder } = req.body;
+    const {
+      name, description, price, currency, durationDays, classLimit, classCategory,
+      features, isActive, sortOrder, isNonTransferable, isNonRepeatable, repeatKey,
+    } = req.body;
     const validCats = ["jumping", "pilates", "mixto", "all"];
     const cat = validCats.includes(classCategory) ? classCategory : null;
+    const nonTransferable = parseBooleanFlag(isNonTransferable ?? req.body.is_non_transferable);
+    const nonRepeatable = parseBooleanFlag(isNonRepeatable ?? req.body.is_non_repeatable);
+    const safeRepeatKey = nonRepeatable
+      ? String(repeatKey ?? req.body.repeat_key ?? "").trim() || null
+      : null;
     // features can be array or comma-string — always store as jsonb array
     const featuresArr = Array.isArray(features)
       ? features
@@ -5593,9 +5780,25 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
     const r = await pool.query(
       `UPDATE plans SET name=$1, description=$2, price=$3, currency=$4, duration_days=$5,
        class_limit=$6, features=$7, is_active=$8, sort_order=$9,
-       class_category=COALESCE($10, class_category), updated_at=NOW()
-       WHERE id=$11 RETURNING *`,
-      [name, description || null, price, currency || "MXN", durationDays || 30, classLimit ?? null, JSON.stringify(featuresArr), isActive !== false, sortOrder || 0, cat, req.params.id]
+       class_category=COALESCE($10, class_category),
+       is_non_transferable=$11, is_non_repeatable=$12, repeat_key=$13, updated_at=NOW()
+       WHERE id=$14 RETURNING *`,
+      [
+        name,
+        description || null,
+        price,
+        currency || "MXN",
+        durationDays || 30,
+        classLimit ?? null,
+        JSON.stringify(featuresArr),
+        isActive !== false,
+        sortOrder || 0,
+        cat,
+        nonTransferable,
+        nonRepeatable,
+        safeRepeatKey,
+        req.params.id,
+      ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     return res.json({ data: camelRow(r.rows[0]) });
@@ -5629,19 +5832,44 @@ app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
 // POST /api/plans
 app.post("/api/plans", adminMiddleware, async (req, res) => {
   try {
-    const { name, description, price, currency = "MXN", durationDays = 30, classLimit, classCategory, features, isActive = true, sortOrder = 0 } = req.body;
+    const {
+      name, description, price, currency = "MXN", durationDays = 30, classLimit,
+      classCategory, features, isActive = true, sortOrder = 0,
+      isNonTransferable, isNonRepeatable, repeatKey,
+    } = req.body;
     if (!name) return res.status(400).json({ message: "Nombre requerido" });
     const validCats = ["jumping", "pilates", "mixto", "all"];
     const cat = validCats.includes(classCategory) ? classCategory : "all";
+    const nonTransferable = parseBooleanFlag(isNonTransferable ?? req.body.is_non_transferable);
+    const nonRepeatable = parseBooleanFlag(isNonRepeatable ?? req.body.is_non_repeatable);
+    const safeRepeatKey = nonRepeatable
+      ? String(repeatKey ?? req.body.repeat_key ?? "").trim() || null
+      : null;
     const featuresArr = Array.isArray(features)
       ? features
       : typeof features === "string" && features.trim()
         ? features.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
     const r = await pool.query(
-      `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [name, description || null, price || 0, currency, durationDays, classLimit ?? null, cat, JSON.stringify(featuresArr), isActive, sortOrder]
+      `INSERT INTO plans
+        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
+       VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [
+        name,
+        description || null,
+        price || 0,
+        currency,
+        durationDays,
+        classLimit ?? null,
+        cat,
+        JSON.stringify(featuresArr),
+        isActive,
+        sortOrder,
+        nonTransferable,
+        nonRepeatable,
+        safeRepeatKey,
+      ]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) {
@@ -5911,6 +6139,11 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
       const planRes = await client.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
       if (!planRes.rows.length) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Plan no encontrado" }); }
       const plan = planRes.rows[0];
+      const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId: user.id, plan, client });
+      if (nonRepeatableConflict) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({ message: nonRepeatableConflict.message });
+      }
       const start = startDate ? new Date(startDate) : new Date();
       const end = new Date(start);
       end.setDate(end.getDate() + plan.duration_days);
@@ -5976,52 +6209,89 @@ app.get("/api/admin/orders", adminMiddleware, async (req, res) => {
 
 // PUT /api/admin/orders/:id/verify
 app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
+  const client = await pool.connect();
   try {
-    const r = await pool.query(
-      "UPDATE orders SET status = 'approved', verified_at = NOW(), verified_by = $1 WHERE id = $2 RETURNING *",
-      [req.userId, req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Orden no encontrada" });
-    const order = r.rows[0];
+    await client.query("BEGIN");
 
-    // Activate membership if this order is for a plan
-    if (order.plan_id) {
-      const planRes = await pool.query("SELECT * FROM plans WHERE id = $1", [order.plan_id]);
-      if (planRes.rows.length) {
-        const plan = planRes.rows[0];
+    const orderRes = await client.query("SELECT * FROM orders WHERE id = $1 FOR UPDATE", [req.params.id]);
+    if (!orderRes.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Orden no encontrada" });
+    }
+    let order = orderRes.rows[0];
+    let justApproved = false;
+
+    if (order.status !== "approved") {
+      let plan = null;
+      if (order.plan_id) {
+        const planRes = await client.query("SELECT * FROM plans WHERE id = $1", [order.plan_id]);
+        if (planRes.rows.length) {
+          plan = planRes.rows[0];
+          const nonRepeatableConflict = await findNonRepeatablePlanConflict({
+            userId: order.user_id,
+            plan,
+            excludeOrderId: order.id,
+            client,
+          });
+          if (nonRepeatableConflict) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ message: nonRepeatableConflict.message });
+          }
+        }
+      }
+
+      const approvedRes = await client.query(
+        "UPDATE orders SET status = 'approved', verified_at = NOW(), verified_by = $1 WHERE id = $2 RETURNING *",
+        [req.userId, req.params.id]
+      );
+      order = approvedRes.rows[0];
+      justApproved = true;
+
+      // Activate membership if this order is for a plan
+      if (order.plan_id && plan && order.user_id) {
         const end = new Date();
         end.setDate(end.getDate() + (plan.duration_days || 30));
-        await pool.query(
+        await client.query(
           `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
            VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)
            ON CONFLICT (order_id) DO UPDATE SET status='active'`,
           [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
-        ).catch(() => { });
+        );
+      }
+    }
 
-        // Email: membership activated
-        if (order.user_id) {
-          try {
-            const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [order.user_id]);
-            if (uRes.rows[0]) {
-              const u = uRes.rows[0];
-              sendMembershipActivated({
-                to: u.email,
-                name: u.display_name || "Alumna",
-                planName: plan.name,
-                startDate: new Date().toISOString(),
-                endDate: end.toISOString(),
-                classLimit: plan.class_limit ?? null,
-              }).catch((e) => console.error("[Email] admin order verify:", e.message));
-            }
-          } catch (emailErr) {
-            console.error("[Email] admin order verify query:", emailErr.message);
-          }
+    await client.query("COMMIT");
+
+    let plan = null;
+    if (order.plan_id) {
+      const planRes = await pool.query("SELECT * FROM plans WHERE id = $1", [order.plan_id]);
+      if (planRes.rows.length) plan = planRes.rows[0];
+    }
+
+    // Email: membership activated
+    if (justApproved && order.user_id && plan) {
+      try {
+        const end = new Date();
+        end.setDate(end.getDate() + (plan.duration_days || 30));
+        const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [order.user_id]);
+        if (uRes.rows[0]) {
+          const u = uRes.rows[0];
+          sendMembershipActivated({
+            to: u.email,
+            name: u.display_name || "Alumna",
+            planName: plan.name,
+            startDate: new Date().toISOString(),
+            endDate: end.toISOString(),
+            classLimit: plan.class_limit ?? null,
+          }).catch((e) => console.error("[Email] admin order verify:", e.message));
         }
+      } catch (emailErr) {
+        console.error("[Email] admin order verify query:", emailErr.message);
       }
     }
 
     // Award loyalty points for purchase
-    if (order.user_id && order.total_amount > 0) {
+    if (justApproved && order.user_id && order.total_amount > 0) {
       try {
         const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
         const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
@@ -6037,8 +6307,11 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
 
     return res.json({ data: order });
   } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (_) { }
     console.error("PUT /admin/orders/:id/verify error:", err);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 

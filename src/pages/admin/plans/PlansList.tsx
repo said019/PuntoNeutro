@@ -46,6 +46,9 @@ const planSchema = z.object({
   classCategory: z.enum(["jumping", "pilates", "mixto", "all"]).default("all"),
   features: z.string().optional(),
   isActive: z.boolean().default(true),
+  isNonTransferable: z.boolean().default(false),
+  isNonRepeatable: z.boolean().default(false),
+  repeatKey: z.string().optional(),
   sortOrder: z.coerce.number().default(0),
 });
 
@@ -58,12 +61,13 @@ interface Plan extends PlanFormData {
 const EMPTY: PlanFormData = {
   name: "", description: "", price: 0, currency: "MXN",
   durationDays: 30, classLimit: null, classCategory: "all",
-  features: "", isActive: true, sortOrder: 0,
+  features: "", isActive: true, isNonTransferable: false, isNonRepeatable: false, repeatKey: "", sortOrder: 0,
 };
 
 function serializePlan(d: PlanFormData) {
   return {
     ...d,
+    repeatKey: d.isNonRepeatable ? (d.repeatKey?.trim() || null) : null,
     features: d.features
       ? d.features.split(",").map((s) => s.trim()).filter(Boolean)
       : [],
@@ -77,6 +81,9 @@ function normalizePlan(p: Plan): PlanFormData {
     features: Array.isArray(p.features)
       ? (p.features as unknown as string[]).join(", ")
       : (p.features as unknown as string) ?? "",
+    isNonTransferable: Boolean((p as any).isNonTransferable ?? (p as any).is_non_transferable),
+    isNonRepeatable: Boolean((p as any).isNonRepeatable ?? (p as any).is_non_repeatable),
+    repeatKey: String((p as any).repeatKey ?? (p as any).repeat_key ?? ""),
   };
 }
 
@@ -143,6 +150,7 @@ const PlansList = () => {
                   <TableHead>Duración</TableHead>
                   <TableHead>Límite clases</TableHead>
                   <TableHead>Categoría</TableHead>
+                  <TableHead>Reglas</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead />
                 </TableRow>
@@ -150,7 +158,7 @@ const PlansList = () => {
               <TableBody>
                 {isLoading
                   ? Array(4).fill(0).map((_, i) => (
-                    <TableRow key={i}>{Array(7).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                    <TableRow key={i}>{Array(8).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                   ))
                   : plans.map((p) => (
                     <TableRow key={p.id}>
@@ -163,6 +171,20 @@ const PlansList = () => {
                           const cat = CATEGORIES.find((c) => c.value === (p.classCategory ?? "all")) ?? CATEGORIES[3];
                           return <Badge className={`border ${cat.color}`}>{cat.label}</Badge>;
                         })()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Boolean((p as any).isNonTransferable ?? (p as any).is_non_transferable) && (
+                            <Badge variant="outline">No transferible</Badge>
+                          )}
+                          {Boolean((p as any).isNonRepeatable ?? (p as any).is_non_repeatable) && (
+                            <Badge variant="outline">No repetible</Badge>
+                          )}
+                          {!Boolean((p as any).isNonTransferable ?? (p as any).is_non_transferable) &&
+                            !Boolean((p as any).isNonRepeatable ?? (p as any).is_non_repeatable) && (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={p.isActive ? "default" : "secondary"}>
@@ -237,6 +259,28 @@ const PlansList = () => {
                 <Label>Beneficios (separados por coma)</Label>
                 <Input {...form.register("features")} />
               </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                  <Switch
+                    checked={form.watch("isNonTransferable")}
+                    onCheckedChange={(v) => form.setValue("isNonTransferable", v)}
+                  />
+                  <Label>No transferible</Label>
+                </div>
+                <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                  <Switch
+                    checked={form.watch("isNonRepeatable")}
+                    onCheckedChange={(v) => form.setValue("isNonRepeatable", v)}
+                  />
+                  <Label>No repetible</Label>
+                </div>
+              </div>
+              {form.watch("isNonRepeatable") && (
+                <div className="space-y-1">
+                  <Label>Clave de repetición (grupo)</Label>
+                  <Input placeholder="ej. trial_single_session" {...form.register("repeatKey")} />
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <Switch
                   checked={form.watch("isActive")}

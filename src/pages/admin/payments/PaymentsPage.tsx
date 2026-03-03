@@ -34,6 +34,7 @@ function groupPlans(plans: any[]) {
     if (cat === "jumping") groups.jumping.push(p);
     else if (cat === "pilates") groups.pilates.push(p);
     else if (cat === "mixto") groups.mixto.push(p);
+    else if (cat === "all") groups.otro.push(p);
     else if (p.name?.toLowerCase().includes("jumping") || p.name?.toLowerCase().includes("jump")) groups.jumping.push(p);
     else if (p.name?.toLowerCase().includes("pilates")) groups.pilates.push(p);
     else if (p.name?.toLowerCase().includes("mixto")) groups.mixto.push(p);
@@ -119,7 +120,7 @@ const CashAssignment = () => {
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al asignar", variant: "destructive" }),
   });
 
-  const plans = Array.isArray(plansData?.data) ? plansData.data : [];
+  const plans = (Array.isArray(plansData?.data) ? plansData.data : []).filter((p) => (p as any).isActive !== false && (p as any).is_active !== false);
   const planGroups = groupPlans(plans);
 
   return (

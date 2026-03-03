@@ -14,44 +14,68 @@ import {
 type Step = "select" | "method" | "bank" | "cash" | "upload" | "done";
 type PaymentMethod = "transfer" | "cash";
 
+function flag(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") return ["true", "1", "yes", "si", "sí", "t"].includes(value.toLowerCase());
+  return false;
+}
+
 // ── Plan card ─────────────────────────────────────────────────────────────────
 const PlanCard = ({
   plan, selected, onSelect,
-}: { plan: any; selected: boolean; onSelect: () => void }) => (
-  <button
-    type="button"
-    onClick={onSelect}
-    className={cn(
-      "relative w-full text-left rounded-2xl border p-4 transition-all duration-200",
-      selected
-        ? "border-[#E15CB8]/60 bg-gradient-to-br from-[#E15CB8]/10 to-[#CA71E1]/5 shadow-[0_0_20px_rgba(225,92,184,0.15)]"
-        : "border-white/[0.08] bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
-    )}
-  >
-    {selected && (
-      <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center">
-        <Check size={11} className="text-white" />
-      </span>
-    )}
-    <p className="text-sm font-semibold text-white/85 pr-6 leading-snug">{plan.name}</p>
-    <div className="flex items-baseline gap-1 mt-2">
-      <span className="text-2xl font-bold text-white">${plan.price.toLocaleString("es-MX")}</span>
-      <span className="text-xs text-white/35">{plan.currency ?? "MXN"}</span>
-    </div>
-    <div className="flex flex-wrap gap-2 mt-2">
-      {plan.duration_days > 0 && (
-        <span className="text-[10px] text-[#CA71E1]/70 bg-[#CA71E1]/8 border border-[#CA71E1]/15 rounded-full px-2 py-0.5">
-          {plan.duration_days} días
+}: { plan: any; selected: boolean; onSelect: () => void }) => {
+  const durationDays = Number(plan.durationDays ?? plan.duration_days ?? 0);
+  const classLimit = plan.classLimit ?? plan.class_limit ?? null;
+  const nonTransferable = flag(plan.isNonTransferable ?? plan.is_non_transferable);
+  const nonRepeatable = flag(plan.isNonRepeatable ?? plan.is_non_repeatable);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "relative w-full text-left rounded-2xl border p-4 transition-all duration-200",
+        selected
+          ? "border-[#E15CB8]/60 bg-gradient-to-br from-[#E15CB8]/10 to-[#CA71E1]/5 shadow-[0_0_20px_rgba(225,92,184,0.15)]"
+          : "border-white/[0.08] bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
+      )}
+    >
+      {selected && (
+        <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center">
+          <Check size={11} className="text-white" />
         </span>
       )}
-      {plan.class_limit > 0 && (
-        <span className="text-[10px] text-[#E7EB6E]/70 bg-[#E7EB6E]/8 border border-[#E7EB6E]/15 rounded-full px-2 py-0.5">
-          {plan.class_limit} clases
-        </span>
-      )}
-    </div>
-  </button>
-);
+      <p className="text-sm font-semibold text-white/85 pr-6 leading-snug">{plan.name}</p>
+      <div className="flex items-baseline gap-1 mt-2">
+        <span className="text-2xl font-bold text-white">${Number(plan.price ?? 0).toLocaleString("es-MX")}</span>
+        <span className="text-xs text-white/35">{plan.currency ?? "MXN"}</span>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-2">
+        {durationDays > 0 && (
+          <span className="text-[10px] text-[#CA71E1]/70 bg-[#CA71E1]/8 border border-[#CA71E1]/15 rounded-full px-2 py-0.5">
+            {durationDays} días
+          </span>
+        )}
+        {Number(classLimit) > 0 && (
+          <span className="text-[10px] text-[#E7EB6E]/70 bg-[#E7EB6E]/8 border border-[#E7EB6E]/15 rounded-full px-2 py-0.5">
+            {classLimit} clases
+          </span>
+        )}
+        {nonTransferable && (
+          <span className="text-[10px] text-amber-300/80 bg-amber-300/10 border border-amber-300/20 rounded-full px-2 py-0.5">
+            No transferible
+          </span>
+        )}
+        {nonRepeatable && (
+          <span className="text-[10px] text-rose-300/80 bg-rose-300/10 border border-rose-300/20 rounded-full px-2 py-0.5">
+            No repetible
+          </span>
+        )}
+      </div>
+    </button>
+  );
+};
 
 // ── Step pill bar ──────────────────────────────────────────────────────────────
 const STEPS: { id: Step; label: string }[] = [
@@ -114,21 +138,30 @@ const Checkout = () => {
     queryKey: ["plans"],
     queryFn: async () => (await api.get("/plans")).data,
   });
-  const plans: any[] = Array.isArray(plansData?.data) ? plansData.data : Array.isArray(plansData) ? plansData : [];
+  const rawPlans: any[] = Array.isArray(plansData?.data) ? plansData.data : Array.isArray(plansData) ? plansData : [];
+  const plans = rawPlans.filter((p) => (p.isActive ?? p.is_active) !== false);
 
   // Group plans by category
   const grouped = plans.reduce((acc: Record<string, any[]>, p) => {
-    const cat = p.category || p.name?.split(" ")[0] || "Otro";
+    const cat = String(p.classCategory ?? p.class_category ?? "all").toLowerCase();
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(p);
     return acc;
   }, {});
 
-  const categoryOrder = ["Jumping", "Pilates", "Mixto", "Base", "Otro"];
+  const categoryOrder = ["jumping", "pilates", "mixto", "all", "otro"];
   const sortedCategories = [
     ...categoryOrder.filter((c) => grouped[c]),
     ...Object.keys(grouped).filter((c) => !categoryOrder.includes(c)),
   ];
+
+  const categoryLabel = (cat: string) => {
+    if (cat === "jumping") return "Jumping";
+    if (cat === "pilates") return "Pilates";
+    if (cat === "mixto") return "Mixto";
+    if (cat === "all") return "General";
+    return "Otro";
+  };
 
   const validateCodeMutation = useMutation({
     mutationFn: () => api.post("/discount-codes/validate", { code: discountCode, planId: selectedPlan?.id }),
@@ -191,7 +224,7 @@ const Checkout = () => {
                   {sortedCategories.map((cat) => (
                     <div key={cat}>
                       <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#CA71E1]/60">
-                        {cat}
+                        {categoryLabel(cat)}
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {grouped[cat].map((plan) => (
