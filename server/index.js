@@ -494,45 +494,10 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS class_id UUID`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT false`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
-    // Legacy schemas may require overall_rating instead of rating
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS overall_rating SMALLINT`).catch(() => {});
-    await pool.query(`UPDATE reviews SET rating = COALESCE(rating, overall_rating, 5) WHERE rating IS NULL`).catch(() => {});
-    await pool.query(`UPDATE reviews SET overall_rating = COALESCE(overall_rating, rating, 5) WHERE overall_rating IS NULL`).catch(() => {});
     await pool.query(`UPDATE reviews SET rating = 5 WHERE rating IS NULL`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET DEFAULT 5`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ALTER COLUMN overall_rating SET DEFAULT 5`).catch(() => {});
-    await pool.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1
-          FROM pg_constraint
-          WHERE conname = 'reviews_rating_check'
-            AND conrelid = 'reviews'::regclass
-        ) THEN
-          ALTER TABLE reviews ADD CONSTRAINT reviews_rating_check CHECK (rating BETWEEN 1 AND 5);
-        END IF;
-      END $$;
-    `).catch(() => {});
-    await pool.query(`
-      DO $$
-      BEGIN
-        IF EXISTS (
-          SELECT 1
-          FROM information_schema.columns
-          WHERE table_schema='public' AND table_name='reviews' AND column_name='overall_rating'
-        ) AND NOT EXISTS (
-          SELECT 1
-          FROM pg_constraint
-          WHERE conname = 'reviews_overall_rating_check'
-            AND conrelid = 'reviews'::regclass
-        ) THEN
-          ALTER TABLE reviews ADD CONSTRAINT reviews_overall_rating_check CHECK (overall_rating BETWEEN 1 AND 5);
-        END IF;
-      END $$;
-    `).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD CONSTRAINT reviews_rating_check CHECK (rating BETWEEN 1 AND 5)`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET NOT NULL`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ALTER COLUMN overall_rating SET NOT NULL`).catch(() => {});
     // Add booking_id, instructor_id, tag_ids columns to reviews if missing
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS booking_id UUID`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS instructor_id UUID`).catch(() => {});
@@ -1486,9 +1451,6 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       console.error("[Email] booking confirmed query error:", emailErr.message);
     }
 
-    queueWalletPassSync(req.userId, isWaitlist ? "booking_waitlist" : "booking_confirmed")
-      .catch((e) => console.error("[Wallet Sync] booking create:", e.message));
-
     const msg = isWaitlist ? "Añadido a lista de espera" : "Reserva confirmada";
     return res.status(201).json({ message: msg, booking: result.rows[0] });
   } catch (err) {
@@ -1592,8 +1554,6 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
           } catch (emailErr) {
             console.error("[Email] cancelled late query:", emailErr.message);
           }
-          queueWalletPassSync(req.userId, "booking_cancelled_late")
-            .catch((e) => console.error("[Wallet Sync] booking cancel late:", e.message));
           return res.json({
             message: "Reserva cancelada. Por ser con menos de 2 horas de anticipación, la clase NO se devuelve a tu paquete.",
             creditRestored: false,
@@ -1633,9 +1593,6 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       console.error("[Email] cancelled query:", emailErr.message);
     }
 
-    queueWalletPassSync(req.userId, "booking_cancelled")
-      .catch((e) => console.error("[Wallet Sync] booking cancel:", e.message));
-
     return res.json({
       message: isLate
         ? "Reserva cancelada. La clase no se devolvió al paquete (cancelación tardía)."
@@ -1653,10 +1610,6 @@ app.post("/api/reviews", authMiddleware, async (req, res) => {
   const { bookingId, rating, comment, tagIds } = req.body;
   if (!bookingId || !rating) return res.status(400).json({ message: "bookingId y rating requeridos" });
   try {
-    const safeRating = Math.max(1, Math.min(5, Number(rating)));
-    if (!Number.isFinite(safeRating)) {
-      return res.status(400).json({ message: "rating inválido" });
-    }
     // Verify booking belongs to user and was attended
     const bRes = await pool.query(
       `SELECT b.id, b.status, c.id AS class_id, c.instructor_id
@@ -1672,73 +1625,12 @@ app.post("/api/reviews", authMiddleware, async (req, res) => {
     const existing = await pool.query("SELECT id FROM reviews WHERE booking_id = $1", [bookingId]);
     if (existing.rows.length > 0) return res.status(409).json({ message: "Ya dejaste una reseña para esta clase" });
 
-    // Insert compatible with both schemas:
-    // - current schema uses rating
-    // - legacy production schema may require overall_rating (NOT NULL)
-    const colRes = await pool.query(
-      `SELECT a.attname AS column_name
-       FROM pg_attribute a
-       JOIN pg_class c ON a.attrelid = c.oid
-       JOIN pg_namespace n ON c.relnamespace = n.oid
-       WHERE n.nspname='public'
-         AND c.relname='reviews'
-         AND a.attnum > 0
-         AND NOT a.attisdropped
-         AND a.attname = ANY($1::text[])`,
-      [["rating", "overall_rating", "tag_ids"]]
+    // Insert the review
+    const rRes = await pool.query(
+      `INSERT INTO reviews (user_id, booking_id, class_id, instructor_id, rating, comment, tag_ids)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [req.userId, bookingId, booking.class_id, booking.instructor_id || null, rating, comment || null, tagIds || []]
     );
-    const hasRating = colRes.rows.some((r) => r.column_name === "rating");
-    const hasOverallRating = colRes.rows.some((r) => r.column_name === "overall_rating");
-    const hasTagIds = colRes.rows.some((r) => r.column_name === "tag_ids");
-
-    const insertCols = ["user_id", "booking_id", "class_id", "instructor_id"];
-    const insertVals = [req.userId, bookingId, booking.class_id, booking.instructor_id || null];
-    if (hasRating) {
-      insertCols.push("rating");
-      insertVals.push(safeRating);
-    }
-    if (hasOverallRating) {
-      insertCols.push("overall_rating");
-      insertVals.push(safeRating);
-    }
-    insertCols.push("comment");
-    insertVals.push(comment || null);
-    if (hasTagIds) {
-      insertCols.push("tag_ids");
-      insertVals.push(tagIds || []);
-    }
-
-    const placeholders = insertCols.map((_, i) => `$${i + 1}`).join(", ");
-    let rRes;
-    try {
-      rRes = await pool.query(
-        `INSERT INTO reviews (${insertCols.join(", ")})
-         VALUES (${placeholders}) RETURNING *`,
-        insertVals
-      );
-    } catch (insertErr) {
-      const missingOverallValue =
-        insertErr?.code === "23502" &&
-        insertErr?.column === "overall_rating" &&
-        !insertCols.includes("overall_rating");
-
-      if (!missingOverallValue) throw insertErr;
-
-      const retryCols = [...insertCols];
-      const retryVals = [...insertVals];
-      const commentIdx = retryCols.indexOf("comment");
-      const insertAt = commentIdx >= 0 ? commentIdx : retryCols.length;
-
-      retryCols.splice(insertAt, 0, "overall_rating");
-      retryVals.splice(insertAt, 0, safeRating);
-
-      const retryPlaceholders = retryCols.map((_, i) => `$${i + 1}`).join(", ");
-      rRes = await pool.query(
-        `INSERT INTO reviews (${retryCols.join(", ")})
-         VALUES (${retryPlaceholders}) RETURNING *`,
-        retryVals
-      );
-    }
     const review = rRes.rows[0];
 
     // Insert tag links
@@ -2212,90 +2104,16 @@ async function ensureGoogleWalletClass() {
   }
 }
 
-/** Build wallet snapshot from DB for a single user */
-async function getWalletSnapshotForUser(userId) {
-  const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1", [userId]);
-  if (userRes.rows.length === 0) return null;
-
-  const user = userRes.rows[0];
-  const userName = user.display_name || user.email;
-  const pointsRes = await pool.query(
-    "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
-    [userId]
-  );
-  const points = Number.parseInt(pointsRes.rows[0]?.total ?? "0", 10) || 0;
-
-  let membership = null;
-  try {
-    const memRes = await pool.query(
-      `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.end_date,
-              m.plan_name_override, m.class_limit_override,
-              p.name AS plan_name, p.class_limit AS plan_class_limit
-       FROM memberships m
-       LEFT JOIN plans p ON m.plan_id = p.id
-       WHERE m.user_id = $1
-         AND m.status = 'active'
-         AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-       ORDER BY m.end_date DESC
-       LIMIT 1`,
-      [userId]
-    );
-    if (memRes.rows.length > 0) {
-      const m = memRes.rows[0];
-      membership = {
-        plan_name: m.plan_name_override || m.plan_name || "Plan Activo",
-        class_limit: m.class_limit_override ?? m.plan_class_limit,
-        classes_remaining: m.classes_remaining,
-        start_date: m.start_date,
-        end_date: m.end_date,
-      };
-    }
-  } catch (memErr) {
-    console.error("Wallet snapshot membership query error:", memErr.message);
-  }
-
-  let nextBooking = null;
-  try {
-    const bookRes = await pool.query(
-      `SELECT c.date, c.start_time, ct.name AS class_name,
-              i.display_name AS instructor_name
-       FROM bookings b
-       JOIN classes c ON b.class_id = c.id
-       JOIN class_types ct ON c.class_type_id = ct.id
-       LEFT JOIN instructors i ON c.instructor_id = i.id
-       WHERE b.user_id = $1
-         AND b.status IN ('confirmed', 'waitlist')
-         AND c.date >= CURRENT_DATE
-       ORDER BY c.date ASC, c.start_time ASC
-       LIMIT 1`,
-      [userId]
-    );
-    if (bookRes.rows.length > 0) nextBooking = bookRes.rows[0];
-  } catch (bookErr) {
-    console.error("Wallet snapshot booking query error:", bookErr.message);
-  }
-
-  return {
-    userId,
-    userName,
-    points,
-    qrCode: Buffer.from(userId).toString("base64"),
-    membership,
-    nextBooking,
-  };
-}
-
-/**
- * Build Google Wallet object payload.
- * @param {Object} opts
- * @param {string} opts.userId
- * @param {string} opts.userName
- * @param {number} opts.points
- * @param {string} opts.qrCode
- * @param {Object|null} opts.membership
- * @param {Object|null} opts.nextBooking
+/** Build a Google Wallet Save URL (JWT) for a user
+ *  @param {Object} opts
+ *  @param {string} opts.userId
+ *  @param {string} opts.userName
+ *  @param {number} opts.points
+ *  @param {string} opts.qrCode
+ *  @param {Object|null} opts.membership  - { plan_name, class_limit, classes_remaining, end_date, start_date }
+ *  @param {Object|null} opts.nextBooking - { class_name, instructor_name, date, start_time }
  */
-function buildGoogleWalletObjectData({ userId, userName, points, qrCode, membership, nextBooking }) {
+function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking }) {
   const objectId = `${GW_ISSUER_ID}.ophelia_${userId.replace(/-/g, "")}`;
 
   // ── Determine pass type and details based on membership ──────────────────
@@ -2434,12 +2252,6 @@ function buildGoogleWalletObjectData({ userId, userName, points, qrCode, members
     },
   };
 
-  return { objectId, loyaltyObject };
-}
-
-/** Build a Google Wallet Save URL (JWT) for a user */
-function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking }) {
-  const { loyaltyObject } = buildGoogleWalletObjectData({ userId, userName, points, qrCode, membership, nextBooking });
   const payload = {
     iss: GW_SA_EMAIL,
     aud: "google",
@@ -2451,34 +2263,6 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   };
   const signedJwt = jwt.sign(payload, GW_SA_PRIVATE_KEY, { algorithm: "RS256" });
   return `https://pay.google.com/gp/v/save/${signedJwt}`;
-}
-
-/** Create or update a user's Google Wallet object so existing passes refresh */
-async function upsertGoogleWalletObject(snapshot) {
-  if (!isGoogleWalletConfigured()) return { skipped: "google_not_configured" };
-  if (!snapshot?.userId) return { skipped: "missing_user_id" };
-
-  const token = await getGoogleWalletAccessToken();
-  const { objectId, loyaltyObject } = buildGoogleWalletObjectData(snapshot);
-  const encodedObjectId = encodeURIComponent(objectId);
-  const objectUrl = `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${encodedObjectId}`;
-
-  try {
-    await axios.get(objectUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    await axios.put(objectUrl, loyaltyObject, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    });
-    return { updated: true, objectId };
-  } catch (getErr) {
-    if (getErr.response?.status !== 404) throw getErr;
-  }
-
-  await axios.post("https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject", loyaltyObject, {
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-  });
-  return { created: true, objectId };
 }
 
 // ─── Routes: /api/wallet/google ─────────────────────────────────────────────
@@ -2495,9 +2279,81 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
     } catch (classErr) {
       console.error("Google Wallet class ensure error (non-fatal):", classErr.response?.data || classErr.message);
     }
-    const snapshot = await getWalletSnapshotForUser(req.userId);
-    if (!snapshot) return res.status(404).json({ message: "Usuario no encontrado" });
-    const saveUrl = buildGoogleWalletSaveUrl(snapshot);
+
+    // Get user info
+    const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1", [req.userId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
+    const user = userRes.rows[0];
+    const userName = user.display_name || user.email;
+
+    // Get points
+    const pointsRes = await pool.query(
+      "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
+      [req.userId]
+    );
+    const points = parseInt(pointsRes.rows[0].total);
+
+    // Get active membership with plan info
+    let membership = null;
+    try {
+      const memRes = await pool.query(
+        `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.end_date,
+                m.plan_name_override, m.class_limit_override,
+                p.name AS plan_name, p.class_limit AS plan_class_limit, p.duration_days
+         FROM memberships m
+         LEFT JOIN plans p ON m.plan_id = p.id
+         WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
+         ORDER BY m.end_date DESC
+         LIMIT 1`,
+        [req.userId]
+      );
+      if (memRes.rows.length > 0) {
+        const m = memRes.rows[0];
+        membership = {
+          plan_name: m.plan_name_override || m.plan_name || "Plan Activo",
+          class_limit: m.class_limit_override ?? m.plan_class_limit,
+          classes_remaining: m.classes_remaining,
+          start_date: m.start_date,
+          end_date: m.end_date,
+        };
+      }
+    } catch (memErr) {
+      console.error("Wallet: membership query error:", memErr.message);
+    }
+
+    // Get next confirmed booking
+    let nextBooking = null;
+    try {
+      const bookRes = await pool.query(
+        `SELECT c.date, c.start_time, ct.name AS class_name,
+                i.display_name AS instructor_name
+         FROM bookings b
+         JOIN classes c ON b.class_id = c.id
+         JOIN class_types ct ON c.class_type_id = ct.id
+         LEFT JOIN instructors i ON c.instructor_id = i.id
+         WHERE b.user_id = $1
+           AND b.status IN ('confirmed', 'waitlist')
+           AND c.date >= CURRENT_DATE
+         ORDER BY c.date ASC, c.start_time ASC
+         LIMIT 1`,
+        [req.userId]
+      );
+      if (bookRes.rows.length > 0) {
+        nextBooking = bookRes.rows[0];
+      }
+    } catch (bookErr) {
+      console.error("Wallet: booking query error:", bookErr.message);
+    }
+
+    const qrCode = Buffer.from(req.userId).toString("base64");
+    const saveUrl = buildGoogleWalletSaveUrl({
+      userId: req.userId,
+      userName,
+      points,
+      qrCode,
+      membership,
+      nextBooking,
+    });
     return res.json({ data: { saveUrl } });
   } catch (err) {
     console.error("Google Wallet save-url error:", err.response?.data || err.message, err.stack?.split("\n").slice(0,3).join("\n"));
@@ -2557,7 +2413,6 @@ const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || "";
 const APPLE_PASS_TYPE_ID = process.env.APPLE_PASS_TYPE_ID || "";
 const APPLE_KEY_ID = process.env.APPLE_KEY_ID || "";
 const APPLE_APNS_KEY_BASE64 = process.env.APPLE_APNS_KEY_BASE64 || "";
-const APPLE_APNS_HOST = process.env.APPLE_APNS_HOST || "https://api.push.apple.com";
 const APPLE_AUTH_TOKEN = process.env.APPLE_AUTH_TOKEN || crypto.randomBytes(32).toString("hex");
 const APPLE_CERT_PASSWORD = process.env.APPLE_CERT_PASSWORD || "";
 
@@ -2694,16 +2549,8 @@ const APPLE_WWDR_CERT_PEM =
   || loadFirstCertFile(CERT_FILE_CANDIDATES.wwdr)
   || decodeBase64ToPem(process.env.APPLE_WWDR_CERT_BASE64 || process.env.APPLE_PASS_WWDR_BASE64 || "", "CERTIFICATE");
 
-const APPLE_APNS_KEY_PEM =
-  loadPemFromEnvValue(process.env.APPLE_APNS_KEY_PEM || process.env.APPLE_APNS_KEY || APPLE_APNS_KEY_BASE64, "PRIVATE KEY")
-  || decodeBase64ToPem(APPLE_APNS_KEY_BASE64 || "", "PRIVATE KEY");
-
 function isAppleWalletConfigured() {
   return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_SIGNER_CERT_PEM && APPLE_SIGNER_KEY_PEM && APPLE_WWDR_CERT_PEM);
-}
-
-function isAppleWalletPushConfigured() {
-  return !!(APPLE_TEAM_ID && APPLE_PASS_TYPE_ID && APPLE_KEY_ID && APPLE_APNS_KEY_PEM);
 }
 
 /** Find image assets — check both public/ and dist/ directories */
@@ -2730,9 +2577,7 @@ console.log("[Apple Wallet]",
   "| PASS_TYPE:", APPLE_PASS_TYPE_ID ? "✅" : "❌",
   "| CERT:", APPLE_SIGNER_CERT_PEM ? `✅ (${APPLE_SIGNER_CERT_PEM.length} chars)` : "❌",
   "| KEY:", APPLE_SIGNER_KEY_PEM ? `✅ (${APPLE_SIGNER_KEY_PEM.length} chars)` : "❌",
-  "| WWDR:", APPLE_WWDR_CERT_PEM ? `✅ (${APPLE_WWDR_CERT_PEM.length} chars)` : "❌",
-  "| APNS_KEY_ID:", APPLE_KEY_ID ? "✅" : "❌",
-  "| APNS_KEY:", APPLE_APNS_KEY_PEM ? `✅ (${APPLE_APNS_KEY_PEM.length} chars)` : "❌");
+  "| WWDR:", APPLE_WWDR_CERT_PEM ? `✅ (${APPLE_WWDR_CERT_PEM.length} chars)` : "❌");
 console.log("[Apple Wallet] File paths checked:",
   "cert:", CERT_FILE_PATHS.cert, safeExists(CERT_FILE_PATHS.cert) ? "✅" : "❌",
   "| key:", CERT_FILE_PATHS.key, safeExists(CERT_FILE_PATHS.key) ? "✅" : "❌",
@@ -2757,151 +2602,9 @@ if (isAppleWalletConfigured()) {
   }
 }
 
-if (isAppleWalletPushConfigured()) {
-  try {
-    crypto.createPrivateKey(APPLE_APNS_KEY_PEM);
-    console.log("[Apple Wallet] ✅ APNS key validated successfully");
-  } catch (apnsErr) {
-    console.error("[Apple Wallet] ❌ APNS key validation failed:", apnsErr.message);
-  }
-}
-
 /** Check if we can at least generate a web pass (always true — no certs needed) */
 function isAppleWebPassAvailable() {
   return true;
-}
-
-const WALLET_SYNC_DELAY_MS = Number(process.env.WALLET_SYNC_DELAY_MS || 500);
-const APPLE_APNS_PROVIDER_TOKEN_TTL_SEC = 50 * 60;
-let walletPassSyncQueue = Promise.resolve();
-let appleApnsProviderTokenCache = { token: "", expiresAt: 0 };
-const walletSyncSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function getAppleSerialForUser(userId) {
-  return `ophelia_${String(userId || "").replace(/-/g, "")}`;
-}
-
-function getAppleApnsProviderToken() {
-  if (!isAppleWalletPushConfigured()) return "";
-  const now = Math.floor(Date.now() / 1000);
-  if (appleApnsProviderTokenCache.token && now < (appleApnsProviderTokenCache.expiresAt - 60)) {
-    return appleApnsProviderTokenCache.token;
-  }
-  try {
-    const token = jwt.sign(
-      { iss: APPLE_TEAM_ID, iat: now },
-      APPLE_APNS_KEY_PEM,
-      { algorithm: "ES256", header: { kid: APPLE_KEY_ID } }
-    );
-    appleApnsProviderTokenCache = {
-      token,
-      expiresAt: now + APPLE_APNS_PROVIDER_TOKEN_TTL_SEC,
-    };
-    return token;
-  } catch (err) {
-    console.error("[Wallet Apple] APNS provider token sign error:", err.message);
-    return "";
-  }
-}
-
-async function pushAppleWalletUpdateForUser(userId, reason = "event") {
-  if (!isAppleWalletPushConfigured()) return { skipped: "apple_push_not_configured" };
-  const serial = getAppleSerialForUser(userId);
-  const providerToken = getAppleApnsProviderToken();
-  if (!providerToken) return { skipped: "apple_push_token_unavailable" };
-
-  const r = await pool.query(
-    "SELECT device_id, push_token FROM apple_wallet_devices WHERE pass_type_id = $1 AND serial_number = $2",
-    [APPLE_PASS_TYPE_ID, serial]
-  );
-  if (!r.rows.length) return { skipped: "no_registered_apple_devices" };
-
-  let sent = 0;
-  let failed = 0;
-
-  for (const row of r.rows) {
-    const pushToken = String(row.push_token || "").trim();
-    if (!pushToken) continue;
-    try {
-      const response = await axios.post(
-        `${APPLE_APNS_HOST}/3/device/${encodeURIComponent(pushToken)}`,
-        {},
-        {
-          headers: {
-            authorization: `bearer ${providerToken}`,
-            "apns-topic": APPLE_PASS_TYPE_ID,
-            "apns-push-type": "background",
-            "apns-priority": "5",
-          },
-          timeout: 12000,
-          validateStatus: () => true,
-        }
-      );
-
-      if (response.status === 200) {
-        sent += 1;
-        continue;
-      }
-
-      failed += 1;
-      const reasonCode = response.data?.reason || `HTTP_${response.status}`;
-      console.error(`[Wallet Apple] push failed (${reason}) user=${userId} device=${row.device_id}:`, reasonCode);
-
-      if (response.status === 410 || reasonCode === "BadDeviceToken" || reasonCode === "Unregistered") {
-        await pool.query(
-          "DELETE FROM apple_wallet_devices WHERE device_id = $1 AND pass_type_id = $2 AND serial_number = $3",
-          [row.device_id, APPLE_PASS_TYPE_ID, serial]
-        ).catch(() => { });
-      }
-    } catch (err) {
-      failed += 1;
-      console.error(`[Wallet Apple] push exception (${reason}) user=${userId}:`, err.response?.data || err.message);
-    }
-  }
-
-  return { sent, failed };
-}
-
-async function syncWalletPassesForUser(userId, reason = "event") {
-  if (!userId) return { skipped: "missing_user_id" };
-  const snapshot = await getWalletSnapshotForUser(userId);
-  if (!snapshot) return { skipped: "user_not_found" };
-
-  const results = {};
-  const tasks = [];
-
-  if (isGoogleWalletConfigured()) {
-    tasks.push((async () => {
-      await ensureGoogleWalletClass();
-      results.google = await upsertGoogleWalletObject(snapshot);
-    })());
-  } else {
-    results.google = { skipped: "google_not_configured" };
-  }
-
-  if (isAppleWalletPushConfigured()) {
-    tasks.push((async () => {
-      results.apple = await pushAppleWalletUpdateForUser(userId, reason);
-    })());
-  } else {
-    results.apple = { skipped: "apple_push_not_configured" };
-  }
-
-  await Promise.allSettled(tasks);
-  return results;
-}
-
-function queueWalletPassSync(userId, reason = "event") {
-  const run = walletPassSyncQueue.then(async () => {
-    try {
-      return await syncWalletPassesForUser(userId, reason);
-    } finally {
-      const jitter = Math.floor(Math.random() * 200);
-      await walletSyncSleep(Math.max(250, WALLET_SYNC_DELAY_MS + jitter));
-    }
-  });
-  walletPassSyncQueue = run.catch(() => { });
-  return run;
 }
 
 /**
@@ -2926,17 +2629,6 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const secondaryFields = [];
   const auxiliaryFields = [];
   const backFields = [];
-  const formatTimeNoSeconds = (raw) => {
-    if (!raw) return "";
-    const text = String(raw);
-    const direct = text.match(/(\d{2}:\d{2})(?::\d{2})?/);
-    if (direct?.[1]) return direct[1];
-    const parsed = new Date(text);
-    if (Number.isFinite(parsed.getTime())) {
-      return parsed.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
-    }
-    return text;
-  };
 
   if (hasMembership) {
     secondaryFields.push({
@@ -2971,13 +2663,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   if (nextBooking) {
     const bookingDate = new Date(nextBooking.date);
     const dateStr = bookingDate.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
-    const timeStr = formatTimeNoSeconds(nextBooking.start_time);
-    auxiliaryFields.push({
-      key: "next_class_time",
-      label: "PRÓXIMA CLASE",
-      value: `${dateStr} ${timeStr}`.trim(),
-      changeMessage: "%@",
-    });
+    const timeStr = nextBooking.start_time ? String(nextBooking.start_time).substring(0, 5) : "";
     backFields.push({
       key: "next_class",
       label: "PRÓXIMA CLASE",
@@ -3009,7 +2695,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
         { key: "points", label: "PUNTOS", value: points, textAlignment: "PKTextAlignmentRight", changeMessage: "Ahora tienes %@ puntos" },
       ],
       primaryFields: [
-        { key: "member", label: "NOMBRE", value: userName },
+        { key: "member", label: passHeader.toUpperCase(), value: userName },
       ],
       secondaryFields,
       auxiliaryFields,
@@ -3300,12 +2986,8 @@ app.get("/api/wallet/apple/status", async (_req, res) => {
   return res.json({
     configured: true, // Always true — we have web pass fallback even without Apple certs
     nativePkpass: isAppleWalletConfigured(),
-    pushUpdates: isAppleWalletPushConfigured(),
     teamId: APPLE_TEAM_ID ? "✅ set" : "❌ (web pass mode)",
     passTypeId: APPLE_PASS_TYPE_ID || "N/A (web pass mode)",
-    apnsKeyId: APPLE_KEY_ID ? "✅ set" : "❌ (push disabled)",
-    apnsKey: APPLE_APNS_KEY_PEM ? `✅ loaded (${APPLE_APNS_KEY_PEM.length} chars)` : "❌ (push disabled)",
-    apnsHost: APPLE_APNS_HOST,
     signerCert: APPLE_SIGNER_CERT_PEM ? `✅ loaded (${APPLE_SIGNER_CERT_PEM.length} chars)` : "❌ (web pass mode)",
     signerKey: APPLE_SIGNER_KEY_PEM ? `✅ loaded (${APPLE_SIGNER_KEY_PEM.length} chars)` : "❌ (web pass mode)",
     wwdrCert: APPLE_WWDR_CERT_PEM ? `✅ loaded (${APPLE_WWDR_CERT_PEM.length} chars)` : "❌ (web pass mode)",
@@ -3331,7 +3013,6 @@ app.get("/api/wallet/apple/debug", authMiddleware, async (req, res) => {
     envVars: {
       APPLE_TEAM_ID: APPLE_TEAM_ID ? `✅ "${APPLE_TEAM_ID}"` : "❌ not set",
       APPLE_PASS_TYPE_ID: APPLE_PASS_TYPE_ID ? `✅ "${APPLE_PASS_TYPE_ID}"` : "❌ not set",
-      APPLE_KEY_ID: APPLE_KEY_ID ? `✅ "${APPLE_KEY_ID}"` : "❌ not set",
       APPLE_CERT_PASSWORD: APPLE_CERT_PASSWORD ? "✅ set" : "⬜ not set (OK if key has no password)",
     },
     certFiles: {
@@ -3344,7 +3025,6 @@ app.get("/api/wallet/apple/debug", authMiddleware, async (req, res) => {
       signerCert: APPLE_SIGNER_CERT_PEM ? `✅ loaded (${APPLE_SIGNER_CERT_PEM.length} chars), starts: ${APPLE_SIGNER_CERT_PEM.substring(0, 40)}...` : "❌ not loaded",
       signerKey: APPLE_SIGNER_KEY_PEM ? `✅ loaded (${APPLE_SIGNER_KEY_PEM.length} chars), starts: ${APPLE_SIGNER_KEY_PEM.substring(0, 40)}...` : "❌ not loaded",
       wwdr: APPLE_WWDR_CERT_PEM ? `✅ loaded (${APPLE_WWDR_CERT_PEM.length} chars), starts: ${APPLE_WWDR_CERT_PEM.substring(0, 40)}...` : "❌ not loaded",
-      apnsKey: APPLE_APNS_KEY_PEM ? `✅ loaded (${APPLE_APNS_KEY_PEM.length} chars), starts: ${APPLE_APNS_KEY_PEM.substring(0, 40)}...` : "❌ not loaded",
     },
     base64EnvFallback: {
       APPLE_SIGNER_CERT_BASE64: process.env.APPLE_SIGNER_CERT_BASE64 ? `✅ (${process.env.APPLE_SIGNER_CERT_BASE64.length} chars)` : "⬜ not set",
@@ -5693,9 +5373,6 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
       } catch (e) { /* loyalty error shouldn't fail membership creation */ }
     }
 
-    queueWalletPassSync(userId, "membership_created_admin")
-      .catch((e) => console.error("[Wallet Sync] membership create:", e.message));
-
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
     console.error("POST /memberships error:", err);
@@ -5733,9 +5410,6 @@ app.put("/api/memberships/:id/activate", adminMiddleware, async (req, res) => {
       console.error("[Email] activate query:", emailErr.message);
     }
 
-    queueWalletPassSync(mem.user_id, "membership_activated")
-      .catch((e) => console.error("[Wallet Sync] membership activate:", e.message));
-
     return res.json({ data: mem });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
@@ -5750,8 +5424,6 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
       [req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
-    queueWalletPassSync(r.rows[0].user_id, "membership_cancelled")
-      .catch((e) => console.error("[Wallet Sync] membership cancel:", e.message));
     return res.json({ data: r.rows[0] });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
@@ -5773,8 +5445,6 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
       [status || null, classesRemaining ?? null, endDate || null, paymentMethod || null, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
-    queueWalletPassSync(r.rows[0].user_id, "membership_updated")
-      .catch((e) => console.error("[Wallet Sync] membership update:", e.message));
     return res.json({ data: r.rows[0] });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
@@ -5994,8 +5664,6 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     const message = isWaitlist
       ? "Clienta agregada a lista de espera"
       : "Reserva asignada correctamente";
-    queueWalletPassSync(userId, isWaitlist ? "booking_waitlist_admin_assign" : "booking_confirmed_admin_assign")
-      .catch((e) => console.error("[Wallet Sync] booking assign admin:", e.message));
     return res.status(201).json({ message, data: { booking: result.rows[0], isWaitlist } });
   } catch (err) {
     console.error("POST /admin/bookings/assign error:", err);
@@ -6026,8 +5694,6 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
         }
       } catch (e) { /* loyalty earn error shouldn't fail check-in */ }
     }
-    queueWalletPassSync(booking.user_id, "booking_checked_in")
-      .catch((e) => console.error("[Wallet Sync] booking check-in:", e.message));
     return res.json({ data: r.rows[0] });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
@@ -6247,9 +5913,6 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
         }
       } catch (e) { /* loyalty earn error shouldn't fail verify */ }
     }
-
-    queueWalletPassSync(order.user_id, "order_verified")
-      .catch((e) => console.error("[Wallet Sync] order verify:", e.message));
 
     return res.json({ data: order });
   } catch (err) {
@@ -7664,7 +7327,7 @@ app.get("*", (_req, res) => {
 async function runWeeklyReminderCron() {
   try {
     const res = await pool.query(`
-      SELECT u.id AS user_id, u.email, COALESCE(u.display_name, 'Alumna') AS name,
+      SELECT u.email, COALESCE(u.display_name, 'Alumna') AS name,
              m.classes_remaining, m.end_date
       FROM memberships m
       JOIN users u ON m.user_id = u.id
@@ -7679,8 +7342,6 @@ async function runWeeklyReminderCron() {
         classesLeft: row.classes_remaining,
         endDate: row.end_date,
       }).catch((e) => console.error("[Email] weekly cron:", e.message));
-      queueWalletPassSync(row.user_id, "weekly_reminder")
-        .catch((e) => console.error("[Wallet Sync] weekly reminder:", e.message));
       // Small delay to avoid rate limits
       await new Promise((r) => setTimeout(r, 200));
     }
@@ -7696,7 +7357,7 @@ async function runWeeklyReminderCron() {
 async function runRenewalReminderCron() {
   try {
     const res = await pool.query(`
-      SELECT u.id AS user_id, u.email, COALESCE(u.display_name, 'Alumna') AS name,
+      SELECT u.email, COALESCE(u.display_name, 'Alumna') AS name,
              m.classes_remaining, m.end_date,
              COALESCE(p.name, m.plan_name_override, 'Tu membresía') AS plan_name
       FROM memberships m
@@ -7720,8 +7381,6 @@ async function runRenewalReminderCron() {
         endDate: row.end_date,
         reason,
       }).catch((e) => console.error("[Email] renewal cron:", e.message));
-      queueWalletPassSync(row.user_id, "renewal_reminder")
-        .catch((e) => console.error("[Wallet Sync] renewal reminder:", e.message));
       await new Promise((r) => setTimeout(r, 200));
     }
   } catch (err) {
