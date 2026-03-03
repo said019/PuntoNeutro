@@ -69,7 +69,7 @@ const GenerateClasses = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-2xl mx-auto">
+        <div className="p-4 md:p-6 max-w-2xl mx-auto">
           <div className="mb-7">
             <h1 className="text-3xl font-bold text-white mb-1">Generar Clases</h1>
             <p className="text-sm text-white/35">Crea clases en bloque para un rango de fechas</p>
@@ -79,7 +79,7 @@ const GenerateClasses = () => {
             {/* Selects */}
             <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
               <p className="text-[11px] text-[#CA71E1]/70 font-semibold uppercase tracking-wider">Clase e instructor</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Tipo de clase</Label>
                   <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
@@ -112,7 +112,7 @@ const GenerateClasses = () => {
             {/* Date range */}
             <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
               <p className="text-[11px] text-[#E15CB8]/70 font-semibold uppercase tracking-wider">Rango de fechas</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Fecha inicio</Label>
                   <DatePicker
@@ -136,7 +136,7 @@ const GenerateClasses = () => {
             {/* Time range */}
             <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
               <p className="text-[11px] text-[#E7EB6E]/70 font-semibold uppercase tracking-wider">Horario</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Hora inicio</Label>
                   <TimePicker

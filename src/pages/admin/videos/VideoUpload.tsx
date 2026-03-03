@@ -239,8 +239,8 @@ const VideoUpload = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-3xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
+        <div className="p-4 md:p-6 max-w-3xl mx-auto">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
             <h1 className="text-2xl font-bold">{editId ? "Editar video" : "Nuevo video"}</h1>
             <Button variant="outline" onClick={() => navigate("/admin/videos")}>Cancelar</Button>
           </div>
@@ -327,15 +327,15 @@ const VideoUpload = () => {
               <h2 className="font-semibold">Metadatos</h2>
               <div className="space-y-1"><Label>Título *</Label><Input {...form.register("title")} /></div>
               <div className="space-y-1"><Label>Descripción</Label><Input {...form.register("description")} /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1"><Label>Subtítulo</Label><Input {...form.register("subtitle")} /></div>
                 <div className="space-y-1"><Label>Tagline</Label><Input {...form.register("tagline")} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1"><Label>Días de clase</Label><Input {...form.register("days")} placeholder="Lunes, Miércoles y Viernes" /></div>
                 <div className="space-y-1"><Label>Duración (segundos)</Label><Input type="number" {...form.register("duration_seconds")} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Nivel</Label>
                   <Select value={form.watch("level")} onValueChange={(v) => form.setValue("level", v as VideoFormData["level"])}>
@@ -355,7 +355,7 @@ const VideoUpload = () => {
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1"><Label>Color de marca</Label><div className="flex gap-2"><Input type="color" {...form.register("brand_color")} className="h-10 w-14 cursor-pointer p-1" /><Input {...form.register("brand_color")} className="font-mono" /></div></div>
                 <div className="space-y-1"><Label>Orden</Label><Input type="number" {...form.register("sort_order")} /></div>
               </div>
@@ -364,7 +364,7 @@ const VideoUpload = () => {
             {/* ── ACCESS ─────────────────────────────────────────────── */}
             <section className="space-y-4 rounded-xl border p-5">
               <h2 className="font-semibold">Acceso y publicación</h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Tipo de acceso</Label>
                   <Select value={form.watch("access_type")} onValueChange={(v) => form.setValue("access_type", v as VideoFormData["access_type"])}>
@@ -401,7 +401,7 @@ const VideoUpload = () => {
                     <Switch checked={form.watch("sales_unlocks_video")} onCheckedChange={(v) => form.setValue("sales_unlocks_video", v)} />
                     <Label>Bloquear video hasta que el pago sea aprobado</Label>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1"><Label>Precio (MXN)</Label><Input type="number" {...form.register("sales_price_mxn")} /></div>
                     <div className="space-y-1"><Label>Créditos de clase</Label><Input type="number" {...form.register("sales_class_credits")} /></div>
                   </div>

@@ -95,7 +95,7 @@ function RegisterDialog({ event, onClose, onDone }: RegisterDialogProps) {
         {!isFree && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">Método de pago</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {(["transfer", "cash"] as const).map((m) => (
                 <button
                   key={m}
@@ -179,7 +179,7 @@ function PaymentSection({ event, onDone }: { event: ClientEvent; onDone: () => v
       <p className="text-sm font-semibold text-foreground">Completa tu pago</p>
 
       {/* Method selector */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {(["transfer", "cash"] as const).map((m) => (
           <button
             key={m}

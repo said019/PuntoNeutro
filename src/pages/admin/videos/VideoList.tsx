@@ -256,7 +256,7 @@ const VideoList = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-6xl mx-auto space-y-10">
+        <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-10">
 
           {/* ── Tarjetas del inicio ── */}
           <section>
@@ -465,7 +465,7 @@ const VideoList = () => {
 
           {/* ── Videos ── */}
           <section>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
               <h2 className="text-lg font-bold">Videos</h2>
               <Button size="sm" onClick={() => navigate("/admin/videos/upload")}>
                 <Plus size={14} className="mr-1" />Nuevo video

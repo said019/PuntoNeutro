@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MembershipCard } from "@/components/MembershipCard";
 import { Calendar, ClipboardList, Play, Star } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
 import type { BookingClient } from "@/types/booking";
@@ -83,39 +84,15 @@ const Dashboard = () => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Membresía */}
-            <Card>
+            <Card className="sm:col-span-2">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Mi membresía</CardTitle>
               </CardHeader>
               <CardContent>
                 {loadingMembership ? (
-                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-40 w-full rounded-2xl" />
                 ) : membership ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{planName}</span>
-                      <Badge variant={membership.status === "active" ? "default" : "secondary"}>
-                        {membership.status === "active" ? "Activa" : membership.status}
-                      </Badge>
-                    </div>
-                    {daysRemaining !== null && (
-                      <p className="text-sm text-muted-foreground">{daysRemaining} días restantes</p>
-                    )}
-                    {/* Unlimited plan */}
-                    {classLimit === null && classesRemaining === null && (
-                      <p className="text-sm font-medium text-primary">♾ Clases ilimitadas</p>
-                    )}
-                    {/* Limited plan with remaining count */}
-                    {classesProgress !== null && classesRemaining !== null && (
-                      <>
-                        <Progress value={classesProgress} className="h-2" />
-                        <p className="text-xs text-muted-foreground">
-                          {classesRemaining} de {classLimit} clases restantes
-                        </p>
-                      </>
-                    )}
-                    {/* Removed "Ver membresía" button */}
-                  </div>
+                  <MembershipCard membership={membership} />
                 ) : (
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">No tienes membresía activa</p>
@@ -180,11 +157,11 @@ const Dashboard = () => {
           {/* Videos recientes */}
           {videos.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <h2 className="font-semibold">Videos recientes</h2>
                 <Link to="/app/videos" className="text-sm text-primary hover:underline">Ver todos</Link>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
                 {videos.map((v: any) => (
                   <Link key={v.id} to={`/app/videos/${v.id}`}>
                     <div className="rounded-xl overflow-hidden border group cursor-pointer">

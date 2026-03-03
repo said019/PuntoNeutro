@@ -56,7 +56,7 @@ const ProductsPage = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="relative max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-8" placeholder="Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -94,7 +94,7 @@ const ProductsPage = () => {
           <DialogHeader><DialogTitle>{editing ? "Editar producto" : "Nuevo producto"}</DialogTitle></DialogHeader>
           <form onSubmit={form.handleSubmit((d) => editing ? updateMutation.mutate({ ...d, id: editing.id }) : createMutation.mutate(d))} className="space-y-4">
             <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("name")} /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Precio</Label><Input type="number" {...form.register("price")} /></div>
               <div className="space-y-1"><Label>Stock</Label><Input type="number" {...form.register("stock")} /></div>
             </div>
@@ -166,7 +166,7 @@ const POSTerminal = () => {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-8" placeholder="Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {products.map((p) => (
             <div
               key={p.id}
@@ -229,7 +229,7 @@ const POSTerminal = () => {
 const POSPage = () => (
   <AuthGuard>
     <AdminLayout>
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Punto de Venta</h1>
         <Tabs defaultValue="pos">
           <TabsList>

@@ -254,3 +254,15 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   opacity: 0;
   cursor: pointer;
 }
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+}
+
+@media (max-width: 1023px) {
+  .admin-mobile-main {
+    overflow-x: hidden;
+  }
+}

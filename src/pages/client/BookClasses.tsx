@@ -143,7 +143,7 @@ const BookClasses = () => {
               <Button variant="outline" size="icon" onClick={() => setWeekStart((w) => subWeeks(w, 1))}>
                 <ChevronLeft size={16} />
               </Button>
-              <span className="text-sm font-medium min-w-[130px] text-center">
+              <span className="text-sm font-medium min-w-[96px] sm:min-w-[130px] text-center">
                 {format(weekStart, "d MMM", { locale: es })} – {format(weekEnd, "d MMM yyyy", { locale: es })}
               </span>
               <Button variant="outline" size="icon" onClick={() => setWeekStart((w) => addWeeks(w, 1))}>
@@ -177,7 +177,7 @@ const BookClasses = () => {
 
           {/* Week grid */}
           <div className="overflow-x-auto">
-            <div className="grid grid-cols-7 gap-1 min-w-[560px]">
+            <div className="grid grid-cols-7 gap-1 min-w-[520px] sm:min-w-[560px]">
               {days.map((day, i) => (
                 <div key={i} className="text-center">
                   <div className="text-xs font-medium text-muted-foreground py-1">{DAYS[i]}</div>

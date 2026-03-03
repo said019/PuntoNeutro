@@ -49,10 +49,10 @@ const ReportsPage = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-6xl mx-auto">
+        <div className="p-4 md:p-6 max-w-6xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">Reportes</h1>
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
             {metric("Miembros activos", o.activeMembers)}
             {metric("Ingresos del mes", o.monthlyRevenue ? `$${o.monthlyRevenue}` : undefined)}
             {metric("Reservas del mes", o.monthlyBookings)}

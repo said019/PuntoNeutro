@@ -490,14 +490,66 @@ async function ensureSchema() {
     // Ensure all review columns exist even if table was created by an older schema
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_id UUID`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS rating SMALLINT`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS overall_rating SMALLINT`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment TEXT`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS class_id UUID`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT false`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
-    await pool.query(`UPDATE reviews SET rating = 5 WHERE rating IS NULL`).catch(() => {});
+    await pool.query(`UPDATE reviews SET rating = COALESCE(rating, overall_rating, 5) WHERE rating IS NULL`).catch(() => {});
+    await pool.query(`UPDATE reviews SET overall_rating = COALESCE(overall_rating, rating, 5) WHERE overall_rating IS NULL`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET DEFAULT 5`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ADD CONSTRAINT reviews_rating_check CHECK (rating BETWEEN 1 AND 5)`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ALTER COLUMN overall_rating SET DEFAULT 5`).catch(() => {});
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'reviews_rating_check'
+            AND conrelid = 'reviews'::regclass
+        ) THEN
+          ALTER TABLE reviews ADD CONSTRAINT reviews_rating_check CHECK (rating BETWEEN 1 AND 5);
+        END IF;
+      END $$;
+    `).catch(() => {});
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema='public' AND table_name='reviews' AND column_name='overall_rating'
+        ) AND NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'reviews_overall_rating_check'
+            AND conrelid = 'reviews'::regclass
+        ) THEN
+          ALTER TABLE reviews ADD CONSTRAINT reviews_overall_rating_check CHECK (overall_rating BETWEEN 1 AND 5);
+        END IF;
+      END $$;
+    `).catch(() => {});
     await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET NOT NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ALTER COLUMN overall_rating SET NOT NULL`).catch(() => {});
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION reviews_sync_overall_rating()
+      RETURNS trigger
+      LANGUAGE plpgsql
+      AS $$
+      BEGIN
+        NEW.overall_rating := COALESCE(NEW.overall_rating, NEW.rating, 5);
+        NEW.rating := COALESCE(NEW.rating, NEW.overall_rating, 5);
+        RETURN NEW;
+      END;
+      $$;
+    `).catch(() => {});
+    await pool.query(`DROP TRIGGER IF EXISTS trg_reviews_sync_overall_rating ON reviews`).catch(() => {});
+    await pool.query(`
+      CREATE TRIGGER trg_reviews_sync_overall_rating
+      BEFORE INSERT OR UPDATE ON reviews
+      FOR EACH ROW
+      EXECUTE FUNCTION reviews_sync_overall_rating();
+    `).catch(() => {});
     // Add booking_id, instructor_id, tag_ids columns to reviews if missing
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS booking_id UUID`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS instructor_id UUID`).catch(() => {});
@@ -1610,6 +1662,10 @@ app.post("/api/reviews", authMiddleware, async (req, res) => {
   const { bookingId, rating, comment, tagIds } = req.body;
   if (!bookingId || !rating) return res.status(400).json({ message: "bookingId y rating requeridos" });
   try {
+    const safeRating = Math.max(1, Math.min(5, Number(rating)));
+    if (!Number.isFinite(safeRating)) {
+      return res.status(400).json({ message: "rating inválido" });
+    }
     // Verify booking belongs to user and was attended
     const bRes = await pool.query(
       `SELECT b.id, b.status, c.id AS class_id, c.instructor_id
@@ -1625,13 +1681,78 @@ app.post("/api/reviews", authMiddleware, async (req, res) => {
     const existing = await pool.query("SELECT id FROM reviews WHERE booking_id = $1", [bookingId]);
     if (existing.rows.length > 0) return res.status(409).json({ message: "Ya dejaste una reseña para esta clase" });
 
-    // Insert the review
-    const rRes = await pool.query(
-      `INSERT INTO reviews (user_id, booking_id, class_id, instructor_id, rating, comment, tag_ids)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [req.userId, bookingId, booking.class_id, booking.instructor_id || null, rating, comment || null, tagIds || []]
+    // Compatible insert for both schemas:
+    // - reviews.rating (legacy/current)
+    // - reviews.overall_rating (production variants)
+    const colRes = await pool.query(
+      `SELECT a.attname AS column_name
+       FROM pg_attribute a
+       JOIN pg_class c ON a.attrelid = c.oid
+       JOIN pg_namespace n ON c.relnamespace = n.oid
+       WHERE n.nspname='public'
+         AND c.relname='reviews'
+         AND a.attnum > 0
+         AND NOT a.attisdropped
+         AND a.attname = ANY($1::text[])`,
+      [["rating", "overall_rating", "tag_ids"]]
     );
-    const review = rRes.rows[0];
+    const hasRating = colRes.rows.some((r) => r.column_name === "rating");
+    const hasOverallRating = colRes.rows.some((r) => r.column_name === "overall_rating");
+    const hasTagIds = colRes.rows.some((r) => r.column_name === "tag_ids");
+
+    const insertCols = ["user_id", "booking_id", "class_id", "instructor_id"];
+    const insertVals = [req.userId, bookingId, booking.class_id, booking.instructor_id || null];
+
+    if (hasRating) {
+      insertCols.push("rating");
+      insertVals.push(safeRating);
+    }
+    if (hasOverallRating) {
+      insertCols.push("overall_rating");
+      insertVals.push(safeRating);
+    }
+
+    insertCols.push("comment");
+    insertVals.push(comment || null);
+
+    if (hasTagIds) {
+      insertCols.push("tag_ids");
+      insertVals.push(tagIds || []);
+    }
+
+    const placeholders = insertCols.map((_, i) => `$${i + 1}`).join(", ");
+
+    let review;
+    try {
+      const rRes = await pool.query(
+        `INSERT INTO reviews (${insertCols.join(", ")})
+         VALUES (${placeholders}) RETURNING *`,
+        insertVals
+      );
+      review = rRes.rows[0];
+    } catch (insertErr) {
+      // Safety retry for schemas where overall_rating exists but wasn't detected
+      const shouldRetry =
+        insertErr?.code === "23502" &&
+        insertErr?.column === "overall_rating" &&
+        !insertCols.includes("overall_rating");
+
+      if (!shouldRetry) throw insertErr;
+
+      const retryCols = [...insertCols];
+      const retryVals = [...insertVals];
+      const insertAt = hasRating ? retryCols.indexOf("rating") + 1 : 4;
+      retryCols.splice(insertAt, 0, "overall_rating");
+      retryVals.splice(insertAt, 0, safeRating);
+      const retryPlaceholders = retryCols.map((_, i) => `$${i + 1}`).join(", ");
+
+      const retryRes = await pool.query(
+        `INSERT INTO reviews (${retryCols.join(", ")})
+         VALUES (${retryPlaceholders}) RETURNING *`,
+        retryVals
+      );
+      review = retryRes.rows[0];
+    }
 
     // Insert tag links
     if (Array.isArray(tagIds) && tagIds.length > 0) {

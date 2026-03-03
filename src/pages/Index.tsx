@@ -214,14 +214,14 @@ const Index = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* ── NAV ── */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-6 lg:px-[60px] py-5 transition-all duration-400 ${
+        className={`fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-4 sm:px-6 lg:px-[60px] py-3 sm:py-4 transition-all duration-400 ${
           navScrolled
             ? "bg-background/92 backdrop-blur-[20px]"
             : "bg-gradient-to-b from-background/95 to-transparent"
         }`}
       >
         <a href="#" className="flex items-center">
-          <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-20 w-auto object-contain" />
+          <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-12 sm:h-14 lg:h-20 w-auto object-contain" />
         </a>
         <ul className="hidden lg:flex gap-8 list-none">
           {[
@@ -245,24 +245,26 @@ const Index = () => {
         {isAuthenticated && user ? (
           <button
             onClick={() => navigate(["admin","super_admin","instructor","reception"].includes(user.role) ? "/admin/dashboard" : "/app")}
-            className="flex items-center gap-2 bg-primary/15 border border-primary/40 text-primary px-5 py-2.5 rounded-full text-[0.82rem] font-medium tracking-wide hover:bg-primary/25 transition-all"
+            className="flex items-center gap-2 bg-primary/15 border border-primary/40 text-primary px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-[0.75rem] sm:text-[0.82rem] font-medium tracking-wide hover:bg-primary/25 transition-all max-w-[190px]"
           >
             <span className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-[0.75rem] font-bold uppercase">
               {user.displayName?.[0] ?? user.email?.[0] ?? "U"}
             </span>
-            {["admin","super_admin"].includes(user.role) ? "Admin" : user.displayName?.split(" ")[0] ?? "Mi cuenta"}
+            <span className="truncate">
+              {["admin","super_admin"].includes(user.role) ? "Admin" : user.displayName?.split(" ")[0] ?? "Mi cuenta"}
+            </span>
           </button>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => navigate("/auth/login")}
-              className="text-muted-foreground text-[0.82rem] font-normal tracking-widest uppercase hover:text-foreground transition-colors bg-transparent border-none cursor-pointer px-2"
+              className="hidden sm:block text-muted-foreground text-[0.82rem] font-normal tracking-widest uppercase hover:text-foreground transition-colors bg-transparent border-none cursor-pointer px-2"
             >
               Iniciar sesión
             </button>
             <button
               onClick={() => navigate("/auth/register")}
-              className="bg-primary text-primary-foreground px-7 py-3 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:scale-[1.04] hover:shadow-[0_0_30px_hsl(var(--pink-glow)/0.35)] transition-all"
+              className="bg-primary text-primary-foreground px-4 sm:px-7 py-2.5 sm:py-3 rounded-full text-[0.75rem] sm:text-[0.82rem] font-medium tracking-wider uppercase hover:scale-[1.04] hover:shadow-[0_0_30px_hsl(var(--pink-glow)/0.35)] transition-all"
             >
               Unirse
             </button>
@@ -463,7 +465,7 @@ const Index = () => {
             </p>
           </div>
           {/* Clean 3-col grid */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Col 1 — tall + small */}
             <div className="flex flex-col gap-3">
               <div className="relative overflow-hidden rounded-2xl aspect-[4/5] group">

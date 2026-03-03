@@ -303,7 +303,7 @@ const CashAssignment = () => {
           {/* Método de pago */}
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
             <Label className="text-xs font-semibold uppercase tracking-wider text-white/40 mb-3 block">Método de pago</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {PAYMENT_METHODS.map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
@@ -397,7 +397,7 @@ const PaymentsPage = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-3xl mx-auto">
+        <div className="p-4 md:p-6 max-w-3xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-1">Pagos</h1>

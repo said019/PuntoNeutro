@@ -155,9 +155,9 @@ const ClientsList = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-6xl mx-auto">
+        <div className="p-4 md:p-6 max-w-6xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-7">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-7">
             <div>
               <h1 className="text-3xl font-bold text-white mb-1">Clientas</h1>
               <p className="text-sm text-white/35">{clients.length} clientas registradas</p>
@@ -249,7 +249,7 @@ const ClientsList = () => {
               <DialogTitle className="text-white">Editar clienta</DialogTitle>
             </DialogHeader>
             <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Nombre</Label>
                   <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("displayName")} />
@@ -271,7 +271,7 @@ const ClientsList = () => {
                 <Label className="text-white/60 text-xs">Notas de salud</Label>
                 <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("healthNotes")} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Contacto de emergencia</Label>
                   <Input className="bg-white/[0.04] border-white/[0.08] text-white" placeholder="Nombre" {...editForm.register("emergencyContactName")} />
@@ -310,7 +310,7 @@ const ClientsList = () => {
               {/* Personal info */}
               <div>
                 <p className="text-[11px] text-[#E15CB8]/70 font-semibold uppercase tracking-wider mb-3">Datos personales</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1 col-span-2">
                     <Label className="text-white/60 text-xs">Nombre completo *</Label>
                     <Input
@@ -396,7 +396,7 @@ const ClientsList = () => {
                   {selectedPlanId && selectedPlanId !== "none" && (
                     <div className="space-y-1">
                       <Label className="text-white/60 text-xs">Método de pago</Label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {PAYMENT_METHODS.map(({ value, label, Icon }) => (
                           <button
                             key={value}

@@ -196,22 +196,24 @@ const ClassesCalendar = () => {
         <div className="p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <h1 className="text-2xl font-bold">Clases</h1>
-            <div className="flex gap-1 rounded-xl bg-secondary p-1">
+            <div className="w-full sm:w-auto overflow-x-auto">
+              <div className="flex min-w-max gap-1 rounded-xl bg-secondary p-1">
               {TABS.map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
                   onClick={() => setTab(key)}
                   className={
-                    "flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all " +
+                    "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all " +
                     (tab === key
                       ? "bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white shadow-md shadow-[#E15CB8]/25"
                       : "text-muted-foreground hover:text-foreground hover:bg-white/5")
                   }
                 >
                   <Icon size={15} />
-                  {label}
+                  {key === "types" ? "Tipos" : key === "generate" ? "Generar" : label}
                 </button>
               ))}
+              </div>
             </div>
           </div>
 
@@ -415,7 +417,7 @@ function CalendarTab({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Inicio</Label><Input type="datetime-local" {...form.register("startTime")} /></div>
               <div className="space-y-1"><Label>Fin</Label><Input type="datetime-local" {...form.register("endTime")} /></div>
             </div>
@@ -523,7 +525,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <p className="text-sm text-muted-foreground">{types.length} tipos registrados</p>
         <Button size="sm" onClick={openCreate} className="bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white">
           <Plus size={14} className="mr-1" />Nuevo tipo
@@ -627,7 +629,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
               </div>
               <Input type="color" {...form.register("color")} className="h-8 w-16 cursor-pointer" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Duración (min)</Label><Input type="number" {...form.register("defaultDuration")} /></div>
               <div className="space-y-1"><Label>Capacidad máx.</Label><Input type="number" {...form.register("maxCapacity")} /></div>
             </div>
@@ -842,7 +844,7 @@ function GenerateTab({
           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] text-xs font-bold">4</span>
           <span className="text-xs font-semibold text-[#8B5CF6]/70 uppercase tracking-wider">Horario y capacidad</span>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <Label className="text-white/60 text-xs">Hora inicio</Label>
             <TimePicker value={startTime} onChange={setStartTime} />
@@ -1038,7 +1040,7 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <p className="text-sm text-muted-foreground">{instructors.length} instructora{instructors.length !== 1 ? "s" : ""} registrada{instructors.length !== 1 ? "s" : ""}</p>
         <Button
           size="sm"

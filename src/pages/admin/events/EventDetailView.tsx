@@ -137,7 +137,7 @@ export default function EventDetailView({
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
           {[
             { label: "Inscritos",   value: `${confirmed.length + pending.length}/${event.capacity}`, sub: `${pending.length} pendiente${pending.length !== 1 ? "s" : ""}`, color: "#E15CB8" },
             { label: "En espera",   value: String(waitlist.length),    sub: null, color: "#CA71E1" },

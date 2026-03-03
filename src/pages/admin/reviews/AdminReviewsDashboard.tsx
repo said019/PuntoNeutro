@@ -39,7 +39,7 @@ const ReviewTagsManager = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h2 className="text-lg font-semibold">Tags de reseñas</h2>
         <Button size="sm" onClick={() => { form.reset({ color: "#8B5CF6" }); setEditing(null); setOpen(true); }}><Plus size={14} className="mr-1" />Nuevo tag</Button>
       </div>
@@ -84,7 +84,7 @@ const AdminReviewsDashboard = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-5xl mx-auto">
+        <div className="p-4 md:p-6 max-w-5xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">Reseñas</h1>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

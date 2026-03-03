@@ -97,7 +97,7 @@ export default function EventsManager() {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-4 md:p-6 max-w-5xl mx-auto">
+        <div className="p-4 md:p-4 md:p-6 max-w-5xl mx-auto">
           {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-8 w-48 rounded-xl" />

@@ -158,7 +158,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-3 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
             {[
               { label: "Confirmadas", value: confirmed, color: "#E7EB6E" },
               { label: "Asistieron",  value: checkedIn, color: "#4ade80" },
@@ -466,7 +466,7 @@ const BookingsList = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-3xl mx-auto">
+        <div className="p-4 md:p-6 max-w-3xl mx-auto">
           <div className="mb-7">
             <h1 className="text-3xl font-bold text-white mb-1">Reservas</h1>
             <p className="text-sm text-white/35">

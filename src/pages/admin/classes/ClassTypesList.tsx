@@ -84,8 +84,8 @@ const ClassTypesList = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
+        <div className="p-4 md:p-6 max-w-4xl mx-auto">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
             <h1 className="text-2xl font-bold">Tipos de Clase</h1>
             <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" />Nuevo tipo</Button>
           </div>
@@ -146,7 +146,7 @@ const ClassTypesList = () => {
                 </div>
                 <Input type="color" {...form.register("color")} className="h-8 w-16 cursor-pointer" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1"><Label>Duración (min)</Label><Input type="number" {...form.register("defaultDuration")} /></div>
                 <div className="space-y-1"><Label>Capacidad máx.</Label><Input type="number" {...form.register("maxCapacity")} /></div>
               </div>

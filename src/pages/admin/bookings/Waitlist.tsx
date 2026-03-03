@@ -53,7 +53,7 @@ const Waitlist = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-3xl mx-auto">
+        <div className="p-4 md:p-6 max-w-3xl mx-auto">
           <div className="mb-7">
             <h1 className="text-3xl font-bold text-white mb-1">Lista de Espera</h1>
             <p className="text-sm text-white/35">

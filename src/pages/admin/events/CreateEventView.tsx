@@ -178,7 +178,7 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
           {/* Type grid */}
           <div>
             <label className={labelCls}>Tipo de evento</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {EVENT_TYPES.map((t) => (
                 <button
                   key={t.value}
@@ -259,7 +259,7 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className={labelCls}>Hora inicio</label>
               <TimePicker value={form.start_time} onChange={(v) => set("start_time", v)} />
@@ -368,7 +368,7 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-2">
               <label className={labelCls}>¿Qué incluye?</label>
               <button
                 onClick={() => set("includes", [...form.includes, ""])}

@@ -156,8 +156,8 @@ const DiscountCodes = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
+        <div className="p-4 md:p-6 max-w-5xl mx-auto">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
             <h1 className="text-2xl font-bold">Códigos de Descuento</h1>
             <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" />Nuevo código</Button>
           </div>
@@ -221,7 +221,7 @@ const DiscountCodes = () => {
               className="space-y-4"
             >
               <div className="space-y-1"><Label>Código</Label><Input {...form.register("code")} className="uppercase font-mono" /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Tipo</Label>
                   <Select value={form.watch("discountType")} onValueChange={(v) => form.setValue("discountType", v as "percent" | "fixed")}>
@@ -234,7 +234,7 @@ const DiscountCodes = () => {
                 </div>
                 <div className="space-y-1"><Label>Valor</Label><Input type="number" {...form.register("discountValue")} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1"><Label>Compra mínima</Label><Input type="number" {...form.register("minOrderAmount")} /></div>
                 <div className="space-y-1"><Label>Máx. usos (vacío=∞)</Label><Input type="number" {...form.register("maxUses")} /></div>
               </div>

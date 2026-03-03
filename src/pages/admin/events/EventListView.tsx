@@ -48,7 +48,7 @@ export default function EventListView({ events, onCreateNew, onSelect }: Props) 
       </div>
 
       {/* ── Summary stats ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Total eventos", value: String(events.length), icon: Calendar, color: "#E15CB8" },
           { label: "Publicados",    value: String(active),         icon: TrendingUp, color: "#4ade80" },
@@ -174,7 +174,7 @@ export default function EventListView({ events, onCreateNew, onSelect }: Props) 
                 </div>
 
                 {/* Stats row */}
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { label: "Capacidad",   value: `${ev.registered}/${ev.capacity}`, color: "#E15CB8" },
                     { label: "Ocupación",   value: `${pct}%`,                         color: barColor },

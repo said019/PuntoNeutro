@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, CalendarDays, Layers, XCircle, Zap } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
+import { MembershipCard } from "@/components/MembershipCard";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   active:              { label: "Activa",          color: "#4ade80", bg: "rgba(74,222,128,0.12)" },
@@ -83,7 +84,7 @@ const ProfileMembership = () => {
           {isLoading ? (
             <div className="space-y-3">
               <Skeleton className="h-32 w-full rounded-2xl" />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Skeleton className="h-24 rounded-2xl" />
                 <Skeleton className="h-24 rounded-2xl" />
               </div>
@@ -91,36 +92,11 @@ const ProfileMembership = () => {
           ) : membership ? (
             <div className="space-y-4">
 
-              {/* ── Main card ── */}
-              <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#1a0d1a] via-[#130d18] to-[#0d0d14] p-6">
-                <div className="pointer-events-none absolute -top-12 -right-12 h-40 w-40 rounded-full bg-[#E15CB8]/12 blur-[50px]" />
-                <div className="pointer-events-none absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-[#CA71E1]/10 blur-[35px]" />
-                <div className="relative">
-                  {statusCfg && (
-                    <span
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide border mb-4"
-                      style={{ background: statusCfg.bg, color: statusCfg.color, borderColor: `${statusCfg.color}30` }}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusCfg.color }} />
-                      {statusCfg.label}
-                    </span>
-                  )}
-                  <h2 className="text-[1.6rem] font-bold text-white leading-tight mb-1">
-                    {membership.plan_name ?? "Plan personalizado"}
-                  </h2>
-                  {membership.end_date && (
-                    <p className="text-[13px] text-white/40">
-                      Vence el{" "}
-                      <span className="text-white/70 font-medium">
-                        {format(safeParse(membership.end_date), "d 'de' MMMM yyyy", { locale: es })}
-                      </span>
-                    </p>
-                  )}
-                </div>
-              </div>
+              {/* ── Tarjeta visual de membresía ── */}
+              <MembershipCard membership={membership} expanded />
 
               {/* ── Stats grid ── */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <StatBox
                   icon={CalendarDays}
                   label="Días restantes"

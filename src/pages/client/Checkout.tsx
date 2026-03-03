@@ -181,7 +181,7 @@ const Checkout = () => {
           {step === "select" && (
             <div className="space-y-5">
               {loadingPlans ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {Array(6).fill(0).map((_, i) => (
                     <div key={i} className="h-28 rounded-2xl border border-white/[0.07] bg-white/[0.02] animate-pulse" />
                   ))}
@@ -193,7 +193,7 @@ const Checkout = () => {
                       <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#CA71E1]/60">
                         {cat}
                       </p>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {grouped[cat].map((plan) => (
                           <PlanCard
                             key={plan.id}
@@ -268,7 +268,7 @@ const Checkout = () => {
 
               <p className="text-sm font-semibold text-white/80">¿Cómo quieres pagar?</p>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Transfer */}
                 <button
                   type="button"

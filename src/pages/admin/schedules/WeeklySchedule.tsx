@@ -83,8 +83,8 @@ const WeeklySchedule = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6 max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-7">
+        <div className="p-4 md:p-6 max-w-5xl mx-auto">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-7">
             <div>
               <h1 className="text-3xl font-bold text-white mb-1">Horarios Semanales</h1>
               <p className="text-sm text-white/35">Horario base que se repite cada semana</p>
@@ -97,7 +97,7 @@ const WeeklySchedule = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-3">
             {DAYS.map((day, i) => (
               <div key={i} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3">
                 <p className="text-[10px] font-bold text-center mb-3 text-[#CA71E1]/60 uppercase tracking-widest">
@@ -186,7 +186,7 @@ const WeeklySchedule = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Hora inicio</Label>
                   <TimePicker

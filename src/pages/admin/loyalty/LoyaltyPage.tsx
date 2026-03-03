@@ -96,7 +96,7 @@ const LoyaltyRewards = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h2 className="text-lg font-semibold">Recompensas</h2>
         <Button size="sm" onClick={() => { form.reset({ reward_type: "discount", is_active: true, stock: null }); setEditing(null); setOpen(true); }}>
           <Plus size={14} className="mr-1" />Nueva
@@ -131,7 +131,7 @@ const LoyaltyRewards = () => {
           <DialogHeader><DialogTitle>{editing ? "Editar recompensa" : "Nueva recompensa"}</DialogTitle></DialogHeader>
           <form onSubmit={form.handleSubmit((d) => editing ? updateMutation.mutate({ ...d, id: editing.id }) : createMutation.mutate(d))} className="space-y-4">
             <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("name")} /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Costo en puntos</Label><Input type="number" {...form.register("points_cost")} /></div>
               <div className="space-y-1"><Label>Stock (vacío=∞)</Label><Input type="number" {...form.register("stock")} /></div>
             </div>
@@ -163,7 +163,7 @@ const LoyaltyRewards = () => {
 const LoyaltyPage = () => (
   <AuthGuard>
     <AdminLayout>
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Programa de Lealtad</h1>
         <Tabs defaultValue="rewards">
           <TabsList>
