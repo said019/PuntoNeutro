@@ -129,6 +129,7 @@ const POSTerminal = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [discountCode, setDiscountCode] = useState("");
   const debouncedSearch = useDebounce(search, 300);
 
   const { data } = useQuery<{ data: Product[] }>({
@@ -154,8 +155,17 @@ const POSTerminal = () => {
       items: cart.map((c) => ({ productId: c.product.id, qty: c.qty })),
       paymentMethod,
       total,
+      discountCode: discountCode.trim() || undefined,
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast({ title: "Venta realizada" }); setCart([]); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: "Venta realizada" });
+      setCart([]);
+      setDiscountCode("");
+    },
+    onError: (err: any) => {
+      toast({ title: "No se pudo completar la venta", description: err?.response?.data?.message, variant: "destructive" });
+    },
   });
 
   return (
@@ -214,6 +224,14 @@ const POSTerminal = () => {
                   <SelectItem value="transfer">Transferencia</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Código de descuento (opcional)</Label>
+              <Input
+                value={discountCode}
+                onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                placeholder="Ej. OPHELIA10"
+              />
             </div>
             <Button className="w-full" onClick={() => checkoutMutation.mutate()} disabled={checkoutMutation.isPending}>
               Confirmar venta

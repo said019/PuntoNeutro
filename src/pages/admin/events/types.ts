@@ -38,6 +38,11 @@ export interface EventRegistration {
   checkedInAt?: string | null;
   waitlistPosition?: number | null;
   notes?: string | null;
+  eventPassId?: string | null;
+  eventPassCode?: string | null;
+  eventPassStatus?: "issued" | "used" | "cancelled" | null;
+  eventPassIssuedAt?: string | null;
+  eventPassUsedAt?: string | null;
   createdAt?: string;
 }
 
@@ -101,5 +106,7 @@ export interface ClientEvent {
     hasPaymentProof: boolean;
     paymentProofFileName: string | null;
     transferDate: string | null;
+    eventPassCode?: string | null;
+    eventPassStatus?: "issued" | "used" | "cancelled" | null;
   } | null;
 }

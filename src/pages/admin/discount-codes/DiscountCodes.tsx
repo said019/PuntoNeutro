@@ -30,6 +30,8 @@ const codeSchema = z.object({
   minOrderAmount: z.coerce.number().min(0).default(0),
   maxUses: nullableInt,
   planId: z.string().optional(),
+  classCategory: z.enum(["all", "jumping", "pilates", "mixto"]).optional(),
+  channel: z.enum(["all", "membership", "pos", "event"]).default("all"),
   expiresAt: z.string().optional(),
   isActive: z.boolean().default(true),
 });
@@ -55,6 +57,8 @@ function normalizeCode(row: any): DiscountCode {
     minOrderAmount: Number(row.minOrderAmount ?? row.min_order_amount ?? 0),
     maxUses: row.maxUses ?? row.max_uses ?? null,
     planId: row.planId ?? row.plan_id ?? undefined,
+    classCategory: row.classCategory ?? row.class_category ?? undefined,
+    channel: (row.channel ?? "all") as "all" | "membership" | "pos" | "event",
     planName: row.planName ?? row.plan_name ?? null,
     expiresAt: row.expiresAt ?? row.expires_at ?? "",
     isActive: Boolean(row.isActive ?? row.is_active ?? true),
@@ -82,13 +86,23 @@ const DiscountCodes = () => {
 
   const form = useForm<CodeFormData>({
     resolver: zodResolver(codeSchema),
-    defaultValues: { discountType: "percent", isActive: true, maxUses: null, minOrderAmount: 0, planId: undefined },
+    defaultValues: {
+      discountType: "percent",
+      isActive: true,
+      maxUses: null,
+      minOrderAmount: 0,
+      planId: undefined,
+      classCategory: undefined,
+      channel: "all",
+    },
   });
 
   const serialize = (d: CodeFormData) => ({
     ...d,
     code: d.code.toUpperCase().trim(),
     planId: d.planId || null,
+    classCategory: d.classCategory || null,
+    channel: d.channel || "all",
     expiresAt: d.expiresAt || null,
     maxUses: d.maxUses ?? null,
   });
@@ -112,6 +126,8 @@ const DiscountCodes = () => {
       minOrderAmount: d.minOrderAmount ?? 0,
       maxUses: d.maxUses ?? null,
       planId: d.planId ?? undefined,
+      classCategory: d.classCategory ?? undefined,
+      channel: d.channel ?? "all",
       expiresAt: d.expiresAt ?? "",
       isActive: d.isActive,
     })),
@@ -138,6 +154,8 @@ const DiscountCodes = () => {
       minOrderAmount: c.minOrderAmount ?? 0,
       maxUses: c.maxUses ?? null,
       planId: c.planId ?? undefined,
+      classCategory: c.classCategory ?? undefined,
+      channel: c.channel ?? "all",
       expiresAt: c.expiresAt ?? "",
       isActive: c.isActive,
     });
@@ -146,7 +164,18 @@ const DiscountCodes = () => {
   };
 
   const openCreate = () => {
-    form.reset({ code: "", discountType: "percent", discountValue: 0, minOrderAmount: 0, isActive: true, maxUses: null, expiresAt: "", planId: undefined });
+    form.reset({
+      code: "",
+      discountType: "percent",
+      discountValue: 0,
+      minOrderAmount: 0,
+      isActive: true,
+      maxUses: null,
+      expiresAt: "",
+      planId: undefined,
+      classCategory: undefined,
+      channel: "all",
+    });
     setEditing(null);
     setOpen(true);
   };
@@ -169,6 +198,7 @@ const DiscountCodes = () => {
                   <TableHead>Código</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Descuento</TableHead>
+                  <TableHead>Canal</TableHead>
                   <TableHead>Aplica a</TableHead>
                   <TableHead>Usos</TableHead>
                   <TableHead>Vence</TableHead>
@@ -184,7 +214,16 @@ const DiscountCodes = () => {
                     <TableCell className="font-mono font-bold">{c.code}</TableCell>
                     <TableCell>{c.discountType === "percent" ? "%" : "MXN"}</TableCell>
                     <TableCell>{c.discountType === "percent" ? `${c.discountValue}%` : `$${c.discountValue}`}</TableCell>
-                    <TableCell>{c.planName ?? "Todos los planes"}</TableCell>
+                    <TableCell>
+                      {c.channel === "membership" ? "Membresías" : c.channel === "pos" ? "POS" : c.channel === "event" ? "Eventos" : "Todos"}
+                    </TableCell>
+                    <TableCell>
+                      {c.planName
+                        ? c.planName
+                        : c.classCategory
+                          ? `Categoría ${c.classCategory}`
+                          : "Todos los planes"}
+                    </TableCell>
                     <TableCell>{c.usesCount}/{c.maxUses ?? "∞"}</TableCell>
                     <TableCell className="text-sm">{c.expiresAt ? new Date(c.expiresAt).toLocaleString("es-MX") : "—"}</TableCell>
                     <TableCell><Badge variant={c.isActive ? "default" : "secondary"}>{c.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
@@ -238,8 +277,35 @@ const DiscountCodes = () => {
                 <div className="space-y-1"><Label>Compra mínima</Label><Input type="number" {...form.register("minOrderAmount")} /></div>
                 <div className="space-y-1"><Label>Máx. usos (vacío=∞)</Label><Input type="number" {...form.register("maxUses")} /></div>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Canal</Label>
+                  <Select value={form.watch("channel")} onValueChange={(v) => form.setValue("channel", v as CodeFormData["channel"])}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="membership">Membresías</SelectItem>
+                      <SelectItem value="pos">POS</SelectItem>
+                      <SelectItem value="event">Eventos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Categoría de clase</Label>
+                  <Select value={form.watch("classCategory") ?? "none"} onValueChange={(v) => form.setValue("classCategory", v === "none" ? undefined : (v as CodeFormData["classCategory"]))}>
+                    <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Todas</SelectItem>
+                      <SelectItem value="all">General</SelectItem>
+                      <SelectItem value="jumping">Jumping</SelectItem>
+                      <SelectItem value="pilates">Pilates</SelectItem>
+                      <SelectItem value="mixto">Mixto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div className="space-y-1">
-                <Label>Aplicar a plan</Label>
+                <Label>Plan específico (opcional)</Label>
                 <Select value={form.watch("planId") ?? "all"} onValueChange={(v) => form.setValue("planId", v === "all" ? undefined : v)}>
                   <SelectTrigger><SelectValue placeholder="Todos los planes" /></SelectTrigger>
                   <SelectContent>

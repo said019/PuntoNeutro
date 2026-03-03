@@ -49,6 +49,7 @@ const BookingCard = ({
   onReview: (booking: BookingClient) => void;
 }) => {
   const isPast = new Date(booking.start_time) < new Date();
+  const hasReview = Boolean(booking.has_review);
   return (
     <div className="flex items-center justify-between rounded-xl border p-4">
       <div className="space-y-1">
@@ -68,9 +69,18 @@ const BookingCard = ({
           </Button>
         )}
         {isPast && booking.status === "checked_in" && (
-          <Button variant="outline" size="sm" onClick={() => onReview(booking)}>
-            <Star size={14} className="mr-1" />Reseña
-          </Button>
+          hasReview ? (
+            <Badge
+              variant="outline"
+              className="border-emerald-300 bg-emerald-50 text-emerald-700"
+            >
+              Reseña enviada
+            </Badge>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => onReview(booking)}>
+              <Star size={14} className="mr-1" />Reseña
+            </Button>
+          )
         )}
       </div>
     </div>
@@ -141,8 +151,13 @@ const MyBookings = () => {
       setReviewBooking(null);
       setComment("");
       setSelectedTags([]);
+      setRating(5);
     },
     onError: (err: any) => {
+      if (err?.response?.status === 409) {
+        qc.invalidateQueries({ queryKey: ["my-bookings"] });
+        setReviewBooking(null);
+      }
       const msg = err?.response?.data?.message || "No se pudo enviar la reseña.";
       toast({ title: "Error", description: msg, variant: "destructive" });
     },

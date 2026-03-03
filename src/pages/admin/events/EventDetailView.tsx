@@ -253,6 +253,9 @@ export default function EventDetailView({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{reg.name}</p>
                       <p className="text-[0.7rem] text-muted-foreground truncate">{reg.email}</p>
+                      {reg.eventPassCode && (
+                        <p className="text-[0.65rem] text-[#CA71E1] mt-0.5 truncate">Pase: {reg.eventPassCode}</p>
+                      )}
                     </div>
                     <div className="hidden sm:block text-right mr-2">
                       <p className="text-sm font-semibold text-[#E7EB6E]">
@@ -265,6 +268,16 @@ export default function EventDetailView({
                     <span className={cn("text-[0.65rem] font-semibold border rounded-full px-2 py-0.5 whitespace-nowrap", badge.className)}>
                       {badge.label}
                     </span>
+                    {reg.eventPassStatus && reg.eventPassStatus !== "cancelled" && (
+                      <span className={cn(
+                        "text-[0.62rem] font-semibold border rounded-full px-2 py-0.5 whitespace-nowrap",
+                        reg.eventPassStatus === "used"
+                          ? "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/8"
+                          : "text-[#CA71E1] border-[#CA71E1]/30 bg-[#CA71E1]/8",
+                      )}>
+                        {reg.eventPassStatus === "used" ? "Pase usado" : "Pase emitido"}
+                      </span>
+                    )}
                     {/* Actions */}
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {reg.status === "pending" && (

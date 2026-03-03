@@ -211,6 +211,8 @@ async function ensureSchema() {
         discount_value DECIMAL(10,2) NOT NULL,
         max_uses INTEGER,
         uses_count INTEGER DEFAULT 0,
+        class_category VARCHAR(20),
+        channel VARCHAR(20) NOT NULL DEFAULT 'all',
         is_active BOOLEAN DEFAULT true,
         expires_at TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -605,6 +607,21 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS booking_id UUID`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS instructor_id UUID`).catch(() => {});
     await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS tag_ids UUID[] DEFAULT '{}'`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reviews_booking ON reviews(booking_id)`).catch(() => {});
+    await pool.query(`
+      DELETE FROM reviews a
+      USING reviews b
+      WHERE a.booking_id IS NOT NULL
+        AND a.booking_id = b.booking_id
+        AND a.created_at < b.created_at
+    `).catch(() => {});
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_booking_unique
+      ON reviews(booking_id)
+      WHERE booking_id IS NOT NULL
+    `).catch((err) => {
+      console.warn("[DB] Could not create unique review index on booking_id:", err?.message || err);
+    });
     // ── Review-tag links (many-to-many) ────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS review_tag_links (
@@ -639,10 +656,12 @@ async function ensureSchema() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(referral_code_id)`).catch(() => { });
     // ── orders: add missing columns if needed ─────────────────────────────
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_code_id UUID REFERENCES discount_codes(id) ON DELETE SET NULL`).catch(() => { });
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS channel VARCHAR(30) DEFAULT 'web'`).catch(() => { });
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS plan_id UUID`).catch(() => { });
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_by UUID`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_discount_code_id ON orders(discount_code_id)`).catch(() => { });
     // Make plan_id nullable (POS orders don't always have a plan)
     await pool.query(`ALTER TABLE orders ALTER COLUMN plan_id DROP NOT NULL`).catch(() => { });
     // Make user_id nullable (walk-in POS sales may not have a user)
@@ -713,9 +732,15 @@ async function ensureSchema() {
     // ── discount_codes: normalise discount_type values ────────────────────
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS plan_id UUID REFERENCES plans(id) ON DELETE SET NULL`).catch(() => { });
+    await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS class_category VARCHAR(20)`).catch(() => { });
+    await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS channel VARCHAR(20) DEFAULT 'all'`).catch(() => { });
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_discount_codes_plan ON discount_codes(plan_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_discount_codes_category ON discount_codes(class_category)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_discount_codes_channel ON discount_codes(channel)`).catch(() => { });
     await pool.query(`UPDATE discount_codes SET discount_type = 'percent' WHERE discount_type IN ('percentage', 'porcentaje', '%')`).catch(() => { });
+    await pool.query(`UPDATE discount_codes SET channel = 'all' WHERE channel IS NULL OR channel = ''`).catch(() => { });
+    await pool.query(`UPDATE discount_codes SET class_category = NULL WHERE class_category NOT IN ('all','jumping','pilates','mixto')`).catch(() => { });
     // ── bookings: add checked_in_at column ────────────────────────────────
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
     // ── Settings table ─────────────────────────────────────────────────────
@@ -854,6 +879,25 @@ async function ensureSchema() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_event  ON event_registrations(event_id)`).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_user   ON event_registrations(user_id)`).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_regs_status ON event_registrations(status)`).catch(() => { });
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS event_passes (
+        id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        event_id       UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        registration_id UUID REFERENCES event_registrations(id) ON DELETE SET NULL,
+        user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        pass_code      VARCHAR(60) NOT NULL UNIQUE,
+        status         VARCHAR(20) NOT NULL DEFAULT 'issued' CHECK (status IN ('issued','used','cancelled')),
+        issued_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        used_at        TIMESTAMPTZ,
+        cancelled_at   TIMESTAMPTZ,
+        created_at     TIMESTAMPTZ DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ DEFAULT NOW()
+      );
+    `).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_passes_user ON event_passes(user_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_passes_event ON event_passes(event_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_passes_status ON event_passes(status)`).catch(() => { });
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_event_passes_registration_unique ON event_passes(registration_id) WHERE registration_id IS NOT NULL`).catch(() => { });
 
     console.log("✅ Schema ensured");
   } catch (err) {
@@ -1019,6 +1063,393 @@ function calculateDiscountAmount(type, value, subtotal) {
     ? safeSubtotal * (safeValue / 100)
     : safeValue;
   return Math.max(0, Math.min(amount, safeSubtotal));
+}
+
+function normalizeClassCategory(value, fallback = "all") {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (["jumping", "pilates", "mixto", "all"].includes(raw)) return raw;
+  return fallback;
+}
+
+function normalizeDiscountChannel(value, fallback = "all") {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (["all", "membership", "pos", "event"].includes(raw)) return raw;
+  return fallback;
+}
+
+function isUnlimitedClasses(value) {
+  return value === null || value === undefined || Number(value) >= 9999;
+}
+
+function isMembershipCategoryCompatible(membershipCategory, classCategory) {
+  const memCat = normalizeClassCategory(membershipCategory, "all");
+  const clsCat = normalizeClassCategory(classCategory, "all");
+  if (clsCat === "all") return true;
+  if (memCat === "all" || memCat === "mixto") return true;
+  return memCat === clsCat;
+}
+
+async function selectMembershipForClass({ userId, classCategory, client = null }) {
+  if (!userId) return null;
+  const q = client ?? pool;
+  const clsCat = normalizeClassCategory(classCategory, "all");
+  const r = await q.query(
+    `SELECT m.id,
+            m.user_id,
+            m.classes_remaining,
+            m.end_date,
+            m.created_at,
+            COALESCE(p.class_category, 'all') AS class_category
+       FROM memberships m
+       LEFT JOIN plans p ON p.id = m.plan_id
+      WHERE m.user_id = $1
+        AND m.status = 'active'
+        AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
+        AND (
+          COALESCE(p.class_category, 'all') IN ('all', 'mixto')
+          OR COALESCE(p.class_category, 'all') = $2
+        )
+        AND (
+          m.classes_remaining IS NULL
+          OR m.classes_remaining >= 9999
+          OR m.classes_remaining > 0
+        )
+      ORDER BY
+        CASE
+          WHEN COALESCE(p.class_category, 'all') = $2 THEN 0
+          WHEN COALESCE(p.class_category, 'all') = 'mixto' THEN 1
+          WHEN COALESCE(p.class_category, 'all') = 'all' THEN 2
+          ELSE 3
+        END ASC,
+        CASE WHEN m.end_date IS NULL THEN 1 ELSE 0 END ASC,
+        m.end_date ASC,
+        CASE WHEN m.classes_remaining IS NULL OR m.classes_remaining >= 9999 THEN 1 ELSE 0 END ASC,
+        m.created_at ASC
+      LIMIT 1`,
+    [userId, clsCat]
+  );
+  return r.rows[0] ?? null;
+}
+
+async function findApplicableDiscountCode({
+  code,
+  subtotal,
+  planId = null,
+  classCategory = "all",
+  channel = "all",
+  client = null,
+}) {
+  if (!code) return null;
+  const q = client ?? pool;
+  const normalizedCode = String(code).toUpperCase().trim();
+  const normalizedChannel = normalizeDiscountChannel(channel, "all");
+  const normalizedCategory = normalizeClassCategory(classCategory, "all");
+  const r = await q.query(
+    `SELECT *
+       FROM discount_codes
+      WHERE code = $1
+        AND is_active = true
+        AND (expires_at IS NULL OR expires_at > NOW())
+        AND (max_uses IS NULL OR uses_count < max_uses)
+        AND (channel = 'all' OR channel = $2)
+        AND (plan_id IS NULL OR plan_id = $3)
+        AND (
+          class_category IS NULL
+          OR class_category = 'all'
+          OR class_category = $4
+          OR (class_category = 'mixto' AND $4 IN ('jumping','pilates'))
+        )
+      ORDER BY
+        CASE WHEN plan_id IS NULL THEN 1 ELSE 0 END ASC,
+        CASE WHEN class_category IS NULL OR class_category = 'all' THEN 1 ELSE 0 END ASC
+      LIMIT 1`,
+    [normalizedCode, normalizedChannel, planId, normalizedCategory]
+  );
+  if (!r.rows.length) return null;
+  const dc = r.rows[0];
+  const safeSubtotal = Number(subtotal || 0);
+  const minOrderAmount = Number(dc.min_order_amount || 0);
+  if (safeSubtotal < minOrderAmount) {
+    return {
+      code: dc,
+      discountAmount: 0,
+      minOrderAmount,
+      rejectedByMinOrder: true,
+    };
+  }
+  const discountAmount = calculateDiscountAmount(dc.discount_type, dc.discount_value, safeSubtotal);
+  return {
+    code: dc,
+    discountAmount,
+    minOrderAmount,
+    rejectedByMinOrder: false,
+  };
+}
+
+async function incrementDiscountUsage(discountId, client = null) {
+  if (!discountId) return null;
+  const q = client ?? pool;
+  const r = await q.query(
+    `UPDATE discount_codes
+        SET uses_count = uses_count + 1,
+            updated_at = NOW()
+      WHERE id = $1
+        AND (max_uses IS NULL OR uses_count < max_uses)
+    RETURNING id, uses_count, max_uses`,
+    [discountId]
+  );
+  if (!r.rows.length) {
+    const usageErr = new Error("El código de descuento alcanzó su límite de usos");
+    usageErr.status = 409;
+    throw usageErr;
+  }
+  return r.rows[0];
+}
+
+function buildEventPassCode(eventId, userId) {
+  const eventPart = String(eventId || "").replace(/-/g, "").slice(0, 6).toUpperCase();
+  const userPart = String(userId || "").replace(/-/g, "").slice(-4).toUpperCase();
+  const randomPart = crypto.randomBytes(3).toString("hex").toUpperCase();
+  return `EV-${eventPart}-${userPart}-${randomPart}`;
+}
+
+async function ensureEventPassForRegistration({ eventId, registrationId, userId, client = null }) {
+  if (!eventId || !registrationId || !userId) return null;
+  const q = client ?? pool;
+
+  const existing = await q.query(
+    "SELECT * FROM event_passes WHERE registration_id = $1 LIMIT 1",
+    [registrationId]
+  );
+  if (existing.rows.length) {
+    const row = existing.rows[0];
+    if (row.status === "issued") return row;
+    const updated = await q.query(
+      `UPDATE event_passes
+          SET event_id = $1,
+              user_id = $2,
+              status = 'issued',
+              issued_at = NOW(),
+              used_at = NULL,
+              cancelled_at = NULL,
+              updated_at = NOW()
+        WHERE id = $3
+      RETURNING *`,
+      [eventId, userId, row.id]
+    );
+    return updated.rows[0] ?? row;
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const passCode = buildEventPassCode(eventId, userId);
+    try {
+      const inserted = await q.query(
+        `INSERT INTO event_passes (event_id, registration_id, user_id, pass_code, status, issued_at)
+         VALUES ($1, $2, $3, $4, 'issued', NOW())
+         RETURNING *`,
+        [eventId, registrationId, userId, passCode]
+      );
+      return inserted.rows[0] ?? null;
+    } catch (err) {
+      if (err?.code !== "23505") throw err;
+    }
+  }
+
+  throw new Error("No se pudo generar un pase único para el evento");
+}
+
+async function cancelEventPassByRegistration({ registrationId, client = null }) {
+  if (!registrationId) return null;
+  const q = client ?? pool;
+  const r = await q.query(
+    `UPDATE event_passes
+        SET status = 'cancelled',
+            cancelled_at = NOW(),
+            updated_at = NOW()
+      WHERE registration_id = $1
+        AND status <> 'cancelled'
+    RETURNING *`,
+    [registrationId]
+  );
+  return r.rows[0] ?? null;
+}
+
+async function markEventPassUsedByRegistration({ registrationId, client = null }) {
+  if (!registrationId) return null;
+  const q = client ?? pool;
+  const r = await q.query(
+    `UPDATE event_passes
+        SET status = 'used',
+            used_at = NOW(),
+            updated_at = NOW()
+      WHERE registration_id = $1
+        AND status = 'issued'
+    RETURNING *`,
+    [registrationId]
+  );
+  return r.rows[0] ?? null;
+}
+
+function normalizePosItems(items) {
+  const qtyByProduct = new Map();
+  for (const raw of Array.isArray(items) ? items : []) {
+    const productId = String(raw?.productId ?? "").trim();
+    const qty = Number(raw?.qty ?? 0);
+    if (!productId || !Number.isFinite(qty) || qty <= 0) continue;
+    qtyByProduct.set(productId, (qtyByProduct.get(productId) || 0) + Math.floor(qty));
+  }
+  return Array.from(qtyByProduct.entries()).map(([productId, qty]) => ({ productId, qty }));
+}
+
+async function processPosSale({ userId, items, paymentMethod = "efectivo", discountCode = null }) {
+  const normalizedItems = normalizePosItems(items);
+  if (!normalizedItems.length) {
+    return { error: { status: 400, message: "Se requieren artículos válidos" } };
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const productIds = normalizedItems.map((item) => item.productId);
+    const productsRes = await client.query(
+      "SELECT * FROM products WHERE id = ANY($1::uuid[]) FOR UPDATE",
+      [productIds]
+    );
+    const productsById = new Map(productsRes.rows.map((p) => [p.id, p]));
+    if (productsById.size !== productIds.length) {
+      const missing = productIds.find((id) => !productsById.has(id));
+      await client.query("ROLLBACK");
+      return { error: { status: 404, message: `Producto ${missing} no encontrado` } };
+    }
+
+    let subtotal = 0;
+    for (const item of normalizedItems) {
+      const product = productsById.get(item.productId);
+      if (Number(product.stock) < item.qty) {
+        await client.query("ROLLBACK");
+        return { error: { status: 400, message: `Stock insuficiente para ${product.name}` } };
+      }
+      subtotal += Number(product.price) * item.qty;
+    }
+
+    let discountAmount = 0;
+    let discountCodeRow = null;
+    if (discountCode) {
+      const discount = await findApplicableDiscountCode({
+        code: discountCode,
+        subtotal,
+        channel: "pos",
+        classCategory: "all",
+        client,
+      });
+      if (!discount) {
+        await client.query("ROLLBACK");
+        return { error: { status: 400, message: "Código de descuento no válido para POS" } };
+      }
+      if (discount.rejectedByMinOrder) {
+        await client.query("ROLLBACK");
+        return {
+          error: {
+            status: 400,
+            message: `Compra mínima requerida: $${Number(discount.minOrderAmount || 0).toFixed(2)} MXN`,
+          },
+        };
+      }
+      discountAmount = discount.discountAmount;
+      discountCodeRow = discount.code;
+    }
+
+    const total = Math.max(0, subtotal - discountAmount);
+    const orderRes = await client.query(
+      `INSERT INTO orders (
+         user_id, subtotal, tax_amount, total_amount, payment_method,
+         status, discount_amount, discount_code_id, channel
+       )
+       VALUES ($1,$2,0,$3,$4,'approved',$5,$6,'pos')
+       RETURNING *`,
+      [userId || null, subtotal, total, paymentMethod, discountAmount, discountCodeRow?.id ?? null]
+    );
+    const order = orderRes.rows[0];
+
+    for (const item of normalizedItems) {
+      const product = productsById.get(item.productId);
+      await client.query(
+        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,$2,$3,$4)",
+        [order.id, item.productId, item.qty, product.price]
+      );
+      const stockUpdate = await client.query(
+        "UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1",
+        [item.qty, item.productId]
+      );
+      if (stockUpdate.rowCount === 0) {
+        const stockErr = new Error(`Stock insuficiente para ${product.name}`);
+        stockErr.status = 400;
+        throw stockErr;
+      }
+    }
+
+    if (discountCodeRow?.id) {
+      await incrementDiscountUsage(discountCodeRow.id, client);
+    }
+
+    if (userId && total > 0) {
+      const cfgRes = await client.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+      const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+      const pts = Math.floor(total * (cfg.points_per_peso ?? 1));
+      if (cfg.enabled !== false && pts > 0) {
+        await client.query(
+          "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
+          [userId, pts, `Venta POS — $${total}`]
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+    return { data: order };
+  } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (_) { }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function awardBirthdayBonusIfEligible(userId, client = null) {
+  if (!userId) return null;
+  const q = client ?? pool;
+  const userRes = await q.query(
+    "SELECT date_of_birth FROM users WHERE id = $1 LIMIT 1",
+    [userId]
+  );
+  const dob = userRes.rows[0]?.date_of_birth;
+  if (!dob) return null;
+
+  const today = new Date();
+  const birth = new Date(dob);
+  const isBirthdayToday =
+    birth.getUTCDate() === today.getUTCDate() &&
+    birth.getUTCMonth() === today.getUTCMonth();
+  if (!isBirthdayToday) return null;
+
+  const cfgRes = await q.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+  const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+  const points = Number(cfg.birthday_bonus ?? 0);
+  if (cfg.enabled === false || points <= 0) return null;
+
+  const year = today.getUTCFullYear();
+  const desc = `Bono de cumpleaños ${year}`;
+  const exists = await q.query(
+    "SELECT id FROM loyalty_transactions WHERE user_id = $1 AND description = $2 LIMIT 1",
+    [userId, desc]
+  );
+  if (exists.rows.length) return null;
+
+  const inserted = await q.query(
+    "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3) RETURNING *",
+    [userId, points, desc]
+  );
+  return inserted.rows[0] ?? null;
 }
 
 const NON_REPEATABLE_ORDER_BLOCK_STATUSES = ["pending_payment", "pending_verification", "approved"];
@@ -1278,6 +1709,11 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user.password_hash) return res.status(401).json({ message: "Credenciales incorrectas" });
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) return res.status(401).json({ message: "Credenciales incorrectas" });
+    try {
+      await awardBirthdayBonusIfEligible(user.id);
+    } catch (bonusErr) {
+      console.error("[Loyalty] birthday bonus login:", bonusErr?.message || bonusErr);
+    }
     const token = signToken(user.id);
     return res.json({ user: mapUser(user), token });
   } catch (err) {
@@ -1413,6 +1849,15 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
          WHEN 'pending_activation'  THEN 2
          WHEN 'pending_payment'     THEN 3
          ELSE 4 END,
+         CASE
+           WHEN m.status = 'active' AND (m.classes_remaining IS NULL OR m.classes_remaining >= 9999) THEN 1
+           ELSE 0
+         END ASC,
+         CASE
+           WHEN m.status = 'active' AND m.end_date IS NULL THEN 1
+           ELSE 0
+         END ASC,
+         m.end_date ASC NULLS LAST,
          m.created_at DESC
        LIMIT 1`,
       [req.userId]
@@ -1521,6 +1966,11 @@ app.get("/api/bookings/my-bookings", authMiddleware, async (req, res) => {
               ct.color AS class_color,
               i.display_name AS instructor_name,
               i.photo_url    AS instructor_photo,
+              EXISTS(
+                SELECT 1
+                FROM reviews rv
+                WHERE rv.booking_id = b.id
+              ) AS has_review,
               f.name         AS facility_name
        FROM bookings b
        JOIN classes c       ON b.class_id       = c.id
@@ -1542,82 +1992,100 @@ app.get("/api/bookings/my-bookings", authMiddleware, async (req, res) => {
 app.post("/api/bookings", authMiddleware, async (req, res) => {
   const { classId } = req.body;
   if (!classId) return res.status(400).json({ message: "classId requerido" });
+  const client = await pool.connect();
   try {
-    // Check membership (get class_category from the joined plan)
-    const memRes = await pool.query(
-      `SELECT m.id, m.classes_remaining, COALESCE(p.class_category, 'all') AS class_category
-       FROM memberships m
-       LEFT JOIN plans p ON m.plan_id = p.id
-       WHERE m.user_id = $1 AND m.status = 'active' AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-       LIMIT 1`,
-      [req.userId]
-    );
-    if (memRes.rows.length === 0) return res.status(403).json({ message: "No tienes membresía activa" });
-    const membership = memRes.rows[0];
+    await client.query("BEGIN");
 
-    // Check if class exists, has capacity, and get its category
-    const classRes = await pool.query(
-      `SELECT c.id, c.max_capacity, c.current_bookings, c.status, ct.category AS class_category
+    // Lock class row to avoid overbooking in concurrent requests
+    const classRes = await client.query(
+      `SELECT c.id, c.max_capacity, c.current_bookings, c.status, c.date, c.start_time,
+              ct.category AS class_category
        FROM classes c
        JOIN class_types ct ON c.class_type_id = ct.id
-       WHERE c.id = $1`,
+       WHERE c.id = $1
+       FOR UPDATE`,
       [classId]
     );
-    if (classRes.rows.length === 0) return res.status(404).json({ message: "Clase no encontrada" });
+    if (classRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Clase no encontrada" });
+    }
     const cls = classRes.rows[0];
-    if (cls.status === "cancelled") return res.status(400).json({ message: "Esta clase fue cancelada" });
+    if (cls.status === "cancelled") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "Esta clase fue cancelada" });
+    }
 
-    // ── Category validation ────────────────────────────────────────────────
-    // mixto/all memberships can book any category (jumping or pilates)
-    // jumping memberships can only book jumping classes
-    // pilates memberships can only book pilates classes
-    const memCategory = membership.class_category ?? "all"; // 'jumping' | 'pilates' | 'mixto' | 'all'
-    const clsCategory = cls.class_category;                  // 'jumping' | 'pilates' | null
-    if (clsCategory && memCategory !== "mixto" && memCategory !== "all" && memCategory !== clsCategory) {
+    const clsCategory = normalizeClassCategory(cls.class_category, "all");
+    const membership = await selectMembershipForClass({
+      userId: req.userId,
+      classCategory: clsCategory,
+      client,
+    });
+    if (!membership) {
+      await client.query("ROLLBACK");
+      const label = clsCategory === "jumping" ? "Jumping" : clsCategory === "pilates" ? "Pilates" : "esta";
+      return res.status(403).json({
+        message: `No tienes membresía activa con créditos para clases de ${label}.`,
+      });
+    }
+
+    // Lock selected membership row to prevent double consumption
+    const lockedMembershipRes = await client.query(
+      "SELECT id, classes_remaining FROM memberships WHERE id = $1 FOR UPDATE",
+      [membership.id]
+    );
+    const lockedMembership = lockedMembershipRes.rows[0];
+    if (!lockedMembership) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ message: "No se encontró una membresía válida para esta reserva." });
+    }
+
+    if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
+      await client.query("ROLLBACK");
       const label = clsCategory === "jumping" ? "Jumping" : "Pilates";
       return res.status(403).json({
         message: `Tu membresía no incluye clases de ${label}. Necesitas una membresía ${label} o Mixta.`,
       });
     }
 
-    // ── Check classes remaining (skip for unlimited plans where remaining is null or >= 9999) ──
-    if (
-      membership.classes_remaining !== null &&
-      membership.classes_remaining < 9999 &&
-      membership.classes_remaining <= 0
-    ) {
+    if (!isUnlimitedClasses(lockedMembership.classes_remaining) && Number(lockedMembership.classes_remaining) <= 0) {
+      await client.query("ROLLBACK");
       return res.status(403).json({
         message: "Ya no tienes clases disponibles en tu paquete. Renueva o adquiere un nuevo plan.",
       });
     }
 
-    // Check duplicate
-    const dupRes = await pool.query(
+    const dupRes = await client.query(
       "SELECT id FROM bookings WHERE class_id = $1 AND user_id = $2 AND status != 'cancelled'",
       [classId, req.userId]
     );
-    if (dupRes.rows.length > 0) return res.status(409).json({ message: "Ya tienes una reserva para esta clase" });
-    // Determine if waitlist
+    if (dupRes.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: "Ya tienes una reserva para esta clase" });
+    }
+
     const isWaitlist = cls.current_bookings >= cls.max_capacity;
     const status = isWaitlist ? "waitlist" : "confirmed";
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO bookings (class_id, user_id, membership_id, status)
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [classId, req.userId, membership.id, status]
     );
+
     if (!isWaitlist) {
-      await pool.query(
+      await client.query(
         "UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1",
         [classId]
       );
-      // Deduct class credit only if membership has a real limit (not null and not 9999+)
-      if (membership.classes_remaining !== null && membership.classes_remaining < 9999) {
-        await pool.query(
-          "UPDATE memberships SET classes_remaining = classes_remaining - 1 WHERE id = $1",
+      if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
+        await client.query(
+          "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
           [membership.id]
         );
       }
     }
+    await client.query("COMMIT");
 
     // ── Email: booking confirmed / waitlist ────────────────────────────────
     try {
@@ -1631,7 +2099,6 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
          WHERE c.id = $1`,
         [classId]
       );
-      // Recalculate remaining after deduction
       const memAfter = await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id]);
       const classesLeft = memAfter.rows[0]?.classes_remaining ?? null;
 
@@ -1656,8 +2123,11 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     const msg = isWaitlist ? "Añadido a lista de espera" : "Reserva confirmada";
     return res.status(201).json({ message: msg, booking: result.rows[0] });
   } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (_) { }
     console.error("POST bookings error:", err);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -1916,6 +2386,12 @@ app.post("/api/reviews", authMiddleware, async (req, res) => {
 
     return res.json({ message: "Reseña enviada — gracias por tu opinión", data: review });
   } catch (err) {
+    if (
+      err?.code === "23505" &&
+      String(err?.detail || err?.message || "").toLowerCase().includes("booking_id")
+    ) {
+      return res.status(409).json({ message: "Ya dejaste una reseña para esta clase" });
+    }
     console.error("POST reviews error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
@@ -1965,50 +2441,76 @@ app.get("/api/orders/:id", authMiddleware, async (req, res) => {
 app.post("/api/orders", authMiddleware, async (req, res) => {
   const { planId, discountCode, paymentMethod = "transfer" } = req.body;
   if (!planId) return res.status(400).json({ message: "planId requerido" });
+  const client = await pool.connect();
   try {
-    const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
-    if (planRes.rows.length === 0) return res.status(404).json({ message: "Plan no encontrado" });
+    await client.query("BEGIN");
+
+    const planRes = await client.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
+    if (planRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Plan no encontrado" });
+    }
     const plan = planRes.rows[0];
-    const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId: req.userId, plan });
+    const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId: req.userId, plan, client });
     if (nonRepeatableConflict) {
+      await client.query("ROLLBACK");
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
-    let subtotal = parseFloat(plan.price);
+
+    const subtotal = parseFloat(plan.price);
     let discount = 0;
-    // Apply discount code
+    let appliedDiscountCode = null;
+
     if (discountCode) {
-      const dcRes = await pool.query(
-        `SELECT * FROM discount_codes WHERE code = $1 AND is_active = true
-         AND (expires_at IS NULL OR expires_at > NOW())
-         AND (plan_id IS NULL OR plan_id = $2)
-         AND (max_uses IS NULL OR uses_count < max_uses)`,
-        [discountCode.toUpperCase(), planId]
-      );
-      if (!dcRes.rows.length) {
+      const discountResult = await findApplicableDiscountCode({
+        code: discountCode,
+        subtotal,
+        planId,
+        classCategory: normalizeClassCategory(plan.class_category, "all"),
+        channel: "membership",
+        client,
+      });
+      if (!discountResult) {
+        await client.query("ROLLBACK");
         return res.status(400).json({ message: "Código de descuento no válido para este plan" });
       }
-      const dc = dcRes.rows[0];
-      const minOrderAmount = Number(dc.min_order_amount || 0);
-      if (minOrderAmount > subtotal) {
-        return res.status(400).json({ message: `Compra mínima requerida: $${minOrderAmount.toFixed(2)} MXN` });
+      if (discountResult.rejectedByMinOrder) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Compra mínima requerida: $${Number(discountResult.minOrderAmount || 0).toFixed(2)} MXN`,
+        });
       }
-      discount = calculateDiscountAmount(dc.discount_type, dc.discount_value, subtotal);
+      discount = discountResult.discountAmount;
+      appliedDiscountCode = discountResult.code;
     }
+
     const total = subtotal - discount;
-    // Bank info from system settings or defaults
-    const settingsRes = await pool.query(
+    const settingsRes = await client.query(
       "SELECT value FROM system_settings WHERE key = 'bank_info'"
     );
     const bankInfo = settingsRes.rows.length > 0
       ? settingsRes.rows[0].value
       : { clabe: "710180000068980", bank: "Banorte", accountHolder: "Ophelia Studio" };
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
-    const orderRes = await pool.query(
-      `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, bank_info, expires_at)
-       VALUES ($1, $2, 'pending_payment', $3, $4, 0, $5, $6, $7)
+    const orderRes = await client.query(
+      `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount, discount_code_id, bank_info, expires_at)
+       VALUES ($1, $2, 'pending_payment', $3, $4, 0, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [req.userId, planId, paymentMethod, subtotal, total, JSON.stringify(bankInfo), expires]
+      [
+        req.userId,
+        planId,
+        paymentMethod,
+        subtotal,
+        total,
+        discount,
+        appliedDiscountCode?.id ?? null,
+        JSON.stringify(bankInfo),
+        expires,
+      ]
     );
+
+    await client.query("COMMIT");
+
     const order = orderRes.rows[0];
     return res.status(201).json({
       data: {
@@ -2018,8 +2520,11 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       }
     });
   } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (_) { }
     console.error("POST orders error:", err);
-    return res.status(500).json({ message: "Error interno" });
+    return res.status(500).json({ message: err?.message || "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -2077,25 +2582,30 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res)
 
 // POST /api/discount-codes/validate
 app.post("/api/discount-codes/validate", authMiddleware, async (req, res) => {
-  const { code, planId } = req.body;
+  const { code, planId, classCategory, channel } = req.body;
   if (!code) return res.status(400).json({ message: "Código requerido" });
   try {
-    const planRes = await pool.query("SELECT price FROM plans WHERE id = $1", [planId]);
+    const planRes = await pool.query("SELECT price, class_category FROM plans WHERE id = $1", [planId || null]);
     const originalPrice = planRes.rows.length > 0 ? parseFloat(planRes.rows[0].price) : 0;
-    const r = await pool.query(
-      `SELECT * FROM discount_codes WHERE code = $1 AND is_active = true
-       AND (expires_at IS NULL OR expires_at > NOW())
-       AND (plan_id IS NULL OR plan_id = $2)
-       AND (max_uses IS NULL OR uses_count < max_uses)`,
-      [code.toUpperCase(), planId || null]
+    const effectiveCategory = normalizeClassCategory(
+      classCategory ?? planRes.rows[0]?.class_category ?? "all",
+      "all"
     );
-    if (r.rows.length === 0) return res.status(404).json({ message: "Código no válido o expirado" });
-    const dc = r.rows[0];
-    const minOrderAmount = Number(dc.min_order_amount || 0);
-    if (minOrderAmount > originalPrice) {
-      return res.status(400).json({ message: `Compra mínima requerida: $${minOrderAmount.toFixed(2)} MXN` });
+    const discountResult = await findApplicableDiscountCode({
+      code,
+      subtotal: originalPrice,
+      planId: planId || null,
+      classCategory: effectiveCategory,
+      channel: channel || "membership",
+    });
+    if (!discountResult) return res.status(404).json({ message: "Código no válido o expirado" });
+    if (discountResult.rejectedByMinOrder) {
+      return res.status(400).json({
+        message: `Compra mínima requerida: $${Number(discountResult.minOrderAmount || 0).toFixed(2)} MXN`,
+      });
     }
-    const discount = calculateDiscountAmount(dc.discount_type, dc.discount_value, originalPrice);
+    const dc = discountResult.code;
+    const discount = discountResult.discountAmount;
     return res.json({
       data: {
         code: dc.code,
@@ -2121,9 +2631,43 @@ app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
       [req.userId]
     );
     const total = parseInt(pointsRes.rows[0].total);
+    const passesRes = await pool.query(
+      `SELECT ep.id,
+              ep.pass_code,
+              ep.status,
+              ep.issued_at,
+              ep.used_at,
+              e.id AS event_id,
+              e.title AS event_title,
+              e.date AS event_date,
+              e.start_time AS event_start_time
+         FROM event_passes ep
+         JOIN events e ON e.id = ep.event_id
+        WHERE ep.user_id = $1
+          AND ep.status <> 'cancelled'
+        ORDER BY e.date DESC, e.start_time DESC
+        LIMIT 20`,
+      [req.userId]
+    );
     // QR data: user ID encoded
     const qrData = Buffer.from(req.userId).toString("base64");
-    return res.json({ data: { points: total, qr_code: qrData } });
+    return res.json({
+      data: {
+        points: total,
+        qr_code: qrData,
+        event_passes: passesRes.rows.map((row) => ({
+          id: row.id,
+          passCode: row.pass_code,
+          status: row.status,
+          issuedAt: row.issued_at,
+          usedAt: row.used_at,
+          eventId: row.event_id,
+          eventTitle: row.event_title,
+          eventDate: row.event_date ? String(row.event_date).slice(0, 10) : null,
+          eventStartTime: row.event_start_time ? String(row.event_start_time).slice(0, 5) : null,
+        })),
+      },
+    });
   } catch (err) {
     console.error("Wallet/pass error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -4311,62 +4855,18 @@ app.delete("/api/schedules/:id", adminMiddleware, async (req, res) => {
 
 // POST /api/pos/checkout — alias for /pos/sale
 app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
-  req.url = "/api/pos/sale";
-  const { userId, items, paymentMethod = "efectivo", discountCode } = req.body;
   try {
-    if (!items?.length) return res.status(400).json({ message: "Se requieren artículos" });
-    let subtotal = 0; let discountAmount = 0;
-    for (const item of items) {
-      const pRes = await pool.query("SELECT * FROM products WHERE id = $1", [item.productId]);
-      if (!pRes.rows.length) return res.status(404).json({ message: `Producto ${item.productId} no encontrado` });
-      subtotal += parseFloat(pRes.rows[0].price) * item.qty;
+    const { userId, items, paymentMethod = "efectivo", discountCode } = req.body;
+    const result = await processPosSale({ userId, items, paymentMethod, discountCode });
+    if (result.error) {
+      return res.status(result.error.status).json({ message: result.error.message });
     }
-    if (discountCode) {
-      const dcRes = await pool.query(
-        `SELECT * FROM discount_codes
-         WHERE code = $1 AND is_active = true
-           AND (expires_at IS NULL OR expires_at > NOW())
-           AND (plan_id IS NULL)
-           AND (max_uses IS NULL OR uses_count < max_uses)`,
-        [discountCode.toUpperCase()]
-      );
-      if (dcRes.rows.length) {
-        const dc = dcRes.rows[0];
-        const minOrderAmount = Number(dc.min_order_amount || 0);
-        if (subtotal >= minOrderAmount) {
-          discountAmount = calculateDiscountAmount(dc.discount_type, dc.discount_value, subtotal);
-        }
-      }
-    }
-    const total = Math.max(0, subtotal - discountAmount);
-    const orderRes = await pool.query(
-      "INSERT INTO orders (user_id, subtotal, tax_amount, total_amount, payment_method, status, discount_amount, channel) VALUES ($1,$2,0,$3,$4,'approved',$5,'pos') RETURNING *",
-      [userId || null, subtotal, total, paymentMethod, discountAmount]
-    );
-    const order = orderRes.rows[0];
-    for (const item of items) {
-      const pRes = await pool.query("SELECT price FROM products WHERE id=$1", [item.productId]);
-      await pool.query("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,$2,$3,$4)", [order.id, item.productId, item.qty, pRes.rows[0].price]);
-      await pool.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [item.qty, item.productId]);
-    }
-
-    // Award loyalty points for POS purchase
-    if (userId && total > 0) {
-      try {
-        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-        const pts = Math.floor(total * (cfg.points_per_peso ?? 1));
-        if (cfg.enabled !== false && pts > 0) {
-          await pool.query(
-            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
-            [userId, pts, `Compra POS — $${total}`]
-          );
-        }
-      } catch (e) { /* loyalty error shouldn't fail POS sale */ }
-    }
-
-    return res.status(201).json({ data: order });
-  } catch (err) { console.error("pos/checkout error:", err); return res.status(500).json({ message: "Error interno" }); }
+    return res.status(201).json({ data: result.data });
+  } catch (err) {
+    console.error("pos/checkout error:", err);
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    return res.status(status).json({ message: err?.message || "Error interno" });
+  }
 });
 
 // ─── Loyalty config & rewards admin ─────────────────────────────────────────
@@ -4441,18 +4941,45 @@ app.get("/api/loyalty/points/:userId", adminMiddleware, async (req, res) => {
 app.get("/api/reports/overview", adminMiddleware, async (req, res) => {
   try {
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
-    const [members, revenue, bookings, classes] = await Promise.all([
+    const [members, revenue, bookings, classes, newMembers, reviews] = await Promise.all([
       pool.query("SELECT COUNT(*) FROM memberships WHERE status='active'"),
       pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status='approved' AND created_at>=$1", [monthStart]),
-      pool.query("SELECT COUNT(*) FROM bookings WHERE created_at>=$1", [monthStart]),
+      pool.query(
+        `SELECT COUNT(*) AS total,
+                COUNT(CASE WHEN status='checked_in' THEN 1 END) AS attended
+           FROM bookings
+          WHERE created_at >= $1`,
+        [monthStart]
+      ),
       pool.query("SELECT COUNT(*) FROM classes WHERE status='scheduled' AND date>=$1", [monthStart]),
+      pool.query("SELECT COUNT(*) FROM users WHERE role='client' AND created_at>=$1", [monthStart]),
+      pool.query(
+        `SELECT COUNT(*) AS total,
+                COUNT(CASE WHEN is_approved = false THEN 1 END) AS pending,
+                COALESCE(AVG(rating),0) AS average
+           FROM reviews
+          WHERE created_at >= $1`,
+        [monthStart]
+      ),
     ]);
+    const monthlyBookings = parseInt(bookings.rows[0].total || 0);
+    const attended = parseInt(bookings.rows[0].attended || 0);
+    const classOccupancyRate = monthlyBookings > 0
+      ? Number(((attended / monthlyBookings) * 100).toFixed(1))
+      : 0;
+
     return res.json({
       data: {
         activeMembers: parseInt(members.rows[0].count),
         monthlyRevenue: parseFloat(revenue.rows[0].total),
-        monthlyBookings: parseInt(bookings.rows[0].count),
+        monthlyBookings,
         upcomingClasses: parseInt(classes.rows[0].count),
+        classOccupancyRate,
+        newMembersThisMonth: parseInt(newMembers.rows[0].count || 0),
+        churnRate: 0,
+        reviewsTotal: parseInt(reviews.rows[0].total || 0),
+        reviewsPending: parseInt(reviews.rows[0].pending || 0),
+        reviewsAverage: Number(parseFloat(reviews.rows[0].average || 0).toFixed(1)),
       }
     });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
@@ -5906,77 +6433,94 @@ app.get("/api/bookings", adminMiddleware, async (req, res) => {
 app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   const { classId, userId } = req.body;
   if (!classId || !userId) return res.status(400).json({ message: "classId y userId requeridos" });
+  const client = await pool.connect();
   try {
-    const memRes = await pool.query(
-      `SELECT m.id, m.classes_remaining, COALESCE(p.class_category, 'all') AS class_category
-       FROM memberships m
-       LEFT JOIN plans p ON m.plan_id = p.id
-       WHERE m.user_id = $1 AND m.status = 'active' AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-       ORDER BY m.created_at DESC
-       LIMIT 1`,
-      [userId]
-    );
-    if (memRes.rows.length === 0) {
-      return res.status(403).json({ message: "La clienta no tiene membresía activa para reservar esta clase" });
-    }
-    const membership = memRes.rows[0];
+    await client.query("BEGIN");
 
-    const classRes = await pool.query(
+    const classRes = await client.query(
       `SELECT c.id, c.max_capacity, c.current_bookings, c.status, ct.category AS class_category
        FROM classes c
        JOIN class_types ct ON c.class_type_id = ct.id
-       WHERE c.id = $1`,
+       WHERE c.id = $1
+       FOR UPDATE`,
       [classId]
     );
-    if (classRes.rows.length === 0) return res.status(404).json({ message: "Clase no encontrada" });
+    if (classRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Clase no encontrada" });
+    }
     const cls = classRes.rows[0];
-    if (cls.status === "cancelled") return res.status(400).json({ message: "Esta clase fue cancelada" });
+    if (cls.status === "cancelled") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "Esta clase fue cancelada" });
+    }
 
-    const memCategory = membership.class_category ?? "all";
-    const clsCategory = cls.class_category;
-    if (clsCategory && memCategory !== "mixto" && memCategory !== "all" && memCategory !== clsCategory) {
-      const label = clsCategory === "jumping" ? "Jumping" : "Pilates";
+    const clsCategory = normalizeClassCategory(cls.class_category, "all");
+    const membership = await selectMembershipForClass({
+      userId,
+      classCategory: clsCategory,
+      client,
+    });
+    if (!membership) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ message: "La clienta no tiene membresía activa con créditos para esta clase" });
+    }
+
+    const lockedMembershipRes = await client.query(
+      "SELECT id, classes_remaining FROM memberships WHERE id = $1 FOR UPDATE",
+      [membership.id]
+    );
+    const lockedMembership = lockedMembershipRes.rows[0];
+    if (!lockedMembership) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ message: "No se encontró una membresía válida para esta clase" });
+    }
+
+    if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
+      await client.query("ROLLBACK");
+      const label = clsCategory === "jumping" ? "Jumping" : clsCategory === "pilates" ? "Pilates" : "esta";
       return res.status(403).json({
         message: `La membresía de la clienta no incluye clases de ${label}.`,
       });
     }
 
-    if (
-      membership.classes_remaining !== null &&
-      membership.classes_remaining < 9999 &&
-      membership.classes_remaining <= 0
-    ) {
+    if (!isUnlimitedClasses(lockedMembership.classes_remaining) && Number(lockedMembership.classes_remaining) <= 0) {
+      await client.query("ROLLBACK");
       return res.status(403).json({
         message: "La clienta ya no tiene clases disponibles en su membresía.",
       });
     }
 
-    const dupRes = await pool.query(
+    const dupRes = await client.query(
       "SELECT id FROM bookings WHERE class_id = $1 AND user_id = $2 AND status != 'cancelled'",
       [classId, userId]
     );
-    if (dupRes.rows.length > 0) return res.status(409).json({ message: "La clienta ya tiene una reserva para esta clase" });
+    if (dupRes.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: "La clienta ya tiene una reserva para esta clase" });
+    }
 
     const isWaitlist = cls.current_bookings >= cls.max_capacity;
     const bookingStatus = isWaitlist ? "waitlist" : "confirmed";
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO bookings (class_id, user_id, membership_id, status)
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [classId, userId, membership.id, bookingStatus]
     );
 
     if (!isWaitlist) {
-      await pool.query(
+      await client.query(
         "UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1",
         [classId]
       );
-      if (membership.classes_remaining !== null && membership.classes_remaining < 9999) {
-        await pool.query(
-          "UPDATE memberships SET classes_remaining = classes_remaining - 1 WHERE id = $1",
+      if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
+        await client.query(
+          "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
           [membership.id]
         );
       }
     }
+    await client.query("COMMIT");
 
     try {
       const userRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [userId]);
@@ -6015,8 +6559,11 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       : "Reserva asignada correctamente";
     return res.status(201).json({ message, data: { booking: result.rows[0], isWaitlist } });
   } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (_) { }
     console.error("POST /admin/bookings/assign error:", err);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -6258,6 +6805,10 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
           [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
         );
       }
+
+      if (order.discount_code_id) {
+        await incrementDiscountUsage(order.discount_code_id, client);
+      }
     }
 
     await client.query("COMMIT");
@@ -6309,7 +6860,8 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch (_) { }
     console.error("PUT /admin/orders/:id/verify error:", err);
-    return res.status(500).json({ message: "Error interno" });
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    return res.status(status).json({ message: err?.message || "Error interno" });
   } finally {
     client.release();
   }
@@ -6457,20 +7009,50 @@ app.post("/api/discount-codes", adminMiddleware, async (req, res) => {
       minOrderAmount,
       minPurchaseAmount,
       planId,
+      classCategory,
+      channel,
       isActive = true,
     } = req.body;
     if (!code || !discountValue) return res.status(400).json({ message: "Código y valor requeridos" });
     const normalizedType = normalizeDiscountType(discountType);
     if (!normalizedType) return res.status(400).json({ message: "Tipo de descuento inválido" });
     const normalizedMinOrder = Number(minOrderAmount ?? minPurchaseAmount ?? 0) || 0;
+    const normalizedCategory =
+      classCategory === undefined || classCategory === null || classCategory === ""
+        ? null
+        : normalizeClassCategory(classCategory, "__invalid__");
+    if (normalizedCategory === "__invalid__") {
+      return res.status(400).json({ message: "Categoría inválida. Usa: all, jumping, pilates o mixto." });
+    }
+    const normalizedChannel =
+      channel === undefined || channel === null || channel === ""
+        ? "all"
+        : normalizeDiscountChannel(channel, "__invalid__");
+    if (normalizedChannel === "__invalid__") {
+      return res.status(400).json({ message: "Canal inválido. Usa: all, membership, pos o event." });
+    }
     if (planId) {
       const planExists = await pool.query("SELECT id FROM plans WHERE id = $1", [planId]);
       if (!planExists.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     }
     const r = await pool.query(
-      `INSERT INTO discount_codes (code, discount_type, discount_value, max_uses, expires_at, min_order_amount, plan_id, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [code.toUpperCase(), normalizedType, discountValue, maxUses || null, expiresAt || null, normalizedMinOrder, planId || null, isActive]
+      `INSERT INTO discount_codes (
+         code, discount_type, discount_value, max_uses, expires_at,
+         min_order_amount, plan_id, class_category, channel, is_active
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [
+        code.toUpperCase(),
+        normalizedType,
+        discountValue,
+        maxUses || null,
+        expiresAt || null,
+        normalizedMinOrder,
+        planId || null,
+        normalizedCategory,
+        normalizedChannel,
+        isActive,
+      ]
     );
     const enriched = await pool.query(
       `SELECT dc.*, p.name AS plan_name
@@ -6489,19 +7071,57 @@ app.post("/api/discount-codes", adminMiddleware, async (req, res) => {
 // PUT /api/discount-codes/:id
 app.put("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
   try {
-    const { code, discountType, discountValue, maxUses, expiresAt, minOrderAmount, minPurchaseAmount, planId, isActive } = req.body;
+    const {
+      code,
+      discountType,
+      discountValue,
+      maxUses,
+      expiresAt,
+      minOrderAmount,
+      minPurchaseAmount,
+      planId,
+      classCategory,
+      channel,
+      isActive,
+    } = req.body;
     const normalizedType = normalizeDiscountType(discountType);
     if (!normalizedType) return res.status(400).json({ message: "Tipo de descuento inválido" });
     const normalizedMinOrder = Number(minOrderAmount ?? minPurchaseAmount ?? 0) || 0;
+    const normalizedCategory =
+      classCategory === undefined || classCategory === null || classCategory === ""
+        ? null
+        : normalizeClassCategory(classCategory, "__invalid__");
+    if (normalizedCategory === "__invalid__") {
+      return res.status(400).json({ message: "Categoría inválida. Usa: all, jumping, pilates o mixto." });
+    }
+    const normalizedChannel =
+      channel === undefined || channel === null || channel === ""
+        ? "all"
+        : normalizeDiscountChannel(channel, "__invalid__");
+    if (normalizedChannel === "__invalid__") {
+      return res.status(400).json({ message: "Canal inválido. Usa: all, membership, pos o event." });
+    }
     if (planId) {
       const planExists = await pool.query("SELECT id FROM plans WHERE id = $1", [planId]);
       if (!planExists.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     }
     const r = await pool.query(
       `UPDATE discount_codes SET code=$1, discount_type=$2, discount_value=$3, max_uses=$4,
-       expires_at=$5, min_order_amount=$6, plan_id=$7, is_active=$8, updated_at=NOW()
-       WHERE id=$9 RETURNING *`,
-      [code?.toUpperCase(), normalizedType, discountValue, maxUses || null, expiresAt || null, normalizedMinOrder, planId || null, isActive !== false, req.params.id]
+       expires_at=$5, min_order_amount=$6, plan_id=$7, class_category=$8, channel=$9, is_active=$10, updated_at=NOW()
+       WHERE id=$11 RETURNING *`,
+      [
+        code?.toUpperCase(),
+        normalizedType,
+        discountValue,
+        maxUses || null,
+        expiresAt || null,
+        normalizedMinOrder,
+        planId || null,
+        normalizedCategory,
+        normalizedChannel,
+        isActive !== false,
+        req.params.id,
+      ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Código no encontrado" });
     const enriched = await pool.query(
@@ -6532,10 +7152,14 @@ app.delete("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
 // GET /api/products
 app.get("/api/products", adminMiddleware, async (req, res) => {
   try {
-    const { search = "" } = req.query;
+    const { search = "", active } = req.query;
     let q = "SELECT * FROM products WHERE 1=1";
     const params = [];
     if (search) { params.push(`%${search}%`); q += ` AND name ILIKE $${params.length}`; }
+    if (active !== undefined) {
+      params.push(String(active) === "true");
+      q += ` AND is_active = $${params.length}`;
+    }
     q += " ORDER BY created_at DESC";
     const r = await pool.query(q, params);
     return res.json({ data: r.rows });
@@ -6588,72 +7212,15 @@ app.delete("/api/products/:id", adminMiddleware, async (req, res) => {
 app.post("/api/pos/sale", adminMiddleware, async (req, res) => {
   try {
     const { userId, items, paymentMethod = "efectivo", discountCode } = req.body;
-    if (!items?.length) return res.status(400).json({ message: "Se requieren artículos" });
-    let subtotal = 0;
-    let discountAmount = 0;
-    // Validate items & compute subtotal
-    for (const item of items) {
-      const pRes = await pool.query("SELECT * FROM products WHERE id = $1", [item.productId]);
-      if (!pRes.rows.length) return res.status(404).json({ message: `Producto ${item.productId} no encontrado` });
-      const product = pRes.rows[0];
-      if (product.stock < item.qty) return res.status(400).json({ message: `Stock insuficiente para ${product.name}` });
-      subtotal += parseFloat(product.price) * item.qty;
+    const result = await processPosSale({ userId, items, paymentMethod, discountCode });
+    if (result.error) {
+      return res.status(result.error.status).json({ message: result.error.message });
     }
-    // Apply discount code
-    if (discountCode) {
-      const dcRes = await pool.query(
-        `SELECT * FROM discount_codes
-         WHERE code = $1 AND is_active = true
-           AND (expires_at IS NULL OR expires_at > NOW())
-           AND (plan_id IS NULL)
-           AND (max_uses IS NULL OR uses_count < max_uses)`,
-        [discountCode.toUpperCase()]
-      );
-      if (dcRes.rows.length) {
-        const dc = dcRes.rows[0];
-        const minOrderAmount = Number(dc.min_order_amount || 0);
-        if (subtotal >= minOrderAmount) {
-          discountAmount = calculateDiscountAmount(dc.discount_type, dc.discount_value, subtotal);
-        }
-      }
-    }
-    const total = Math.max(0, subtotal - discountAmount);
-    // Create order
-    const orderRes = await pool.query(
-      "INSERT INTO orders (user_id, subtotal, tax_amount, total_amount, payment_method, status, discount_amount, channel) VALUES ($1,$2,0,$3,$4,'approved',$5,'pos') RETURNING *",
-      [userId || null, subtotal, total, paymentMethod, discountAmount]
-    );
-    const order = orderRes.rows[0];
-    // Create order items & update stock
-    for (const item of items) {
-      const pRes = await pool.query("SELECT * FROM products WHERE id = $1", [item.productId]);
-      const product = pRes.rows[0];
-      await pool.query(
-        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,$2,$3,$4)",
-        [order.id, item.productId, item.qty, product.price]
-      );
-      await pool.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [item.qty, item.productId]);
-    }
-
-    // Award loyalty points for POS purchase
-    if (userId && total > 0) {
-      try {
-        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-        const pts = Math.floor(total * (cfg.points_per_peso ?? 1));
-        if (cfg.enabled !== false && pts > 0) {
-          await pool.query(
-            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
-            [userId, pts, `Venta POS — $${total}`]
-          );
-        }
-      } catch (e) { /* loyalty error shouldn't fail POS sale */ }
-    }
-
-    return res.status(201).json({ data: order });
+    return res.status(201).json({ data: result.data });
   } catch (err) {
     console.error("POST /pos/sale error:", err);
-    return res.status(500).json({ message: "Error interno" });
+    const status = Number.isInteger(err?.status) ? err.status : 500;
+    return res.status(status).json({ message: err?.message || "Error interno" });
   }
 });
 
@@ -7139,8 +7706,19 @@ app.delete("/api/admin/videos/:id", adminMiddleware, async (req, res) => {
 app.get("/api/admin/reviews", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT rv.*, u.display_name AS user_name, u.email
-       FROM reviews rv LEFT JOIN users u ON rv.user_id = u.id
+      `SELECT rv.*,
+              u.display_name AS user_name,
+              u.email,
+              i.display_name AS instructor_name,
+              ct.name AS class_type_name,
+              c.date AS class_date,
+              c.start_time AS class_start_time
+       FROM reviews rv
+       LEFT JOIN users u ON rv.user_id = u.id
+       LEFT JOIN bookings b ON rv.booking_id = b.id
+       LEFT JOIN classes c ON c.id = COALESCE(rv.class_id, b.class_id)
+       LEFT JOIN class_types ct ON c.class_type_id = ct.id
+       LEFT JOIN instructors i ON i.id = COALESCE(rv.instructor_id, c.instructor_id)
        ORDER BY rv.created_at DESC LIMIT 100`
     );
     return res.json({ data: r.rows });
@@ -7225,6 +7803,11 @@ function mapRegRow(row) {
     checkedInAt: row.checked_in_at || null,
     waitlistPosition: row.waitlist_position || null,
     notes: row.notes || null,
+    eventPassId: row.event_pass_id || null,
+    eventPassCode: row.event_pass_code || null,
+    eventPassStatus: row.event_pass_status || null,
+    eventPassIssuedAt: row.event_pass_issued_at || null,
+    eventPassUsedAt: row.event_pass_used_at || null,
     createdAt: row.created_at,
   };
 }
@@ -7264,8 +7847,15 @@ app.get("/api/events/admin/all", adminMiddleware, async (req, res) => {
       `SELECT * FROM events ORDER BY date DESC, start_time DESC`
     );
     const regRows = await pool.query(
-      `SELECT er.*, u.display_name FROM event_registrations er
+      `SELECT er.*, u.display_name,
+              ep.id AS event_pass_id,
+              ep.pass_code AS event_pass_code,
+              ep.status AS event_pass_status,
+              ep.issued_at AS event_pass_issued_at,
+              ep.used_at AS event_pass_used_at
+         FROM event_registrations er
        LEFT JOIN users u ON er.user_id = u.id
+       LEFT JOIN event_passes ep ON ep.registration_id = er.id
        ORDER BY er.created_at ASC`
     );
     const regsByEvent = {};
@@ -7304,7 +7894,16 @@ app.get("/api/events/:id", async (req, res) => {
     const result = mapEventRow(ev);
     if (userId) {
       const regRes = await pool.query(
-        `SELECT * FROM event_registrations WHERE event_id = $1 AND user_id = $2 AND status != 'cancelled' LIMIT 1`,
+        `SELECT er.*,
+                ep.id AS event_pass_id,
+                ep.pass_code AS event_pass_code,
+                ep.status AS event_pass_status,
+                ep.issued_at AS event_pass_issued_at,
+                ep.used_at AS event_pass_used_at
+           FROM event_registrations er
+           LEFT JOIN event_passes ep ON ep.registration_id = er.id
+          WHERE er.event_id = $1 AND er.user_id = $2 AND er.status != 'cancelled'
+          LIMIT 1`,
         [req.params.id, userId]
       );
       result.myRegistration = regRes.rows.length ? mapRegRow(regRes.rows[0]) : null;
@@ -7483,6 +8082,20 @@ app.post("/api/events/:id/register", authMiddleware, async (req, res) => {
       );
     }
 
+    let issuedPass = null;
+    if (regStatus === "confirmed" && reg.user_id) {
+      issuedPass = await ensureEventPassForRegistration({
+        eventId: req.params.id,
+        registrationId: reg.id,
+        userId: reg.user_id,
+      }).catch((passErr) => {
+        console.error("[Events] pass issue on register:", passErr?.message || passErr);
+        return null;
+      });
+    } else {
+      await cancelEventPassByRegistration({ registrationId: reg.id }).catch(() => { });
+    }
+
     let message;
     if (regStatus === "waitlist") message = `Te agregamos a la lista de espera (posición ${waitlistPosition})`;
     else if (amount === 0) message = "¡Registro confirmado! Te esperamos en el evento.";
@@ -7495,6 +8108,7 @@ app.post("/api/events/:id/register", authMiddleware, async (req, res) => {
       amount: Number(reg.amount),
       isFree: amount === 0,
       waitlistPosition,
+      passCode: issuedPass?.pass_code ?? null,
       message,
     });
   } catch (err) {
@@ -7520,6 +8134,7 @@ app.delete("/api/events/:id/register", authMiddleware, async (req, res) => {
       "UPDATE event_registrations SET status='cancelled', updated_at=NOW() WHERE id=$1",
       [reg.id]
     );
+    await cancelEventPassByRegistration({ registrationId: reg.id }).catch(() => { });
     await pool.query(
       "UPDATE events SET registered = GREATEST(0, (SELECT COUNT(*) FROM event_registrations WHERE event_id=$1 AND status='confirmed')) WHERE id=$1",
       [req.params.id]
@@ -7535,8 +8150,15 @@ app.delete("/api/events/:id/register", authMiddleware, async (req, res) => {
 app.get("/api/events/:id/registrations", adminMiddleware, async (req, res) => {
   try {
     const rows = await pool.query(
-      `SELECT er.*, u.display_name FROM event_registrations er
+      `SELECT er.*, u.display_name,
+              ep.id AS event_pass_id,
+              ep.pass_code AS event_pass_code,
+              ep.status AS event_pass_status,
+              ep.issued_at AS event_pass_issued_at,
+              ep.used_at AS event_pass_used_at
+         FROM event_registrations er
        LEFT JOIN users u ON er.user_id = u.id
+       LEFT JOIN event_passes ep ON ep.registration_id = er.id
        WHERE er.event_id = $1 ORDER BY er.created_at ASC`,
       [req.params.id]
     );
@@ -7579,6 +8201,18 @@ app.put("/api/events/:eventId/registrations/:regId", adminMiddleware, async (req
       "UPDATE events SET registered = (SELECT COUNT(*) FROM event_registrations WHERE event_id=$1 AND status='confirmed') WHERE id=$1",
       [req.params.eventId]
     );
+    const updatedReg = r.rows[0];
+    if (updatedReg.status === "confirmed" && updatedReg.user_id) {
+      await ensureEventPassForRegistration({
+        eventId: req.params.eventId,
+        registrationId: updatedReg.id,
+        userId: updatedReg.user_id,
+      }).catch((passErr) => {
+        console.error("[Events] pass issue on admin status update:", passErr?.message || passErr);
+      });
+    } else if (["cancelled", "no_show", "waitlist", "pending"].includes(updatedReg.status)) {
+      await cancelEventPassByRegistration({ registrationId: updatedReg.id }).catch(() => { });
+    }
     return res.json({ message: "Inscripción actualizada", status: r.rows[0].status });
   } catch (err) {
     console.error(err);
@@ -7596,6 +8230,7 @@ app.post("/api/events/:eventId/checkin/:regId", adminMiddleware, async (req, res
       [req.userId, req.params.regId, req.params.eventId]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Inscripción no encontrada" });
+    await markEventPassUsedByRegistration({ registrationId: r.rows[0].id }).catch(() => { });
     return res.json({ message: "Check-in exitoso", checkedIn: true });
   } catch (err) {
     console.error(err);

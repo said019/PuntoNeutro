@@ -74,22 +74,10 @@ const FALLBACK_PACKAGES: PackageRow[] = [
   { id: "p16", name: "Ilimitado Mixto",       num_classes: "ILIMITADO", price: 1000, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 5 },
 ];
 
-const TESTIMONIOS = [
-  { name: "Karla M.", stars: 5, text: "Llevo 6 meses y no puedo parar! Baje 8 kg y me siento increible. El ambiente del studio es unico, las instructoras te motivan a dar lo mejor.", avatar: "KM" },
-  { name: "Sofia R.", stars: 5, text: "Empece sin forma fisica y ahora hago Power Jump sin problema. La comunidad de Ophelia es lo mejor, todas nos apoyamos.", avatar: "SR" },
-  { name: "Daniela V.", stars: 5, text: "El jumping fue lo que necesitaba. Cuida mis rodillas y aun asi siento que entene duro. Las clases de 7am me cambiaron la manana.", avatar: "DV" },
-  { name: "Mariana L.", stars: 5, text: "Desde el primer dia me senti bienvenida. El studio es hermoso, la musica increible y los resultados hablan solos. 100% recomendado.", avatar: "ML" },
-  { name: "Valeria P.", stars: 5, text: "Probe mil clases y ninguna me engancho como el jumping. Es adictivo en el mejor sentido, cada clase es diferente y divertidisima.", avatar: "VP" },
-  { name: "Fernanda T.", stars: 5, text: "Las instructoras son excelentes, siempre atentas a la tecnica. Me encanta que hay clases para todos los niveles. Ophelia es mi lugar favorito.", avatar: "FT" },
-];
-
-/** Map emoji field to a Lucide icon based on the stored value or the card title */
+/** Map icon key field to a Lucide icon based on stored value or card title */
 const ICON_MAP: Record<string, LucideIcon> = {
   dumbbell: Dumbbell, music: Music, waves: Waves, flame: Flame,
   zap: Zap, heart: Heart, activity: Activity, sparkles: Sparkles,
-  // Emoji fallbacks for backwards compat
-  "🏋️": Dumbbell, "🏋": Dumbbell, "💃": Music, "🧘": Waves,
-  "🔥": Flame, "⚡": Zap, "❤️": Heart, "💪": Activity, "✨": Sparkles,
 };
 function getCardIcon(emoji?: string, title?: string): LucideIcon {
   if (emoji && ICON_MAP[emoji]) return ICON_MAP[emoji];
@@ -125,7 +113,6 @@ const Index = () => {
   const [classTypes, setClassTypes] = useState<ClassTypeRow[]>(FALLBACK_CLASS_TYPES);
   const [packages, setPackages] = useState<PackageRow[]>(FALLBACK_PACKAGES);
   const [activePkgTab, setActivePkgTab] = useState<"jumping" | "pilates" | "mixtos">("jumping");
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const navigate = useNavigate();
@@ -150,9 +137,9 @@ const Index = () => {
   const videoCards = videoCardsData?.data?.length
     ? videoCardsData.data
     : [
-        { id: 1, title: "Jumping Fitness", description: "Cardio de alta intensidad en trampolín con música que te hará volar.", emoji: "🏋️", video_url: null, thumbnail_url: null },
-        { id: 2, title: "Jumping Dance",   description: "Coreografías sobre el trampolín que combinan ritmo y diversión.",     emoji: "💃", video_url: null, thumbnail_url: null },
-        { id: 3, title: "Pilates Flow",    description: "Secuencias fluidas para fortalecer tu core y mejorar postura.",        emoji: "🧘", video_url: null, thumbnail_url: null },
+        { id: 1, title: "Jumping Fitness", description: "Cardio de alta intensidad en trampolín con música que te hará volar.", emoji: "dumbbell", video_url: null, thumbnail_url: null },
+        { id: 2, title: "Jumping Dance",   description: "Coreografías sobre el trampolín que combinan ritmo y diversión.",     emoji: "music", video_url: null, thumbnail_url: null },
+        { id: 3, title: "Pilates Flow",    description: "Secuencias fluidas para fortalecer tu core y mejorar postura.",        emoji: "waves", video_url: null, thumbnail_url: null },
       ];
 
   useEffect(() => {
@@ -181,12 +168,6 @@ const Index = () => {
       const rows = Array.isArray(data?.data) ? data.data : [];
       if (rows.length > 0) setInstructors(rows);
     }).catch(() => {});
-  }, []);
-
-  // Auto-rotate testimonials
-  useEffect(() => {
-    const t = setInterval(() => setActiveTestimonial((p) => (p + 1) % TESTIMONIOS.length), 5000);
-    return () => clearInterval(t);
   }, []);
 
   // Scroll reveal
@@ -798,74 +779,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ── TESTIMONIOS ── */}
-      <section id="testimonios" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(var(--primary)/0.08)_0%,transparent_60%)] pointer-events-none" />
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 relative z-10">
-          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
-            <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Comunidad
-          </div>
-          <h2 className="font-bebas text-[clamp(3rem,5vw,5rem)] leading-[0.95] text-foreground mb-16">
-            LO QUE DICEN<br />NUESTRAS ALUMNAS
-          </h2>
-          {/* Featured testimonial */}
-          <div className="max-w-[700px] mx-auto text-center mb-12">
-            <div className="flex justify-center gap-1 mb-6">
-              {Array.from({ length: TESTIMONIOS[activeTestimonial].stars }).map((_, i) => (
-                <span key={i} className="text-primary text-xl">★</span>
-              ))}
-            </div>
-            <blockquote className="text-[1.1rem] text-foreground leading-[1.8] font-light mb-8 min-h-[80px] transition-all">
-              "{TESTIMONIOS[activeTestimonial].text}"
-            </blockquote>
-            <div className="flex items-center justify-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-[#CA71E1] flex items-center justify-center text-white font-bold text-sm">
-                {TESTIMONIOS[activeTestimonial].avatar}
-              </div>
-              <span className="font-syne font-semibold text-foreground">{TESTIMONIOS[activeTestimonial].name}</span>
-            </div>
-          </div>
-          {/* Dots */}
-          <div className="flex justify-center gap-2 mb-12">
-            {TESTIMONIOS.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveTestimonial(i)}
-                className={`rounded-full transition-all ${i === activeTestimonial ? "w-8 h-2 bg-primary" : "w-2 h-2 bg-border hover:bg-primary/50"}`}
-              />
-            ))}
-          </div>
-          {/* Grid de mini testimonials */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {TESTIMONIOS.map((t, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveTestimonial(i)}
-                className={`text-left rounded-2xl p-6 border transition-all ${
-                  i === activeTestimonial
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-background/40 hover:border-primary/40"
-                }`}
-              >
-                <div className="flex gap-1 mb-3">
-                  {Array.from({ length: t.stars }).map((_, s) => (
-                    <span key={s} className="text-primary text-sm">★</span>
-                  ))}
-                </div>
-                <p className="text-[0.82rem] text-muted-foreground leading-[1.6] mb-4 line-clamp-2">{t.text}</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/40 to-[#CA71E1]/40 flex items-center justify-center text-[0.65rem] font-bold text-primary">
-                    {t.avatar}
-                  </div>
-                  <span className="text-[0.78rem] font-medium text-foreground">{t.name}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── POLÍTICAS ── */}
       <section id="politicas" className="py-16 lg:py-24 px-6 lg:px-[60px] bg-secondary">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
@@ -1124,7 +1037,7 @@ const Index = () => {
         </div>
         <div className="border-t border-border py-5 flex flex-col sm:flex-row justify-between items-center gap-2">
           <p className="text-[0.75rem] text-muted-foreground/50">© 2026 Ophelia Jumping Studio. Todos los derechos reservados.</p>
-          <p className="text-[0.75rem] text-muted-foreground/50">Hecho con ♥ en San Juan del Río</p>
+          <p className="text-[0.75rem] text-muted-foreground/50">Hecho con pasión en San Juan del Río</p>
         </div>
       </footer>
     </div>

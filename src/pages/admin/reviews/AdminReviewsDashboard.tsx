@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -70,16 +70,76 @@ const ReviewTagsManager = () => {
   );
 };
 
-const AdminReviewsDashboard = () => {
-  const { data: statsData } = useQuery({ queryKey: ["reviews-stats"], queryFn: async () => (await api.get("/reviews/stats")).data });
-  const { data: reviewsData } = useQuery({ queryKey: ["reviews"], queryFn: async () => (await api.get("/reviews?limit=50")).data });
+interface AdminReview {
+  id: string;
+  user_name?: string;
+  user_id?: string;
+  email?: string;
+  instructor_name?: string;
+  instructor_id?: string;
+  class_type_name?: string;
+  class_date?: string;
+  class_start_time?: string;
+  rating?: number;
+  overall_rating?: number;
+  comment?: string;
+  is_approved?: boolean;
+  created_at?: string;
+}
 
-  const stats = statsData?.data ?? statsData ?? {};
-  const reviews = Array.isArray(reviewsData?.data) ? reviewsData.data : [];
+const AdminReviewsDashboard = () => {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const { data: reviewsData, isLoading } = useQuery({
+    queryKey: ["admin-reviews"],
+    queryFn: async () => (await api.get("/admin/reviews")).data,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => api.put(`/admin/reviews/${id}/approve`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-reviews"] });
+      toast({ title: "Reseña aprobada" });
+    },
+    onError: () => toast({ title: "No se pudo aprobar la reseña", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/admin/reviews/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-reviews"] });
+      toast({ title: "Reseña eliminada" });
+    },
+    onError: () => toast({ title: "No se pudo eliminar la reseña", variant: "destructive" }),
+  });
+
+  const reviews: AdminReview[] = Array.isArray(reviewsData?.data) ? reviewsData.data : [];
+
+  const stats = useMemo(() => {
+    const ratings = reviews
+      .map((r) => Number(r.rating ?? r.overall_rating ?? 0))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    const average = ratings.length ? (ratings.reduce((acc, n) => acc + n, 0) / ratings.length).toFixed(1) : "—";
+    const pending = reviews.filter((r) => !r.is_approved).length;
+    return {
+      total: reviews.length,
+      average,
+      pending,
+    };
+  }, [reviews]);
 
   const renderStars = (n: number) => Array(5).fill(0).map((_, i) => (
     <Star key={i} size={12} fill={i < n ? "currentColor" : "none"} className={i < n ? "text-yellow-400" : "text-muted-foreground"} />
   ));
+
+  const renderClassLabel = (r: AdminReview) => {
+    const classLabel = r.class_type_name || "Clase";
+    if (!r.class_date) return classLabel;
+    const date = new Date(r.class_date);
+    const dateLabel = Number.isNaN(date.getTime()) ? r.class_date : date.toLocaleDateString("es-MX");
+    const timeLabel = r.class_start_time ? String(r.class_start_time).slice(0, 5) : "";
+    return `${classLabel} · ${dateLabel}${timeLabel ? ` ${timeLabel}` : ""}`;
+  };
 
   return (
     <AuthGuard>
@@ -88,9 +148,9 @@ const AdminReviewsDashboard = () => {
           <h1 className="text-2xl font-bold mb-6">Reseñas</h1>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Total reseñas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{stats.totalReviews ?? 0}</p></CardContent></Card>
-            <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Promedio</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{stats.averageRating ?? "—"} ⭐</p></CardContent></Card>
-            <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">5 estrellas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{stats.fiveStarCount ?? 0}</p></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Total reseñas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{stats.total}</p></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Promedio</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{stats.average} ⭐</p></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Pendientes</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{stats.pending}</p></CardContent></Card>
           </div>
 
           <Tabs defaultValue="list">
@@ -100,17 +160,78 @@ const AdminReviewsDashboard = () => {
             </TabsList>
             <TabsContent value="list" className="mt-4">
               <Table>
-                <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Instructor</TableHead><TableHead>Rating</TableHead><TableHead>Comentario</TableHead><TableHead>Fecha</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Clase</TableHead>
+                    <TableHead>Instructor</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead>Estatus</TableHead>
+                    <TableHead>Comentario</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead className="w-[56px]" />
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
-                  {reviews.map((r: any) => (
-                    <TableRow key={r.id}>
-                      <TableCell>{r.userName ?? r.userId}</TableCell>
-                      <TableCell>{r.instructorName ?? r.instructorId ?? "—"}</TableCell>
-                      <TableCell><div className="flex">{renderStars(r.rating)}</div></TableCell>
-                      <TableCell className="text-sm max-w-xs truncate">{r.comment ?? "—"}</TableCell>
-                      <TableCell className="text-sm">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("es-MX") : "—"}</TableCell>
+                  {!isLoading && reviews.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-sm text-muted-foreground text-center py-8">
+                        No hay reseñas para mostrar.
+                      </TableCell>
                     </TableRow>
-                  ))}
+                  )}
+                  {reviews.map((r) => {
+                    const numericRating = Number(r.rating ?? r.overall_rating ?? 0);
+                    const safeRating = Number.isFinite(numericRating) && numericRating > 0
+                      ? Math.max(1, Math.min(5, Math.round(numericRating)))
+                      : null;
+
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell>{r.user_name || r.email || r.user_id || "—"}</TableCell>
+                        <TableCell>{renderClassLabel(r)}</TableCell>
+                        <TableCell>{r.instructor_name || r.instructor_id || "—"}</TableCell>
+                        <TableCell>
+                          {safeRating ? <div className="flex">{renderStars(safeRating)}</div> : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {r.is_approved ? (
+                            <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">Aprobada</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">Pendiente</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm max-w-xs truncate">{r.comment || "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          {r.created_at ? new Date(r.created_at).toLocaleString("es-MX") : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal size={16} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {!r.is_approved && (
+                                <DropdownMenuItem onClick={() => approveMutation.mutate(r.id)}>
+                                  Aprobar
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => {
+                                  if (window.confirm("¿Eliminar esta reseña?")) deleteMutation.mutate(r.id);
+                                }}
+                              >
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TabsContent>

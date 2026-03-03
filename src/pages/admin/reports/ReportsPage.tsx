@@ -36,6 +36,20 @@ const ReportsPage = () => {
   const o = overview?.data ?? overview ?? {};
 
   const safeArray = (v: any) => (Array.isArray(v) ? v : []);
+  const classesData = safeArray(classes?.data ?? classes).map((row: any) => ({
+    label: row.name ?? row.week ?? "—",
+    bookings: Number(row.bookings ?? row.count ?? 0),
+    attended: Number(row.attended ?? 0),
+  }));
+  const retentionRaw = retention?.data ?? retention;
+  const retentionData = Array.isArray(retentionRaw)
+    ? retentionRaw
+    : retentionRaw
+      ? [
+          { month: "Total", rate: Number(retentionRaw.total ?? 0) },
+          { month: "Nuevos", rate: Number(retentionRaw.new_this_month ?? retentionRaw.newThisMonth ?? 0) },
+        ]
+      : [];
 
   const metric = (label: string, value: string | number | undefined, suffix = "") => (
     <Card>
@@ -59,6 +73,8 @@ const ReportsPage = () => {
             {metric("Ocupación clases", o.classOccupancyRate, "%")}
             {metric("Nuevos miembros", o.newMembersThisMonth)}
             {metric("Churn rate", o.churnRate, "%")}
+            {metric("Reseñas del mes", o.reviewsTotal)}
+            {metric("Reseñas pendientes", o.reviewsPending)}
           </div>
 
           <Tabs defaultValue="revenue">
@@ -91,12 +107,13 @@ const ReportsPage = () => {
                 <CardHeader><CardTitle>Clases por semana</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={safeArray(classes?.data ?? classes)}>
+                    <BarChart data={classesData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="week" />
+                      <XAxis dataKey="label" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="bookings" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="attended" fill="#CA71E1" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -108,7 +125,7 @@ const ReportsPage = () => {
                 <CardHeader><CardTitle>Retención de miembros</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={safeArray(retention?.data ?? retention)}>
+                    <LineChart data={retentionData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />

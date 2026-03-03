@@ -8,8 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   Check, Loader2, CreditCard, Copy, Banknote, Building2,
-  Tag, ChevronRight, ArrowLeft, Upload, CheckCircle,
+  Tag, ChevronRight, ArrowLeft, Upload, CheckCircle, Sparkles,
 } from "lucide-react";
+import imgTrampoline from "@/assets/trampoline_2982156.png";
+import imgPilates from "@/assets/pilates_2320695.png";
 
 type Step = "select" | "method" | "bank" | "cash" | "upload" | "done";
 type PaymentMethod = "transfer" | "cash";
@@ -21,6 +23,16 @@ function flag(value: unknown): boolean {
   return false;
 }
 
+function detectPlanCategory(plan: any): "jumping" | "pilates" | "mixto" | "all" {
+  const raw = String(plan.classCategory ?? plan.class_category ?? "").toLowerCase();
+  if (["jumping", "pilates", "mixto", "all"].includes(raw)) return raw as "jumping" | "pilates" | "mixto" | "all";
+  const byName = String(plan.name ?? "").toLowerCase();
+  if (byName.includes("jump")) return "jumping";
+  if (byName.includes("pilates")) return "pilates";
+  if (byName.includes("mixto")) return "mixto";
+  return "all";
+}
+
 // ── Plan card ─────────────────────────────────────────────────────────────────
 const PlanCard = ({
   plan, selected, onSelect,
@@ -29,24 +41,51 @@ const PlanCard = ({
   const classLimit = plan.classLimit ?? plan.class_limit ?? null;
   const nonTransferable = flag(plan.isNonTransferable ?? plan.is_non_transferable);
   const nonRepeatable = flag(plan.isNonRepeatable ?? plan.is_non_repeatable);
+  const category = detectPlanCategory(plan);
+  const categoryLabel =
+    category === "jumping" ? "Jumping" :
+    category === "pilates" ? "Pilates" :
+    category === "mixto" ? "Mixto" : "General";
+  const accent =
+    category === "jumping" ? "#E15CB8" :
+    category === "pilates" ? "#E7EB6E" :
+    category === "mixto" ? "#CA71E1" : "#CA71E1";
+  const iconSrc =
+    category === "jumping" ? imgTrampoline :
+    category === "pilates" ? imgPilates :
+    category === "mixto" ? imgTrampoline : imgTrampoline;
 
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        "relative w-full text-left rounded-2xl border p-4 transition-all duration-200",
+        "relative w-full text-left rounded-2xl border p-4 transition-all duration-200 overflow-hidden",
         selected
           ? "border-[#E15CB8]/60 bg-gradient-to-br from-[#E15CB8]/10 to-[#CA71E1]/5 shadow-[0_0_20px_rgba(225,92,184,0.15)]"
           : "border-white/[0.08] bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
       )}
     >
+      <div className="pointer-events-none absolute -top-12 -right-10 h-28 w-28 rounded-full opacity-30 blur-2xl" style={{ backgroundColor: accent }} />
       {selected && (
         <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center">
           <Check size={11} className="text-white" />
         </span>
       )}
-      <p className="text-sm font-semibold text-white/85 pr-6 leading-snug">{plan.name}</p>
+      <div className="flex items-start gap-3 pr-7">
+        <div
+          className="h-11 w-11 rounded-xl border flex items-center justify-center shrink-0"
+          style={{ borderColor: `${accent}55`, background: `${accent}20` }}
+        >
+          <img src={iconSrc} alt="" className="h-7 w-7 object-contain" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-white/85 leading-snug">{plan.name}</p>
+          <div className="mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold" style={{ borderColor: `${accent}55`, color: accent }}>
+            <Sparkles size={10} /> {categoryLabel}
+          </div>
+        </div>
+      </div>
       <div className="flex items-baseline gap-1 mt-2">
         <span className="text-2xl font-bold text-white">${Number(plan.price ?? 0).toLocaleString("es-MX")}</span>
         <span className="text-xs text-white/35">{plan.currency ?? "MXN"}</span>
