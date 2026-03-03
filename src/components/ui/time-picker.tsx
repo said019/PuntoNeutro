@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, Clock } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 interface TimePickerProps {
@@ -23,6 +24,7 @@ const parseTime = (v?: string): [number, number] => {
 };
 
 export const TimePicker = ({ value, onChange, className, disabled }: TimePickerProps) => {
+  const isMobile = useIsMobile();
   const [hours, setHours] = useState(9);
   const [minutes, setMinutes] = useState(0);
 
@@ -62,6 +64,30 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
       {up ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
     </button>
   );
+
+  if (isMobile) {
+    return (
+      <div
+        className={cn(
+          "inline-flex w-full items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2",
+          "focus-within:border-[#E15CB8]/40 focus-within:bg-[#E15CB8]/[0.03]",
+          disabled && "opacity-50 pointer-events-none",
+          className,
+        )}
+      >
+        <Clock size={13} className="text-[#E15CB8]/50 shrink-0" />
+        <input
+          type="time"
+          step={300}
+          value={value ?? `${pad(hours)}:${pad(minutes)}`}
+          disabled={disabled}
+          onChange={(e) => onChange?.(e.target.value)}
+          className="w-full bg-transparent text-sm text-white/90 focus:outline-none"
+          aria-label="Seleccionar hora"
+        />
+      </div>
+    );
+  }
 
   return (
     <div

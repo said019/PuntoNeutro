@@ -66,7 +66,7 @@ const Dashboard = () => {
   return (
     <AuthGuard requiredRoles={["admin", "instructor"]}>
       <AdminLayout>
-        <div className="p-4 md:p-6 max-w-6xl mx-auto">
+        <div className="admin-page max-w-6xl">
           <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
           {/* Metric cards */}

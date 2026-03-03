@@ -69,7 +69,7 @@ const GenerateClasses = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-4 md:p-6 max-w-2xl mx-auto">
+        <div className="admin-page max-w-2xl">
           <div className="mb-7">
             <h1 className="text-3xl font-bold text-white mb-1">Generar Clases</h1>
             <p className="text-sm text-white/35">Crea clases en bloque para un rango de fechas</p>

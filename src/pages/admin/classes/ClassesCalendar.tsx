@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,6 +22,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimePicker } from "@/components/ui/time-picker";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck, Sparkles, Calendar } from "lucide-react";
 
 /* ── Palette ── */
@@ -176,6 +178,7 @@ function instructorPayload(d: InstructorFormData) {
 const ClassesCalendar = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const isMobile = useIsMobile();
   const [tab, setTab] = useState<TabKey>("calendar");
 
   const { data: typesData } = useQuery<{ data: ClassType[] }>({
@@ -193,9 +196,12 @@ const ClassesCalendar = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <h1 className="text-2xl font-bold">Clases</h1>
+        <div className="admin-page max-w-6xl">
+          <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="admin-title font-bold text-white">Clases</h1>
+              <p className="mt-1 text-xs text-white/45 sm:text-sm">Gestiona calendario, tipos, generación semanal e instructoras.</p>
+            </div>
             <div className="w-full sm:w-auto overflow-x-auto">
               <div className="flex min-w-max gap-1 rounded-xl bg-secondary p-1">
               {TABS.map(({ key, label, icon: Icon }) => (
@@ -203,14 +209,20 @@ const ClassesCalendar = () => {
                   key={key}
                   onClick={() => setTab(key)}
                   className={
-                    "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all " +
+                    "flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap transition-all sm:px-4 sm:text-sm " +
                     (tab === key
                       ? "bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white shadow-md shadow-[#E15CB8]/25"
                       : "text-muted-foreground hover:text-foreground hover:bg-white/5")
                   }
                 >
                   <Icon size={15} />
-                  {key === "types" ? "Tipos" : key === "generate" ? "Generar" : label}
+                  {isMobile
+                    ? key === "types"
+                      ? "Tipos"
+                      : key === "generate"
+                        ? "Generar"
+                        : label
+                    : label}
                 </button>
               ))}
               </div>
@@ -241,11 +253,13 @@ function CalendarTab({
   toast: any;
   qc: any;
 }) {
+  const isMobile = useIsMobile();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedClass, setSelectedClass] = useState<ClassInstance | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [mobileDay, setMobileDay] = useState(() => format(new Date(), "yyyy-MM-dd"));
 
   const start = format(weekStart, "yyyy-MM-dd");
   const end = format(addDays(weekStart, 6), "yyyy-MM-dd");
@@ -302,88 +316,199 @@ function CalendarTab({
   const classesForDay = (date: Date) =>
     classes.filter((c) => c.startTime?.startsWith(format(date, "yyyy-MM-dd")));
 
+  useEffect(() => {
+    const currentWeekDays = days.map((d) => format(d, "yyyy-MM-dd"));
+    if (!currentWeekDays.includes(mobileDay)) {
+      setMobileDay(currentWeekDays[0]);
+    }
+  }, [weekStart, mobileDay, days]);
+
   const openCreate = (date: string) => {
     setSelectedDate(date);
     form.reset({ startTime: date + "T09:00", endTime: date + "T10:00", maxCapacity: 10 });
     setCreateOpen(true);
   };
 
+  const shiftWeek = (offset: number) => {
+    const next = addDays(weekStart, offset);
+    setWeekStart(next);
+    if (isMobile) setMobileDay(format(next, "yyyy-MM-dd"));
+  };
+
+  const mobileDayDate = parseISO(mobileDay);
+  const mobileClasses = classes.filter((c) => c.startTime?.startsWith(mobileDay));
+
   return (
     <>
       {/* Week nav */}
-      <div className="flex items-center justify-center gap-3 mb-6">
-        <Button variant="outline" size="icon" onClick={() => setWeekStart(addDays(weekStart, -7))}>
+      <div className="mb-4 flex items-center justify-center gap-2 sm:mb-6 sm:gap-3">
+        <Button variant="outline" size="icon" onClick={() => shiftWeek(-7)}>
           <ChevronLeft size={14} />
         </Button>
-        <span className="text-sm font-medium">
+        <span className="text-center text-xs font-medium sm:text-sm">
           {format(weekStart, "d MMM", { locale: es })} – {format(addDays(weekStart, 6), "d MMM yyyy", { locale: es })}
         </span>
-        <Button variant="outline" size="icon" onClick={() => setWeekStart(addDays(weekStart, 7))}>
+        <Button variant="outline" size="icon" onClick={() => shiftWeek(7)}>
           <ChevronRight size={14} />
         </Button>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-7 gap-2">
-        {days.map((day, i) => {
-          const dayClasses = classesForDay(day);
-          return (
-            <div key={i} className="min-h-[300px]">
-              <div
-                className="text-center text-xs font-medium text-muted-foreground mb-2 cursor-pointer hover:text-foreground"
-                onClick={() => openCreate(format(day, "yyyy-MM-dd"))}
-              >
-                <div>{DAYS_ES[day.getDay()]}</div>
-                <div className="text-lg font-bold text-foreground">{format(day, "d")}</div>
-              </div>
-              <div className="space-y-1">
-                {dayClasses.map((c) => (
-                  <div
-                    key={c.id}
-                    onClick={() => { setSelectedClass(c); setSheetOpen(true); }}
-                    className="rounded-lg px-2 py-1.5 text-xs cursor-pointer hover:opacity-80 transition-opacity"
-                    style={{
-                      backgroundColor: c.classTypeColor ? c.classTypeColor + "33" : "hsl(var(--primary)/0.2)",
-                      borderLeft: "3px solid " + (c.classTypeColor ?? "hsl(var(--primary))"),
-                    }}
+      {isMobile ? (
+        <div className="space-y-3">
+          <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/[0.02] p-2">
+            <div className="flex min-w-max gap-2">
+              {days.map((day) => {
+                const dayKey = format(day, "yyyy-MM-dd");
+                const isActive = dayKey === mobileDay;
+                const count = classesForDay(day).length;
+                return (
+                  <button
+                    key={dayKey}
+                    type="button"
+                    onClick={() => setMobileDay(dayKey)}
+                    className={cn(
+                      "flex min-h-[52px] min-w-[76px] flex-col items-center justify-center rounded-xl border px-2 text-xs transition-colors",
+                      isActive
+                        ? "border-[#E15CB8]/60 bg-gradient-to-r from-[#E15CB8]/20 to-[#CA71E1]/20 text-white"
+                        : "border-white/10 bg-black/30 text-white/70",
+                    )}
                   >
-                    <div className="font-medium truncate">{c.classTypeName ?? "Clase"}</div>
-                    <div className="text-muted-foreground">{c.startTime ? format(parseISO(c.startTime), "HH:mm") : ""}</div>
-                    {/* Instructor avatar */}
-                    <div className="flex items-center gap-1 mt-1">
+                    <span className="text-[10px] uppercase">{DAYS_ES[day.getDay()]}</span>
+                    <span className="text-base font-bold leading-none">{format(day, "d")}</span>
+                    <span className="mt-0.5 text-[10px] text-white/55">{count} cls</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-white/45">{DAYS_ES[mobileDayDate.getDay()]}</p>
+                <p className="text-sm font-semibold text-white">{format(mobileDayDate, "d 'de' MMMM", { locale: es })}</p>
+              </div>
+              <Button size="sm" className="h-9" onClick={() => openCreate(mobileDay)}>
+                <Plus size={14} className="mr-1" /> Nueva
+              </Button>
+            </div>
+
+            {mobileClasses.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-white/10 p-6 text-center text-xs text-white/45">
+                Sin clases programadas para este día.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {mobileClasses.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => { setSelectedClass(c); setSheetOpen(true); }}
+                    className="w-full rounded-xl border border-white/10 bg-black/30 p-3 text-left"
+                    style={{ borderLeftColor: c.classTypeColor ?? "#CA71E1", borderLeftWidth: 3 }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{c.classTypeName ?? "Clase"}</p>
+                        <p className="text-xs text-white/60">
+                          {c.startTime ? format(parseISO(c.startTime), "HH:mm") : "—"}
+                          {" - "}
+                          {c.endTime ? format(parseISO(c.endTime), "HH:mm") : "—"}
+                        </p>
+                      </div>
+                      <Badge variant={c.isCancelled ? "destructive" : "secondary"} className="text-[10px]">
+                        {c.isCancelled ? "Cancelada" : "Activa"}
+                      </Badge>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
                       {c.instructorPhoto ? (
                         <img
                           src={c.instructorPhoto}
                           alt={c.instructorName ?? ""}
-                          className="w-4 h-4 rounded-full object-cover ring-1 ring-white/30"
+                          className="h-6 w-6 rounded-full object-cover ring-1 ring-white/25"
                         />
                       ) : (
                         <span
-                          className="w-4 h-4 rounded-full flex items-center justify-center text-[0.5rem] font-bold text-white ring-1 ring-white/30"
+                          className="flex h-6 w-6 items-center justify-center rounded-full text-[0.6rem] font-bold text-white"
                           style={{ background: c.classTypeColor ?? "#CA71E1" }}
                         >
                           {(c.instructorName ?? "?")[0].toUpperCase()}
                         </span>
                       )}
-                      <span className="text-muted-foreground truncate text-[0.65rem]">{c.instructorName ?? "—"}</span>
+                      <span className="truncate text-xs text-white/60">{c.instructorName ?? "—"}</span>
+                      <span className="ml-auto text-xs text-white/55">
+                        {(c.bookedCount ?? c.currentBookings ?? 0)}/{c.maxCapacity ?? c.capacity ?? "?"}
+                      </span>
                     </div>
-                    <div className="text-muted-foreground mt-0.5">
-                      {(c.bookedCount ?? c.currentBookings ?? 0)}/{c.maxCapacity ?? c.capacity ?? "?"}
-                    </div>
-                    {c.isCancelled && <Badge variant="destructive" className="text-[0.6rem] px-1 mt-1">Cancelada</Badge>}
-                  </div>
+                  </button>
                 ))}
-                <button
-                  onClick={() => openCreate(format(day, "yyyy-MM-dd"))}
-                  className="w-full text-center text-muted-foreground/40 hover:text-muted-foreground text-lg py-1 transition-colors"
-                >
-                  <Plus size={12} className="mx-auto" />
-                </button>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <div className="grid min-w-[980px] grid-cols-7 gap-2">
+            {days.map((day, i) => {
+              const dayClasses = classesForDay(day);
+              return (
+                <div key={i} className="min-h-[320px]">
+                  <div
+                    className="mb-2 cursor-pointer text-center text-xs font-medium text-muted-foreground hover:text-foreground"
+                    onClick={() => openCreate(format(day, "yyyy-MM-dd"))}
+                  >
+                    <div>{DAYS_ES[day.getDay()]}</div>
+                    <div className="text-lg font-bold text-foreground">{format(day, "d")}</div>
+                  </div>
+                  <div className="space-y-1">
+                    {dayClasses.map((c) => (
+                      <div
+                        key={c.id}
+                        onClick={() => { setSelectedClass(c); setSheetOpen(true); }}
+                        className="cursor-pointer rounded-lg px-2 py-1.5 text-xs transition-opacity hover:opacity-80"
+                        style={{
+                          backgroundColor: c.classTypeColor ? c.classTypeColor + "33" : "hsl(var(--primary)/0.2)",
+                          borderLeft: "3px solid " + (c.classTypeColor ?? "hsl(var(--primary))"),
+                        }}
+                      >
+                        <div className="truncate font-medium">{c.classTypeName ?? "Clase"}</div>
+                        <div className="text-muted-foreground">{c.startTime ? format(parseISO(c.startTime), "HH:mm") : ""}</div>
+                        <div className="mt-1 flex items-center gap-1">
+                          {c.instructorPhoto ? (
+                            <img
+                              src={c.instructorPhoto}
+                              alt={c.instructorName ?? ""}
+                              className="h-4 w-4 rounded-full object-cover ring-1 ring-white/30"
+                            />
+                          ) : (
+                            <span
+                              className="flex h-4 w-4 items-center justify-center rounded-full text-[0.5rem] font-bold text-white ring-1 ring-white/30"
+                              style={{ background: c.classTypeColor ?? "#CA71E1" }}
+                            >
+                              {(c.instructorName ?? "?")[0].toUpperCase()}
+                            </span>
+                          )}
+                          <span className="truncate text-[0.65rem] text-muted-foreground">{c.instructorName ?? "—"}</span>
+                        </div>
+                        <div className="mt-0.5 text-muted-foreground">
+                          {(c.bookedCount ?? c.currentBookings ?? 0)}/{c.maxCapacity ?? c.capacity ?? "?"}
+                        </div>
+                        {c.isCancelled && <Badge variant="destructive" className="mt-1 px-1 text-[0.6rem]">Cancelada</Badge>}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => openCreate(format(day, "yyyy-MM-dd"))}
+                      className="w-full py-1 text-center text-lg text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+                    >
+                      <Plus size={12} className="mx-auto" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -474,6 +599,7 @@ function CalendarTab({
    TAB 2 – CLASS TYPES
    ═══════════════════════════════════════════════════════════════════ */
 function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: any }) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ClassType | null>(null);
   const form = useForm<TypeFormData>({
@@ -532,55 +658,104 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
         </Button>
       </div>
 
-      <div className="rounded-xl border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-16">Color</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Categoría</TableHead>
-              <TableHead>Duración</TableHead>
-              <TableHead>Capacidad</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {types.map((t) => (
-              <TableRow key={t.id}>
-                <TableCell><div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: t.color }} /></TableCell>
-                <TableCell className="font-medium">{t.name}</TableCell>
-                <TableCell>
-                  {t.category === "jumping" && <Badge className="bg-[#E15CB8]/20 text-[#E15CB8] border border-[#E15CB8]/30">Jumping</Badge>}
-                  {t.category === "pilates" && <Badge className="bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30">Pilates</Badge>}
-                  {!t.category && <Badge variant="secondary">—</Badge>}
-                </TableCell>
-                <TableCell>{(t.defaultDuration ?? t.durationMin ?? "—") + " min"}</TableCell>
-                <TableCell>{t.maxCapacity ?? t.capacity ?? "—"}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={t.isActive !== false ? "default" : "secondary"}
-                    className={t.isActive !== false ? "bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30" : ""}
-                  >
-                    {t.isActive !== false ? "Activo" : "Inactivo"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
+      {isMobile ? (
+        <div className="space-y-2">
+          {types.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-white/10 p-6 text-center text-xs text-white/45">
+              Sin tipos registrados.
+            </div>
+          ) : (
+            types.map((t) => (
+              <div key={t.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: t.color }} />
+                      <p className="truncate text-sm font-semibold text-white">{t.name}</p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {t.category === "jumping" && <Badge className="bg-[#E15CB8]/20 text-[#E15CB8] border border-[#E15CB8]/30">Jumping</Badge>}
+                      {t.category === "pilates" && <Badge className="bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30">Pilates</Badge>}
+                      {!t.category && <Badge variant="secondary">—</Badge>}
+                      <Badge variant="outline">{(t.defaultDuration ?? t.durationMin ?? "—") + " min"}</Badge>
+                      <Badge variant="outline">{(t.maxCapacity ?? t.capacity ?? "—") + " cupos"}</Badge>
+                    </div>
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
+                      <Button variant="ghost" size="icon" className="h-11 w-11 min-h-[44px] min-w-[44px]">
+                        <MoreHorizontal size={14} />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                       <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este tipo de clase?")) deleteMutation.mutate(t.id); }}>Eliminar</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </TableCell>
+                </div>
+                <div className="mt-2">
+                  <Badge
+                    variant={t.isActive !== false ? "default" : "secondary"}
+                    className={t.isActive !== false ? "bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30" : ""}
+                  >
+                    {t.isActive !== false ? "Activo" : "Inactivo"}
+                  </Badge>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16">Color</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Categoría</TableHead>
+                <TableHead>Duración</TableHead>
+                <TableHead>Capacidad</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="w-12" />
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {types.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell><div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: t.color }} /></TableCell>
+                  <TableCell className="font-medium">{t.name}</TableCell>
+                  <TableCell>
+                    {t.category === "jumping" && <Badge className="bg-[#E15CB8]/20 text-[#E15CB8] border border-[#E15CB8]/30">Jumping</Badge>}
+                    {t.category === "pilates" && <Badge className="bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30">Pilates</Badge>}
+                    {!t.category && <Badge variant="secondary">—</Badge>}
+                  </TableCell>
+                  <TableCell>{(t.defaultDuration ?? t.durationMin ?? "—") + " min"}</TableCell>
+                  <TableCell>{t.maxCapacity ?? t.capacity ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={t.isActive !== false ? "default" : "secondary"}
+                      className={t.isActive !== false ? "bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30" : ""}
+                    >
+                      {t.isActive !== false ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este tipo de clase?")) deleteMutation.mutate(t.id); }}>Eliminar</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* CRUD dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
@@ -878,13 +1053,13 @@ function GenerateTab({
             </Badge>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5">
+          <div className="hidden grid-cols-7 gap-1.5 sm:grid">
             {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
               <div key={d} className="text-center text-[10px] font-bold text-white/25 uppercase">{d}</div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 max-h-[200px] overflow-y-auto">
+          <div className="grid max-h-[220px] grid-cols-4 gap-1.5 overflow-y-auto sm:grid-cols-7">
             {preview.map((d) => (
               <div
                 key={d.toISOString()}
@@ -953,6 +1128,7 @@ function GenerateTab({
    TAB 4 – INSTRUCTORAS
    ═══════════════════════════════════════════════════════════════════ */
 function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Instructor | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1065,71 +1241,130 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
         }}
       />
 
-      <div className="rounded-xl border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-16">Foto</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Especialidades</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading
-              ? Array(4).fill(0).map((_, i) => (
-                <TableRow key={i}>
-                  {Array(6).fill(0).map((_, j) => (
-                    <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
-                  ))}
-                </TableRow>
-              ))
-              : instructors.map((ins) => (
-                <TableRow key={ins.id}>
-                  <TableCell>
-                    {ins.photoUrl ? (
-                      <img src={ins.photoUrl} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#CA71E1]/30" alt="" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#CA71E1] to-[#E15CB8] flex items-center justify-center text-xs font-bold text-white">
-                        {ins.displayName?.[0]?.toUpperCase()}
+      {isMobile ? (
+        <div className="space-y-2">
+          {isLoading ? (
+            Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
+          ) : instructors.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-white/10 p-6 text-center text-xs text-white/45">
+              Sin instructoras registradas.
+            </div>
+          ) : (
+            instructors.map((ins) => (
+              <div key={ins.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      {ins.photoUrl ? (
+                        <img src={ins.photoUrl} className="h-9 w-9 rounded-full object-cover ring-2 ring-[#CA71E1]/30" alt="" />
+                      ) : (
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#CA71E1] to-[#E15CB8] text-xs font-bold text-white">
+                          {ins.displayName?.[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{ins.displayName}</p>
+                        <p className="truncate text-xs text-white/55">{ins.email}</p>
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium">{ins.displayName}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{ins.email}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={ins.isActive ? "default" : "secondary"}
-                      className={ins.isActive ? "bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30" : ""}
-                    >
-                      {ins.isActive ? "Activa" : "Inactiva"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setUploadTarget(ins.id); setTimeout(() => fileRef.current?.click(), 50); }}>
-                          Subir foto
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este instructor?")) deleteMutation.mutate(ins.id); }}>
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            }
-          </TableBody>
-        </Table>
-      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-white/55">{normalizeSpecialties(ins.specialties).join(", ") || "Sin especialidades"}</p>
+                    <div className="mt-2">
+                      <Badge
+                        variant={ins.isActive ? "default" : "secondary"}
+                        className={ins.isActive ? "bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30" : ""}
+                      >
+                        {ins.isActive ? "Activa" : "Inactiva"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-11 w-11 min-h-[44px] min-w-[44px]">
+                        <MoreHorizontal size={14} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setUploadTarget(ins.id); setTimeout(() => fileRef.current?.click(), 50); }}>
+                        Subir foto
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este instructor?")) deleteMutation.mutate(ins.id); }}>
+                        Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16">Foto</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Especialidades</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading
+                ? Array(4).fill(0).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array(6).fill(0).map((_, j) => (
+                      <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
+                    ))}
+                  </TableRow>
+                ))
+                : instructors.map((ins) => (
+                  <TableRow key={ins.id}>
+                    <TableCell>
+                      {ins.photoUrl ? (
+                        <img src={ins.photoUrl} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#CA71E1]/30" alt="" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#CA71E1] to-[#E15CB8] flex items-center justify-center text-xs font-bold text-white">
+                          {ins.displayName?.[0]?.toUpperCase()}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{ins.displayName}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{ins.email}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={ins.isActive ? "default" : "secondary"}
+                        className={ins.isActive ? "bg-[#CA71E1]/20 text-[#CA71E1] border border-[#CA71E1]/30" : ""}
+                      >
+                        {ins.isActive ? "Activa" : "Inactiva"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setUploadTarget(ins.id); setTimeout(() => fileRef.current?.click(), 50); }}>
+                            Subir foto
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este instructor?")) deleteMutation.mutate(ins.id); }}>
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              }
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* CRUD dialog */}
       <Dialog

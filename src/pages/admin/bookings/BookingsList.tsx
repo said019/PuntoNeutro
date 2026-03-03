@@ -466,7 +466,7 @@ const BookingsList = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-4 md:p-6 max-w-3xl mx-auto">
+        <div className="admin-page max-w-3xl">
           <div className="mb-7">
             <h1 className="text-3xl font-bold text-white mb-1">Reservas</h1>
             <p className="text-sm text-white/35">

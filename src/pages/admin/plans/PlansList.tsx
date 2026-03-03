@@ -128,7 +128,7 @@ const PlansList = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-4 md:p-6 max-w-5xl mx-auto">
+        <div className="admin-page max-w-5xl">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
             <h1 className="text-2xl font-bold">Planes</h1>
             <Button onClick={openCreate} size="sm"><Plus size={14} className="mr-1" />Nuevo plan</Button>

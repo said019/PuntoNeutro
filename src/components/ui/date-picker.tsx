@@ -10,6 +10,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 interface DatePickerProps {
@@ -32,6 +33,7 @@ export const DatePicker = ({
   value, onChange, placeholder = "Seleccionar fecha",
   className, disabled, min,
 }: DatePickerProps) => {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState<Date>(safeParseISO(value) ?? new Date());
   const ref = useRef<HTMLDivElement>(null);
@@ -70,6 +72,27 @@ export const DatePicker = ({
   while (cur <= gridEnd) {
     days.push(new Date(cur));
     cur.setDate(cur.getDate() + 1);
+  }
+
+  if (isMobile) {
+    return (
+      <div className={cn("relative w-full", className)}>
+        <CalendarDays size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#E15CB8]/60" />
+        <input
+          type="date"
+          min={min}
+          value={value ?? ""}
+          disabled={disabled}
+          onChange={(e) => onChange?.(e.target.value)}
+          className={cn(
+            "w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 pl-9 pr-3 text-sm text-white/90",
+            "focus:border-[#E15CB8]/40 focus:bg-[#E15CB8]/[0.03] focus:outline-none",
+            "disabled:pointer-events-none disabled:opacity-50",
+          )}
+          aria-label={placeholder}
+        />
+      </div>
+    );
   }
 
   return (

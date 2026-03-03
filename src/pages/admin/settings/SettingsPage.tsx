@@ -428,7 +428,7 @@ const NotificationTemplates = () => {
 const SettingsPage = () => (
   <AuthGuard>
     <AdminLayout>
-      <div className="p-4 md:p-6 max-w-3xl mx-auto">
+      <div className="admin-page max-w-3xl">
         <h1 className="text-2xl font-bold mb-6">Configuración</h1>
         <Tabs defaultValue="general">
           <TabsList className="flex-wrap h-auto gap-1 mb-6">

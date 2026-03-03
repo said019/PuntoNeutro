@@ -79,7 +79,7 @@ const ClientDetail = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-4 md:p-6 max-w-5xl mx-auto">
+        <div className="admin-page max-w-5xl">
           {isLoading ? (
             <Skeleton className="h-10 w-60 mb-4" />
           ) : (

@@ -259,6 +259,41 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .pb-safe {
     padding-bottom: max(env(safe-area-inset-bottom), 0px);
   }
+
+  .admin-page {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 1rem;
+  }
+
+  .admin-card-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .admin-title {
+    font-size: clamp(1.25rem, 2.6vw, 1.85rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+}
+
+@media (min-width: 640px) {
+  .admin-page {
+    padding: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-page {
+    padding: 1.5rem;
+  }
+
+  .admin-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1023px) {

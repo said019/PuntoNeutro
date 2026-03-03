@@ -397,7 +397,7 @@ const PaymentsPage = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-4 md:p-6 max-w-3xl mx-auto">
+        <div className="admin-page max-w-3xl">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-1">Pagos</h1>

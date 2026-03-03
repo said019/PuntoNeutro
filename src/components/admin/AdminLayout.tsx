@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import opheliaLogo from "@/assets/ophelia-logo-full.png";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
@@ -49,11 +50,20 @@ const NAV_GROUPS = [
   },
 ];
 
+const MOBILE_QUICK_NAV = [
+  { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
+  { path: "/admin/classes", label: "Clases", icon: CalendarDays },
+  { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
+  { path: "/admin/clients", label: "Clientes", icon: Users },
+  { path: "/admin/payments", label: "Pagos", icon: DollarSign },
+];
+
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
+  const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
@@ -104,7 +114,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           "fixed inset-y-0 left-0 z-50 flex flex-col transition-transform duration-300 shrink-0",
           "border-r border-white/[0.06]",
           "bg-gradient-to-b from-[#0f0518] via-[#0a0a0a] to-[#080808]",
-          "w-[86vw] max-w-[300px] -translate-x-full lg:translate-x-0 lg:static",
+          "w-[88vw] max-w-[300px] -translate-x-full lg:translate-x-0 lg:static",
           mobileOpen && "translate-x-0",
           collapsed ? "lg:w-[72px]" : "lg:w-[240px]",
         )}
@@ -284,7 +294,34 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           </div>
         </header>
 
-        <main className="admin-mobile-main flex-1 overflow-auto">{children}</main>
+        <main className="admin-mobile-main flex-1 overflow-auto pb-[88px] lg:pb-0">{children}</main>
+
+        {isMobile && (
+          <nav className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border border-white/10 bg-[#0b0b0bcc] p-1 pb-safe backdrop-blur-xl lg:hidden">
+            <ul className="grid grid-cols-5 gap-1">
+              {MOBILE_QUICK_NAV.map((item) => {
+                const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      className={cn(
+                        "flex h-12 min-h-[44px] flex-col items-center justify-center rounded-xl text-[11px] font-semibold transition-colors",
+                        active
+                          ? "bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white shadow-[0_0_14px_rgba(225,92,184,0.28)]"
+                          : "text-white/55 hover:bg-white/5 hover:text-white",
+                      )}
+                      aria-current={active ? "page" : undefined}
+                    >
+                      <item.icon size={14} />
+                      <span className="mt-0.5 leading-none">{item.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        )}
       </div>
     </div>
   );

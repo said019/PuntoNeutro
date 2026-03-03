@@ -239,7 +239,7 @@ const VideoUpload = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="p-4 md:p-6 max-w-3xl mx-auto">
+        <div className="admin-page max-w-3xl">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
             <h1 className="text-2xl font-bold">{editId ? "Editar video" : "Nuevo video"}</h1>
             <Button variant="outline" onClick={() => navigate("/admin/videos")}>Cancelar</Button>

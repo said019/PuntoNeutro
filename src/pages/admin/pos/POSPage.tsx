@@ -229,7 +229,7 @@ const POSTerminal = () => {
 const POSPage = () => (
   <AuthGuard>
     <AdminLayout>
-      <div className="p-4 md:p-6 max-w-5xl mx-auto">
+      <div className="admin-page max-w-5xl">
         <h1 className="text-2xl font-bold mb-6">Punto de Venta</h1>
         <Tabs defaultValue="pos">
           <TabsList>
