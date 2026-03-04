@@ -11,12 +11,12 @@ import { useToast } from "@/hooks/use-toast";
 import opheliaLogo from "@/assets/ophelia-logo-full.png";
 import { useState } from "react";
 
-const GoogleIcon = ({ color = "full" }: { color?: "full" | "gray" }) => (
+const GoogleIcon = ({ color = "full" }: { color?: "full" | "gray" | "palette" }) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12.5 6.9c1.32 0 2.21.57 2.72 1.05l1.99-1.94C15.85 4.79 14.35 4 12.5 4c-3.07 0-5.64 2.05-6.52 4.82l2.32 1.8C9.03 8.57 10.6 6.9 12.5 6.9z" fill={color === "full" ? "#EA4335" : "#888"}/>
-    <path d="M18.77 12.16c0-.53-.08-1.04-.2-1.52H12.5v2.87h3.52c-.15.8-.61 1.48-1.3 1.94l2.01 1.56c1.2-1.1 1.88-2.73 1.88-4.85h.16z" fill={color === "full" ? "#4285F4" : "#888"}/>
-    <path d="M8.3 13.38A4.6 4.6 0 018.06 12c0-.48.09-.94.24-1.38l-2.32-1.8A7.52 7.52 0 005 12c0 1.2.29 2.34.8 3.34l2.5-1.96z" fill={color === "full" ? "#FBBC05" : "#888"}/>
-    <path d="M12.5 20c1.84 0 3.38-.61 4.51-1.65l-2.01-1.56c-.63.4-1.43.64-2.5.64-1.9 0-3.47-1.27-4.06-3h-2.5l-.03.1A7.99 7.99 0 0012.5 20z" fill={color === "full" ? "#34A853" : "#888"}/>
+    <path d="M12.5 6.9c1.32 0 2.21.57 2.72 1.05l1.99-1.94C15.85 4.79 14.35 4 12.5 4c-3.07 0-5.64 2.05-6.52 4.82l2.32 1.8C9.03 8.57 10.6 6.9 12.5 6.9z" fill={color === "full" ? "#EA4335" : color === "palette" ? "#E7EB6E" : "#888"} />
+    <path d="M18.77 12.16c0-.53-.08-1.04-.2-1.52H12.5v2.87h3.52c-.15.8-.61 1.48-1.3 1.94l2.01 1.56c1.2-1.1 1.88-2.73 1.88-4.85h.16z" fill={color === "full" ? "#4285F4" : color === "palette" ? "#E7EB6E" : "#888"} />
+    <path d="M8.3 13.38A4.6 4.6 0 018.06 12c0-.48.09-.94.24-1.38l-2.32-1.8A7.52 7.52 0 005 12c0 1.2.29 2.34.8 3.34l2.5-1.96z" fill={color === "full" ? "#FBBC05" : color === "palette" ? "#E7EB6E" : "#888"} />
+    <path d="M12.5 20c1.84 0 3.38-.61 4.51-1.65l-2.01-1.56c-.63.4-1.43.64-2.5.64-1.9 0-3.47-1.27-4.06-3h-2.5l-.03.1A7.99 7.99 0 0012.5 20z" fill={color === "full" ? "#34A853" : color === "palette" ? "#E7EB6E" : "#888"} />
   </svg>
 );
 
@@ -286,18 +286,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black border border-white/15 hover:border-white/30 transition-all shadow-md"
                 >
-                  <GoogleIcon />
+                  <GoogleIcon color="palette" />
                   <span className="text-white font-semibold text-sm">Agregar a Google Wallet</span>
-                  <ExternalLink size={14} className="text-white/50" />
+                  <ExternalLink size={14} className="text-[#E7EB6E]/70" />
                 </a>
               ) : (
                 <button
                   onClick={handleGoogleRetry}
                   className="flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black border border-white/10 hover:border-white/20 transition-all cursor-pointer"
                 >
-                  <GoogleIcon color="gray" />
+                  <GoogleIcon color="palette" />
                   <span className="text-white/70 font-medium text-sm">Reintentar Google Wallet</span>
-                  <RefreshCw size={13} className="text-white/40" />
+                  <RefreshCw size={13} className="text-[#E7EB6E]/65" />
                 </button>
               )}
 
@@ -310,11 +310,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
                   appleLoading && "opacity-60 cursor-wait"
                 )}
               >
-                <AppleIcon color="white" />
+                <AppleIcon color="#E7EB6E" />
                 <span className="text-white font-semibold text-sm">
                   {appleLoading ? "Preparando pase…" : "Agregar a Apple Wallet"}
                 </span>
-                {!appleLoading && <Download size={14} className="text-white/50" />}
+                {!appleLoading && <Download size={14} className="text-[#E7EB6E]/70" />}
               </button>
             </div>
           </div>

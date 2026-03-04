@@ -2689,12 +2689,48 @@ app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
         LIMIT 20`,
       [req.userId]
     );
+    let membership = null;
+    try {
+      const memRes = await pool.query(
+        `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.end_date,
+                m.plan_name_override, m.class_limit_override,
+                p.name AS plan_name, p.class_limit AS plan_class_limit,
+                p.class_category, p.is_non_transferable, p.is_non_repeatable, p.repeat_key
+           FROM memberships m
+      LEFT JOIN plans p ON p.id = m.plan_id
+          WHERE m.user_id = $1
+            AND m.status = 'active'
+            AND m.end_date >= CURRENT_DATE
+       ORDER BY m.end_date DESC
+          LIMIT 1`,
+        [req.userId]
+      );
+      if (memRes.rows.length > 0) {
+        const m = memRes.rows[0];
+        membership = {
+          id: m.id,
+          status: m.status,
+          plan_name: m.plan_name_override || m.plan_name || "Plan Activo",
+          class_limit: m.class_limit_override ?? m.plan_class_limit,
+          classes_remaining: m.classes_remaining,
+          start_date: m.start_date,
+          end_date: m.end_date,
+          class_category: normalizeClassCategory(m.class_category, "all"),
+          is_non_transferable: parseBooleanFlag(m.is_non_transferable),
+          is_non_repeatable: parseBooleanFlag(m.is_non_repeatable),
+          repeat_key: m.repeat_key || null,
+        };
+      }
+    } catch (memErr) {
+      console.error("Wallet/pass membership error:", memErr.message);
+    }
     // QR data: user ID encoded
     const qrData = Buffer.from(req.userId).toString("base64");
     return res.json({
       data: {
         points: total,
         qr_code: qrData,
+        membership,
         event_passes: passesRes.rows.map((row) => ({
           id: row.id,
           passCode: row.pass_code,
@@ -2977,14 +3013,25 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
 
   // ── Determine pass type and details based on membership ──────────────────
   const hasMembership = !!membership;
+  const membershipCategory = hasMembership
+    ? normalizeClassCategory(membership.class_category, "all")
+    : "all";
+  const membershipCategoryLabel =
+    membershipCategory === "jumping" ? "Jumping" :
+    membershipCategory === "pilates" ? "Pilates" :
+    membershipCategory === "mixto" ? "Mixto" : "General";
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
   const isPackage = hasMembership && !isUnlimited && membership.class_limit > 1;
   const isSingleClass = hasMembership && !isUnlimited && membership.class_limit === 1;
+  const isTrialSingleSession = hasMembership && String(membership.repeat_key || "").startsWith("trial_single_session");
+  const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
+  const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
 
   // Header label
   let passHeader = "OPHELIA CLUB";
   if (hasMembership) {
-    if (isUnlimited) passHeader = "MEMBRESÍA";
+    if (isTrialSingleSession) passHeader = "CLASE MUESTRA";
+    else if (isUnlimited) passHeader = "MEMBRESÍA";
     else if (isPackage) passHeader = "PAQUETE";
     else if (isSingleClass) passHeader = "CLASE INDIVIDUAL";
   }
@@ -2998,6 +3045,11 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
       id: "plan",
       header: passHeader,
       body: membership.plan_name || "Plan Activo",
+    });
+    textModules.push({
+      id: "modalidad",
+      header: "MODALIDAD",
+      body: membershipCategoryLabel,
     });
   } else {
     textModules.push({
@@ -3034,6 +3086,20 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
         id: "clases",
         header: "CLASES DISPONIBLES",
         body: `${membership.classes_remaining ?? 0} de ${membership.class_limit} restantes (${used} usadas)`,
+      });
+    }
+  }
+
+  // Row 3.1: Membership rules
+  if (hasMembership) {
+    const rules = [];
+    if (nonTransferable) rules.push("No transferible");
+    if (nonRepeatable) rules.push("No repetible");
+    if (rules.length) {
+      textModules.push({
+        id: "reglas",
+        header: "REGLAS",
+        body: rules.join(" · "),
       });
     }
   }
@@ -3100,6 +3166,12 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
             { label: "Plan", value: membership.plan_name || "—" },
           ],
         },
+        {
+          columns: [
+            { label: "Modalidad", value: membershipCategoryLabel },
+            { label: "Reglas", value: [nonTransferable ? "No transferible" : "", nonRepeatable ? "No repetible" : ""].filter(Boolean).join(" · ") || "—" },
+          ],
+        },
       ] : [
         {
           columns: [
@@ -3158,7 +3230,8 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
       const memRes = await pool.query(
         `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.end_date,
                 m.plan_name_override, m.class_limit_override,
-                p.name AS plan_name, p.class_limit AS plan_class_limit, p.duration_days
+                p.name AS plan_name, p.class_limit AS plan_class_limit, p.duration_days,
+                p.class_category, p.is_non_transferable, p.is_non_repeatable, p.repeat_key
          FROM memberships m
          LEFT JOIN plans p ON m.plan_id = p.id
          WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
@@ -3174,6 +3247,10 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
           classes_remaining: m.classes_remaining,
           start_date: m.start_date,
           end_date: m.end_date,
+          class_category: normalizeClassCategory(m.class_category, "all"),
+          is_non_transferable: parseBooleanFlag(m.is_non_transferable),
+          is_non_repeatable: parseBooleanFlag(m.is_non_repeatable),
+          repeat_key: m.repeat_key || null,
         };
       }
     } catch (memErr) {
@@ -3473,13 +3550,31 @@ function isAppleWebPassAvailable() {
 async function generateApplePkpass({ userId, userName, points, qrCode, membership, nextBooking }) {
   const serialNumber = `ophelia_${userId.replace(/-/g, "")}`;
   const hasMembership = !!membership;
+  const membershipCategory = hasMembership
+    ? normalizeClassCategory(membership.class_category, "all")
+    : "all";
+  const membershipCategoryLabel =
+    membershipCategory === "jumping" ? "Jumping" :
+    membershipCategory === "pilates" ? "Pilates" :
+    membershipCategory === "mixto" ? "Mixto" : "General";
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
   const isPackage = hasMembership && !isUnlimited && membership.class_limit > 1;
+  const isTrialSingleSession = hasMembership && String(membership.repeat_key || "").startsWith("trial_single_session");
+  const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
+  const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
+  const passAccent = membershipCategory === "pilates"
+    ? "rgb(231, 235, 110)"
+    : membershipCategory === "jumping"
+      ? "rgb(225, 92, 184)"
+      : membershipCategory === "mixto"
+        ? "rgb(202, 113, 225)"
+        : "rgb(164, 133, 80)";
 
   // Pass header
   let passHeader = "Ophelia Club";
   if (hasMembership) {
-    if (isUnlimited) passHeader = "Membresía";
+    if (isTrialSingleSession) passHeader = "Clase Muestra";
+    else if (isUnlimited) passHeader = "Membresía";
     else if (isPackage) passHeader = "Paquete";
     else passHeader = "Clase Individual";
   }
@@ -3495,6 +3590,11 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       label: "PLAN",
       value: membership.plan_name || "Plan Activo",
       changeMessage: "Tu plan cambió a %@",
+    });
+    secondaryFields.push({
+      key: "modalidad",
+      label: "MODALIDAD",
+      value: membershipCategoryLabel,
     });
     if (membership.end_date) {
       const endDate = new Date(membership.end_date);
@@ -3513,6 +3613,16 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
         label: "CLASES",
         value: `${membership.classes_remaining ?? 0} / ${membership.class_limit} restantes`,
         changeMessage: "Clases restantes: %@",
+      });
+    }
+    const rules = [];
+    if (nonTransferable) rules.push("No transferible");
+    if (nonRepeatable) rules.push("No repetible");
+    if (rules.length) {
+      auxiliaryFields.push({
+        key: "reglas",
+        label: "REGLAS",
+        value: rules.join(" · "),
       });
     }
   } else {
@@ -3548,7 +3658,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     logoText: "Ophelia Studio",
     foregroundColor: "rgb(255, 255, 255)",
     backgroundColor: "rgb(26, 11, 38)",
-    labelColor: "rgb(202, 113, 225)",
+    labelColor: passAccent,
     generic: {
       headerFields: [
         { key: "points", label: "PUNTOS", value: points, textAlignment: "PKTextAlignmentRight", changeMessage: "Ahora tienes %@ puntos" },
@@ -3686,7 +3796,8 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
       const memRes = await pool.query(
         `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.end_date,
                 m.plan_name_override, m.class_limit_override,
-                p.name AS plan_name, p.class_limit AS plan_class_limit
+                p.name AS plan_name, p.class_limit AS plan_class_limit,
+                p.class_category, p.is_non_transferable, p.is_non_repeatable, p.repeat_key
          FROM memberships m
          LEFT JOIN plans p ON m.plan_id = p.id
          WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
@@ -3701,6 +3812,10 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
           classes_remaining: m.classes_remaining,
           start_date: m.start_date,
           end_date: m.end_date,
+          class_category: normalizeClassCategory(m.class_category, "all"),
+          is_non_transferable: parseBooleanFlag(m.is_non_transferable),
+          is_non_repeatable: parseBooleanFlag(m.is_non_repeatable),
+          repeat_key: m.repeat_key || null,
         };
       }
     } catch (e) { console.error("Apple Wallet: membership query error:", e.message); }
@@ -3983,13 +4098,24 @@ app.get("/api/wallet/v1/passes/:passTypeId/:serial", async (req, res) => {
     try {
       const memRes = await pool.query(
         `SELECT m.id, m.classes_remaining, m.start_date, m.end_date, m.plan_name_override, m.class_limit_override,
-                p.name AS plan_name, p.class_limit AS plan_class_limit
+                p.name AS plan_name, p.class_limit AS plan_class_limit,
+                p.class_category, p.is_non_transferable, p.is_non_repeatable, p.repeat_key
          FROM memberships m LEFT JOIN plans p ON m.plan_id = p.id
          WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
          ORDER BY m.end_date DESC LIMIT 1`, [userId]);
       if (memRes.rows.length > 0) {
         const m = memRes.rows[0];
-        membership = { plan_name: m.plan_name_override || m.plan_name || "Plan Activo", class_limit: m.class_limit_override ?? m.plan_class_limit, classes_remaining: m.classes_remaining, start_date: m.start_date, end_date: m.end_date };
+        membership = {
+          plan_name: m.plan_name_override || m.plan_name || "Plan Activo",
+          class_limit: m.class_limit_override ?? m.plan_class_limit,
+          classes_remaining: m.classes_remaining,
+          start_date: m.start_date,
+          end_date: m.end_date,
+          class_category: normalizeClassCategory(m.class_category, "all"),
+          is_non_transferable: parseBooleanFlag(m.is_non_transferable),
+          is_non_repeatable: parseBooleanFlag(m.is_non_repeatable),
+          repeat_key: m.repeat_key || null,
+        };
       }
     } catch (_) {}
     let nextBooking = null;
