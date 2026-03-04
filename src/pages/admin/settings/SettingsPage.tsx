@@ -9,11 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Send, Users, MessageSquare, RefreshCw, Wifi, WifiOff, Pencil, BellDot } from "lucide-react";
+import { Loader2, Send, MessageSquare, RefreshCw, Wifi, WifiOff, Pencil, BellDot } from "lucide-react";
 
 function normalizeQrDataUrl(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -129,27 +128,6 @@ const WhatsAppSettings = () => {
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al enviar prueba", variant: "destructive" }),
   });
 
-  // ── Notify clients ──────────────────────────────────────────────────
-  const [notifyFilter, setNotifyFilter] = useState<"all" | "members" | "active">("all");
-  const [notifyMessage, setNotifyMessage] = useState("");
-  const [notifyResult, setNotifyResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
-
-  const notifyMutation = useMutation({
-    mutationFn: () => api.post("/evolution/notify-clients", { filter: notifyFilter, message: notifyMessage }),
-    onSuccess: (res) => {
-      const d = (res as any).data?.data ?? (res as any).data;
-      setNotifyResult(d);
-      toast({ title: `✅ Enviados ${d.sent} / ${d.total}` });
-    },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al enviar notificaciones", variant: "destructive" }),
-  });
-
-  const filterLabels: Record<string, string> = {
-    all: "Todos los clientes",
-    members: "Solo con membresía activa",
-    active: "Clientes activos (últimos 60 días)",
-  };
-
   return (
     <div className="space-y-8 max-w-xl">
       {/* ── Status ─────────────────────────────────────────────────── */}
@@ -216,61 +194,6 @@ const WhatsAppSettings = () => {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">Incluye código de país. Ej: 521 + 10 dígitos para México.</p>
-        </div>
-      )}
-
-      {/* ── Notify clients ──────────────────────────────────────────── */}
-      {status.connected && (
-        <div className="rounded-xl border p-5 space-y-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Users size={16} />
-            Notificar a clientes
-          </h3>
-
-          <div className="space-y-1">
-            <Label>Destinatarios</Label>
-            <Select value={notifyFilter} onValueChange={(v) => setNotifyFilter(v as any)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los clientes</SelectItem>
-                <SelectItem value="members">Solo con membresía activa</SelectItem>
-                <SelectItem value="active">Clientes activos (últimos 60 días)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">{filterLabels[notifyFilter]}</p>
-          </div>
-
-          <div className="space-y-1">
-            <Label>Mensaje</Label>
-            <Textarea
-              placeholder="Escribe tu mensaje aquí…"
-              rows={4}
-              value={notifyMessage}
-              onChange={(e) => setNotifyMessage(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">{notifyMessage.length} caracteres</p>
-          </div>
-
-          {notifyResult && (
-            <div className="rounded-lg bg-muted px-4 py-3 text-sm space-y-1">
-              <p>✅ Enviados: <strong>{notifyResult.sent}</strong></p>
-              {notifyResult.failed > 0 && <p>❌ Fallidos: <strong>{notifyResult.failed}</strong></p>}
-              <p className="text-muted-foreground">Total: {notifyResult.total}</p>
-            </div>
-          )}
-
-          <Button
-            onClick={() => { setNotifyResult(null); notifyMutation.mutate(); }}
-            disabled={notifyMutation.isPending || !notifyMessage.trim()}
-            className="w-full"
-          >
-            {notifyMutation.isPending
-              ? <><Loader2 className="animate-spin mr-2" size={14} /> Enviando…</>
-              : <><Send size={14} className="mr-2" /> Enviar notificación</>
-            }
-          </Button>
         </div>
       )}
     </div>

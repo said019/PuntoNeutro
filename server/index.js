@@ -1191,7 +1191,93 @@ async function ensureSchema() {
 }
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
-app.use(cors());
+const CORS_ALLOWED_ORIGINS = String(
+  process.env.CORS_ALLOWED_ORIGINS ||
+  "https://ophelia-studio.com.mx,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080",
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const SECURITY_RATE_LIMIT_WINDOW_MS = Math.max(10_000, Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60_000));
+const SECURITY_RATE_LIMIT_MAX = Math.max(30, Number(process.env.API_RATE_LIMIT_MAX || 180));
+const SECURITY_AUTH_WINDOW_MS = Math.max(10_000, Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 60_000));
+const SECURITY_AUTH_MAX = Math.max(5, Number(process.env.AUTH_RATE_LIMIT_MAX || 20));
+
+app.disable("x-powered-by");
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow non-browser / same-origin server requests (no Origin header).
+    if (!origin) return callback(null, true);
+    if (CORS_ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    return callback(new Error("Origen no permitido por CORS"));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+}));
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  next();
+});
+
+const rateLimitBuckets = new Map();
+function getRateLimitIp(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  if (forwarded) return forwarded;
+  return String(req.ip || req.socket?.remoteAddress || "unknown");
+}
+function createSimpleRateLimiter({ windowMs, max, keyPrefix, shouldApply }) {
+  return (req, res, next) => {
+    if (!shouldApply(req)) return next();
+    const ip = getRateLimitIp(req);
+    const key = `${keyPrefix}:${ip}`;
+    const now = Date.now();
+    const current = rateLimitBuckets.get(key);
+    if (!current || current.resetAt <= now) {
+      rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    if (current.count >= max) {
+      const retryAfterSec = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
+      res.setHeader("Retry-After", String(retryAfterSec));
+      return res.status(429).json({ message: "Demasiadas solicitudes. Intenta de nuevo en unos segundos." });
+    }
+    current.count += 1;
+    return next();
+  };
+}
+// Best-effort in-memory cleanup to avoid unbounded map growth.
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of rateLimitBuckets.entries()) {
+    if (!value || value.resetAt <= now) rateLimitBuckets.delete(key);
+  }
+}, 60_000).unref();
+
+app.use(createSimpleRateLimiter({
+  windowMs: SECURITY_RATE_LIMIT_WINDOW_MS,
+  max: SECURITY_RATE_LIMIT_MAX,
+  keyPrefix: "api",
+  shouldApply: (req) =>
+    req.path.startsWith("/api/") &&
+    !req.path.startsWith("/api/wallet/v1/") &&
+    req.path !== "/api/webhook/evolution",
+}));
+app.use(createSimpleRateLimiter({
+  windowMs: SECURITY_AUTH_WINDOW_MS,
+  max: SECURITY_AUTH_MAX,
+  keyPrefix: "auth",
+  shouldApply: (req) =>
+    req.path === "/api/auth/login" ||
+    req.path === "/api/auth/register" ||
+    req.path === "/api/auth/forgot-password" ||
+    req.path === "/api/auth/reset-password",
+}));
+
 // Skip JSON body parsing for binary upload-chunk endpoint
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/drive/upload-chunk/")) return next();
@@ -3546,8 +3632,8 @@ app.get("/api/wallet/events/google/save-url", authMiddleware, async (req, res) =
   }
 });
 
-// GET /api/wallet/google/diagnostics — check env config
-app.get("/api/wallet/google/diagnostics", async (_req, res) => {
+// GET /api/wallet/google/diagnostics — check env config (admin only)
+app.get("/api/wallet/google/diagnostics", adminMiddleware, async (_req, res) => {
   const rawKey = process.env.GOOGLE_SA_PRIVATE_KEY || "";
   const keyPreview = GW_SA_PRIVATE_KEY
     ? `parsed_length=${GW_SA_PRIVATE_KEY.length}, hasNewlines=${GW_SA_PRIVATE_KEY.includes("\n")}, begins=${GW_SA_PRIVATE_KEY.substring(0, 32)}…`
@@ -4273,6 +4359,52 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const serialNumber = hasEventPass ? `${baseSerialNumber}_ev_${eventSerialHash}` : baseSerialNumber;
   const eventSchedule = formatWalletEventSchedule(activeEventPass);
   const eventTitle = truncateWalletField(activeEventPass?.eventTitle || "Evento especial", 30);
+  const eventDateObj = activeEventPass?.eventDate ? new Date(activeEventPass.eventDate) : null;
+  const hasValidEventDate = !!eventDateObj && !Number.isNaN(eventDateObj.getTime());
+  const eventDateShort = hasValidEventDate
+    ? eventDateObj.toLocaleDateString("es-MX", { day: "numeric", month: "short" })
+    : "Por confirmar";
+  const eventDateLong = hasValidEventDate
+    ? eventDateObj.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+    : "Fecha por confirmar";
+  const eventStartTimeLabel = activeEventPass?.eventStartTime ? String(activeEventPass.eventStartTime).slice(0, 5) : "";
+  const eventEndTimeLabel = activeEventPass?.eventEndTime ? String(activeEventPass.eventEndTime).slice(0, 5) : "";
+  const eventTimeShort = eventStartTimeLabel && eventEndTimeLabel
+    ? `${eventStartTimeLabel}-${eventEndTimeLabel}`
+    : (eventStartTimeLabel || "Por confirmar");
+  const eventTimeLong = eventStartTimeLabel && eventEndTimeLabel
+    ? `${eventStartTimeLabel} - ${eventEndTimeLabel}`
+    : (eventStartTimeLabel || "Horario por confirmar");
+  const eventLocationShort = truncateWalletField(activeEventPass?.eventLocation || "Ophelia Studio", 24);
+  const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Ophelia Studio", 38);
+  const eventCodeLabel = truncateWalletField(activeEventPass?.passCode || "—", 18);
+  const eventRelevantDate = (() => {
+    if (!hasEventPass || !hasValidEventDate) return new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    const startDate = new Date(eventDateObj);
+    if (eventStartTimeLabel) {
+      const [hh, mm] = eventStartTimeLabel.split(":").map((p) => Number(p));
+      if (Number.isFinite(hh) && Number.isFinite(mm)) {
+        startDate.setHours(hh, mm, 0, 0);
+      }
+    } else {
+      startDate.setHours(10, 0, 0, 0);
+    }
+    return startDate.toISOString();
+  })();
+  const eventExpirationDate = (() => {
+    if (!hasEventPass || !hasValidEventDate) return null;
+    const endDate = new Date(eventDateObj);
+    if (eventEndTimeLabel) {
+      const [hh, mm] = eventEndTimeLabel.split(":").map((p) => Number(p));
+      if (Number.isFinite(hh) && Number.isFinite(mm)) {
+        endDate.setHours(hh, mm, 0, 0);
+      }
+    } else {
+      endDate.setHours(23, 0, 0, 0);
+    }
+    endDate.setHours(endDate.getHours() + 8);
+    return endDate.toISOString();
+  })();
   const membershipCategory = hasMembership
     ? normalizeClassCategory(membership.class_category, "all")
     : "all";
@@ -4317,33 +4449,54 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   // Build secondary/auxiliary fields
   const secondaryFields = [];
   const auxiliaryFields = [];
+  const compactAuxiliaryFields = [];
   const backFields = [];
 
   if (hasEventPass) {
     secondaryFields.push({
       key: "event_title",
       label: "EVENTO",
-      value: eventTitle,
+      value: truncateWalletField(eventTitle, 24),
+    });
+    secondaryFields.push({
+      key: "event_date",
+      label: "FECHA",
+      value: eventDateLong,
+    });
+    auxiliaryFields.push({
+      key: "event_time",
+      label: "HORARIO",
+      value: eventTimeLong,
     });
     auxiliaryFields.push({
       key: "event_code",
       label: "CÓDIGO",
-      value: activeEventPass.passCode || "—",
+      value: eventCodeLabel,
     });
-    if (eventSchedule) {
-      auxiliaryFields.push({
-        key: "event_schedule",
-        label: "FECHA Y HORA",
-        value: eventSchedule,
-      });
-    }
     if (activeEventPass?.eventLocation) {
       auxiliaryFields.push({
         key: "event_location",
-        label: "LUGAR",
-        value: truncateWalletField(activeEventPass.eventLocation, 32),
+        label: "SEDE",
+        value: eventLocationLong,
       });
     }
+    compactAuxiliaryFields.push(
+      {
+        key: "compact_event_time",
+        label: "HORA",
+        value: eventTimeShort,
+      },
+      {
+        key: "compact_event_venue",
+        label: "SEDE",
+        value: eventLocationShort,
+      },
+      {
+        key: "compact_event_code",
+        label: "CÓDIGO",
+        value: eventCodeLabel,
+      },
+    );
   }
 
   if (hasMembership) {
@@ -4481,6 +4634,18 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
         value: activeEventPass.eventLocation,
       });
     }
+    backFields.push(
+      {
+        key: "event_access_back",
+        label: "ACCESO",
+        value: "Pase personal de un solo acceso. No transferible.",
+      },
+      {
+        key: "event_checkin_back",
+        label: "CHECK-IN",
+        value: "Presenta tu QR en recepción 10 minutos antes del evento.",
+      },
+    );
   }
 
   backFields.push(
@@ -4530,14 +4695,12 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     compactSecondaryFields.push({
       key: "compact_event_title",
       label: "EVENTO",
-      value: truncateWalletField(activeEventPass?.eventTitle || "Evento especial", 18),
+      value: truncateWalletField(activeEventPass?.eventTitle || "Evento especial", 20),
     });
-  }
-  if (hasEventPass && eventSchedule) {
     compactSecondaryFields.push({
-      key: "compact_event_schedule",
+      key: "compact_event_date",
       label: "FECHA",
-      value: truncateWalletField(eventSchedule, 16),
+      value: truncateWalletField(eventDateShort, 16),
     });
   } else if (hasMembership && membership.end_date) {
     const endDate = new Date(membership.end_date);
@@ -4568,7 +4731,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       ],
       primaryFields: showFullFrontTextFields ? primaryFields : compactPrimaryFields,
       secondaryFields: showFullFrontTextFields ? secondaryFields : compactSecondaryFields,
-      auxiliaryFields: showFullFrontTextFields ? auxiliaryFields : [],
+      auxiliaryFields: showFullFrontTextFields ? auxiliaryFields : (hasEventPass ? compactAuxiliaryFields : []),
       backFields,
     },
     barcode: {
@@ -4585,8 +4748,11 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     ],
     webServiceURL: `${SITE_URL}/api/wallet`,
     authenticationToken: APPLE_AUTH_TOKEN,
-    relevantDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+    relevantDate: eventRelevantDate,
   };
+  if (eventExpirationDate) {
+    passJson.expirationDate = eventExpirationDate;
+  }
 
   // Read image assets with dedicated retina variants to avoid pixelation in Wallet.
   const assetCategory =
@@ -4941,7 +5107,17 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
     if (!snapshot) return res.status(404).json({ message: "Usuario no encontrado" });
     const { userName, points, qrCode, activeEventPass } = snapshot;
     if (!activeEventPass) return res.status(404).json({ message: "No existe pase activo para ese evento" });
-    const eventSchedule = formatWalletEventSchedule(activeEventPass);
+    const eventDateObj = activeEventPass?.eventDate ? new Date(activeEventPass.eventDate) : null;
+    const hasValidEventDate = !!eventDateObj && !Number.isNaN(eventDateObj.getTime());
+    const eventDateLong = hasValidEventDate
+      ? eventDateObj.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+      : "Fecha por confirmar";
+    const eventStartTimeLabel = activeEventPass?.eventStartTime ? String(activeEventPass.eventStartTime).slice(0, 5) : "";
+    const eventEndTimeLabel = activeEventPass?.eventEndTime ? String(activeEventPass.eventEndTime).slice(0, 5) : "";
+    const eventTimeLong = eventStartTimeLabel && eventEndTimeLabel
+      ? `${eventStartTimeLabel} - ${eventEndTimeLabel}`
+      : (eventStartTimeLabel || "Horario por confirmar");
+    const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Ophelia Studio", 38);
 
     if (isAppleWalletConfigured()) {
       const pkpassBuffer = await generateApplePkpass({
@@ -4968,19 +5144,42 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.pass{width:100%;max-width:380px;border-radius:24px;overflow:hidden;background:linear-gradient(160deg,#1F0047 0%,#2D0A40 58%,#1F0047 100%);box-shadow:0 20px 60px rgba(225,92,184,.2),0 0 0 1px rgba(202,113,225,.15)}
-.header{padding:24px 24px 12px}.title{font-weight:800;font-size:18px;color:#E7EB6E}
-.subtitle{font-size:13px;color:#F9F7E8;opacity:.9;margin-top:6px}
-.qr{display:flex;justify-content:center;padding:20px}.qr img{background:#fff;border-radius:18px;padding:12px}
+.pass{width:100%;max-width:390px;border-radius:24px;overflow:hidden;background:linear-gradient(165deg,#1F0047 0%,#2D0A40 56%,#1F0047 100%);box-shadow:0 22px 60px rgba(225,92,184,.2),0 0 0 1px rgba(202,113,225,.18)}
+.header{padding:20px 22px 10px}
+.badge{display:inline-flex;align-items:center;gap:8px;padding:4px 10px;border-radius:999px;background:rgba(231,235,110,.13);color:#E7EB6E;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.title{margin-top:10px;font-weight:800;font-size:22px;line-height:1.1;color:#F9F7E8}
+.meta{padding:0 22px 6px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.meta-item{border:1px solid rgba(249,247,232,.16);border-radius:12px;padding:10px 11px;background:rgba(255,255,255,.02)}
+.meta-label{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#E7EB6E;font-weight:700}
+.meta-value{font-size:13px;line-height:1.3;color:#F9F7E8;margin-top:4px}
+.qr{display:flex;justify-content:center;padding:16px 20px 10px}
+.qr img{background:#fff;border-radius:18px;padding:12px}
+.code{padding:0 22px 22px;text-align:center;font-size:13px;color:#F9F7E8}
+.code strong{color:#E7EB6E;letter-spacing:.04em}
 </style>
 </head>
 <body>
   <div class="pass">
     <div class="header">
+      <span class="badge">Pase de evento</span>
       <div class="title">${activeEventPass.eventTitle || "Evento Ophelia"}</div>
-      <div class="subtitle">${eventSchedule || ""}</div>
+    </div>
+    <div class="meta">
+      <div class="meta-item">
+        <div class="meta-label">Fecha</div>
+        <div class="meta-value">${eventDateLong || "Por confirmar"}</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Horario</div>
+        <div class="meta-value">${eventTimeLong || "Por confirmar"}</div>
+      </div>
+      <div class="meta-item" style="grid-column:1 / span 2;">
+        <div class="meta-label">Sede</div>
+        <div class="meta-value">${eventLocationLong || "Ophelia Studio"}</div>
+      </div>
     </div>
     <div class="qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(activeEventPass.passCode || qrCode)}&bgcolor=FFFFFF&color=1F0047" alt="QR"/></div>
+    <div class="code">Código de acceso: <strong>${activeEventPass.passCode || "—"}</strong></div>
   </div>
 </body>
 </html>`;
@@ -4992,8 +5191,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   }
 });
 
-// GET /api/wallet/apple/status — check Apple Wallet config
-app.get("/api/wallet/apple/status", async (_req, res) => {
+// GET /api/wallet/apple/status — check Apple Wallet config (admin only)
+app.get("/api/wallet/apple/status", adminMiddleware, async (_req, res) => {
   return res.json({
     configured: true, // Always true — we have web pass fallback even without Apple certs
     nativePkpass: isAppleWalletConfigured(),
@@ -5487,7 +5686,7 @@ app.get("/api/referrals/code", authMiddleware, async (req, res) => {
 // ─── Routes: /api/admin/class-types ─────────────────────────────────────────
 
 // GET /api/admin/class-types
-app.get("/api/admin/class-types", async (req, res) => {
+app.get("/api/admin/class-types", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query("SELECT * FROM class_types ORDER BY sort_order, name");
     return res.json({ data: camelRows(r.rows) });
@@ -5498,7 +5697,7 @@ app.get("/api/admin/class-types", async (req, res) => {
 });
 
 // POST /api/admin/class-types
-app.post("/api/admin/class-types", async (req, res) => {
+app.post("/api/admin/class-types", adminMiddleware, async (req, res) => {
   const { name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order } = req.body;
   if (!name?.trim()) return res.status(400).json({ message: "name requerido" });
   try {
@@ -5518,7 +5717,7 @@ app.post("/api/admin/class-types", async (req, res) => {
 });
 
 // PUT /api/admin/class-types/:id
-app.put("/api/admin/class-types/:id", async (req, res) => {
+app.put("/api/admin/class-types/:id", adminMiddleware, async (req, res) => {
   const { name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, is_active, sort_order } = req.body;
   try {
     const r = await pool.query(
@@ -5552,7 +5751,7 @@ app.put("/api/admin/class-types/:id", async (req, res) => {
 });
 
 // DELETE /api/admin/class-types/:id
-app.delete("/api/admin/class-types/:id", async (req, res) => {
+app.delete("/api/admin/class-types/:id", adminMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM class_types WHERE id = $1", [req.params.id]);
     return res.json({ message: "Eliminado" });
@@ -5565,7 +5764,7 @@ app.delete("/api/admin/class-types/:id", async (req, res) => {
 // ─── Routes: /api/admin/schedule-slots ──────────────────────────────────────
 
 // GET /api/admin/schedule-slots
-app.get("/api/admin/schedule-slots", async (req, res) => {
+app.get("/api/admin/schedule-slots", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT ss.*, ct.color as class_color, ct.emoji as class_emoji
@@ -5582,7 +5781,7 @@ app.get("/api/admin/schedule-slots", async (req, res) => {
 });
 
 // POST /api/admin/schedule-slots
-app.post("/api/admin/schedule-slots", async (req, res) => {
+app.post("/api/admin/schedule-slots", adminMiddleware, async (req, res) => {
   const { time_slot, day_of_week, class_type_id, class_type_name, instructor_name } = req.body;
   if (!time_slot?.trim() || !day_of_week) return res.status(400).json({ message: "time_slot y day_of_week requeridos" });
   try {
@@ -5610,7 +5809,7 @@ app.post("/api/admin/schedule-slots", async (req, res) => {
 });
 
 // PUT /api/admin/schedule-slots/:id
-app.put("/api/admin/schedule-slots/:id", async (req, res) => {
+app.put("/api/admin/schedule-slots/:id", adminMiddleware, async (req, res) => {
   const { time_slot, day_of_week, class_type_id, class_type_name, instructor_name, is_active } = req.body;
   try {
     let ctName = class_type_name || null;
@@ -5639,7 +5838,7 @@ app.put("/api/admin/schedule-slots/:id", async (req, res) => {
 });
 
 // DELETE /api/admin/schedule-slots/:id
-app.delete("/api/admin/schedule-slots/:id", async (req, res) => {
+app.delete("/api/admin/schedule-slots/:id", adminMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM schedule_slots WHERE id = $1", [req.params.id]);
     return res.json({ message: "Eliminado" });
@@ -5652,7 +5851,7 @@ app.delete("/api/admin/schedule-slots/:id", async (req, res) => {
 // ─── Routes: /api/admin/plans (CRUD) ────────────────────────────────────────
 
 // POST /api/admin/plans
-app.post("/api/admin/plans", async (req, res) => {
+app.post("/api/admin/plans", adminMiddleware, async (req, res) => {
   const {
     name, description, price, currency, duration_days, class_limit, class_category,
     features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
@@ -5680,7 +5879,7 @@ app.post("/api/admin/plans", async (req, res) => {
 });
 
 // PUT /api/admin/plans/:id
-app.put("/api/admin/plans/:id", async (req, res) => {
+app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
   const {
     name, description, price, currency, duration_days, class_limit, class_category,
     features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
@@ -5722,7 +5921,7 @@ app.put("/api/admin/plans/:id", async (req, res) => {
 });
 
 // DELETE /api/admin/plans/:id
-app.delete("/api/admin/plans/:id", async (req, res) => {
+app.delete("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
   try {
     await pool.query("UPDATE plans SET is_active = false WHERE id = $1", [req.params.id]);
     return res.json({ message: "Plan desactivado" });
@@ -5735,7 +5934,7 @@ app.delete("/api/admin/plans/:id", async (req, res) => {
 // ─── Routes: /api/admin/schedule (schedule_templates) ───────────────────────
 
 // GET /api/admin/schedule
-app.get("/api/admin/schedule", async (_req, res) => {
+app.get("/api/admin/schedule", adminMiddleware, async (_req, res) => {
   try {
     const r = await pool.query(
       "SELECT * FROM schedule_templates ORDER BY time_slot ASC, day_of_week ASC"
@@ -5748,7 +5947,7 @@ app.get("/api/admin/schedule", async (_req, res) => {
 });
 
 // POST /api/admin/schedule
-app.post("/api/admin/schedule", async (req, res) => {
+app.post("/api/admin/schedule", adminMiddleware, async (req, res) => {
   const { time_slot, day_of_week, class_label, shift } = req.body;
   if (!time_slot || !day_of_week || !class_label) {
     return res.status(400).json({ message: "time_slot, day_of_week y class_label requeridos" });
@@ -5770,7 +5969,7 @@ app.post("/api/admin/schedule", async (req, res) => {
 });
 
 // PUT /api/admin/schedule/:id
-app.put("/api/admin/schedule/:id", async (req, res) => {
+app.put("/api/admin/schedule/:id", adminMiddleware, async (req, res) => {
   const { time_slot, day_of_week, class_label, shift, is_active } = req.body;
   try {
     const r = await pool.query(
@@ -5795,7 +5994,7 @@ app.put("/api/admin/schedule/:id", async (req, res) => {
 });
 
 // DELETE /api/admin/schedule/:id
-app.delete("/api/admin/schedule/:id", async (req, res) => {
+app.delete("/api/admin/schedule/:id", adminMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM schedule_templates WHERE id = $1", [req.params.id]);
     return res.json({ ok: true });
@@ -5821,7 +6020,7 @@ app.get("/api/packages", async (_req, res) => {
 });
 
 // POST /api/admin/packages
-app.post("/api/admin/packages", async (req, res) => {
+app.post("/api/admin/packages", adminMiddleware, async (req, res) => {
   const { name, num_classes, price, category, validity_days, sort_order } = req.body;
   if (!name?.trim() || !num_classes || price === undefined || !category) {
     return res.status(400).json({ message: "name, num_classes, price y category requeridos" });
@@ -5840,7 +6039,7 @@ app.post("/api/admin/packages", async (req, res) => {
 });
 
 // PUT /api/admin/packages/:id
-app.put("/api/admin/packages/:id", async (req, res) => {
+app.put("/api/admin/packages/:id", adminMiddleware, async (req, res) => {
   const { name, num_classes, price, category, validity_days, is_active, sort_order } = req.body;
   try {
     const r = await pool.query(
@@ -5868,7 +6067,7 @@ app.put("/api/admin/packages/:id", async (req, res) => {
 });
 
 // DELETE /api/admin/packages/:id
-app.delete("/api/admin/packages/:id", async (req, res) => {
+app.delete("/api/admin/packages/:id", adminMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM packages WHERE id = $1", [req.params.id]);
     return res.json({ ok: true });
@@ -6691,52 +6890,11 @@ app.post("/api/evolution/send-message", adminMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/evolution/notify-clients  { filter: "all"|"members"|"active", message }
+// POST /api/evolution/notify-clients — disabled for safety
 app.post("/api/evolution/notify-clients", adminMiddleware, async (req, res) => {
-  try {
-    const { filter = "all", message } = req.body;
-    if (!message) return res.status(400).json({ message: "El mensaje es requerido" });
-
-    let query;
-    if (filter === "members") {
-      query = `SELECT DISTINCT u.id, u.display_name AS name, u.phone FROM users u
-               JOIN memberships m ON m.user_id = u.id
-               WHERE u.role = 'client' AND u.phone IS NOT NULL AND u.phone != ''
-               AND m.status = 'active'`;
-    } else if (filter === "active") {
-      query = `SELECT DISTINCT u.id, u.display_name AS name, u.phone FROM users u
-               JOIN bookings b ON b.user_id = u.id
-               WHERE u.role = 'client' AND u.phone IS NOT NULL AND u.phone != ''
-               AND b.status IN ('confirmed','checked_in')
-               AND b.created_at > NOW() - INTERVAL '60 days'`;
-    } else {
-      query = `SELECT id, display_name AS name, phone FROM users
-               WHERE role = 'client' AND phone IS NOT NULL AND phone != ''`;
-    }
-
-    const clients = (await pool.query(query)).rows;
-    if (!clients.length) return res.json({ data: { sent: 0, failed: 0, total: 0, message: "No hay clientes con teléfono registrado" } });
-
-    let sent = 0;
-    let failed = 0;
-    const errors = [];
-
-    for (const client of clients) {
-      try {
-        const number = normalisePhone(client.phone);
-        await queueWhatsAppSend(number, message);
-        sent++;
-      } catch (sendErr) {
-        failed++;
-        errors.push({ name: client.name, phone: client.phone, error: sendErr.response?.data?.message || sendErr.message });
-      }
-    }
-
-    return res.json({ data: { sent, failed, total: clients.length, errors: errors.slice(0, 10) } });
-  } catch (err) {
-    console.error("[EVOLUTION NOTIFY-CLIENTS]", err.response?.data || err.message);
-    return res.status(500).json({ message: "Error al enviar notificaciones" });
-  }
+  return res.status(410).json({
+    message: "Los envíos masivos por WhatsApp fueron deshabilitados por seguridad.",
+  });
 });
 
 // ─── Videos purchases approve/reject ────────────────────────────────────────
