@@ -41,6 +41,17 @@ type PackageRow = {
   sort_order: number;
 };
 
+type TrialPlanRow = {
+  id: string;
+  name: string;
+  classCategory: "jumping" | "pilates";
+  price: number;
+  durationDays: number;
+  classLimit: number;
+  isNonTransferable: boolean;
+  isNonRepeatable: boolean;
+};
+
 const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
   { id: "c1", name: "Jumping Fitness", subtitle: "Full Body", description: "Entrena todo el cuerpo en trampolín con coreografías dinámicas y música motivadora. Alta intensidad, bajo impacto.", category: "jumping", intensity: "media", color: "#E15CB8", emoji: "", level: "Todos los niveles", duration_min: 50, capacity: 10, is_active: true, sort_order: 1 },
   { id: "c2", name: "Jumping Dance", subtitle: "Coreografías", description: "Combina el jumping con movimientos de danza. Divertido, enérgico y perfecto para liberar el estrés.", category: "jumping", intensity: "media", color: "#CA71E1", emoji: "", level: "Todos los niveles", duration_min: 50, capacity: 10, is_active: true, sort_order: 2 },
@@ -72,6 +83,29 @@ const FALLBACK_PACKAGES: PackageRow[] = [
   { id: "p14", name: "16 Clases Mixto",       num_classes: "16",        price: 1120, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 3 },
   { id: "p15", name: "20 Clases Mixto",       num_classes: "20",        price: 1300, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 4 },
   { id: "p16", name: "Ilimitado Mixto",       num_classes: "ILIMITADO", price: 1000, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 5 },
+];
+
+const FALLBACK_TRIAL_PLANS: TrialPlanRow[] = [
+  {
+    id: "trial-jumping",
+    name: "Clase muestra Jumping",
+    classCategory: "jumping",
+    price: 65,
+    durationDays: 7,
+    classLimit: 1,
+    isNonTransferable: true,
+    isNonRepeatable: true,
+  },
+  {
+    id: "trial-pilates",
+    name: "Clase muestra Pilates",
+    classCategory: "pilates",
+    price: 65,
+    durationDays: 7,
+    classLimit: 1,
+    isNonTransferable: true,
+    isNonRepeatable: true,
+  },
 ];
 
 /** Map icon key field to a Lucide icon based on stored value or card title */
@@ -117,6 +151,10 @@ const Index = () => {
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
+  const isAdminRole = ["admin", "super_admin", "instructor", "reception"].includes(user?.role ?? "");
+  const membershipCtaPath = isAuthenticated
+    ? (isAdminRole ? "/admin/dashboard" : "/app/checkout")
+    : "/auth/register";
 
   // Instructors from admin
   const [instructors, setInstructors] = useState<{
@@ -141,6 +179,47 @@ const Index = () => {
         { id: 2, title: "Jumping Dance",   description: "Coreografías sobre el trampolín que combinan ritmo y diversión.",     emoji: "music", video_url: null, thumbnail_url: null },
         { id: 3, title: "Pilates Flow",    description: "Secuencias fluidas para fortalecer tu core y mejorar postura.",        emoji: "waves", video_url: null, thumbnail_url: null },
       ];
+  const { data: plansData } = useQuery<{ data: any[] }>({
+    queryKey: ["plans-public"],
+    queryFn: async () => (await api.get("/plans")).data,
+    staleTime: 1000 * 60 * 5,
+  });
+  const trialPlans: TrialPlanRow[] = (() => {
+    const rows = Array.isArray(plansData?.data) ? plansData.data : [];
+    const byCategory = new Map<"jumping" | "pilates", TrialPlanRow>();
+
+    for (const row of rows) {
+      const isActive = (row?.isActive ?? row?.is_active) !== false;
+      if (!isActive) continue;
+
+      const category = String(row?.classCategory ?? row?.class_category ?? "").toLowerCase();
+      if (category !== "jumping" && category !== "pilates") continue;
+
+      const repeatKey = String(row?.repeatKey ?? row?.repeat_key ?? "");
+      const classLimit = Number(row?.classLimit ?? row?.class_limit ?? 0);
+      const price = Number(row?.price ?? 0);
+      const looksLikeTrial = repeatKey.startsWith("trial_single_session")
+        || (classLimit === 1 && Math.abs(price - 65) < 0.01);
+
+      if (!looksLikeTrial || byCategory.has(category)) continue;
+
+      byCategory.set(category, {
+        id: String(row?.id ?? `${category}-trial`),
+        name: String(row?.name ?? `Clase muestra ${category === "jumping" ? "Jumping" : "Pilates"}`),
+        classCategory: category,
+        price,
+        durationDays: Number(row?.durationDays ?? row?.duration_days ?? 7) || 7,
+        classLimit: classLimit || 1,
+        isNonTransferable: Boolean(row?.isNonTransferable ?? row?.is_non_transferable),
+        isNonRepeatable: Boolean(row?.isNonRepeatable ?? row?.is_non_repeatable),
+      });
+    }
+
+    const ordered = ["jumping", "pilates"]
+      .map((cat) => byCategory.get(cat as "jumping" | "pilates"))
+      .filter(Boolean) as TrialPlanRow[];
+    return ordered.length > 0 ? ordered : FALLBACK_TRIAL_PLANS;
+  })();
 
   useEffect(() => {
     const handleScroll = () => setNavScrolled(window.scrollY > 50);
@@ -619,8 +698,60 @@ const Index = () => {
               ELIGE TU<br />PAQUETE
             </h2>
             <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Paquetes para todos los gustos. Vigencia de 30 dias. Sin compromisos.
+              Paquetes mensuales y clase muestra de $65. Compra directo desde la app.
             </p>
+          </div>
+          <div className="rounded-3xl border border-primary/30 bg-background mb-8 p-5 sm:p-7">
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 mb-5">
+              <div>
+                <p className="text-[0.68rem] tracking-[0.15em] uppercase text-primary font-medium">Clase muestra</p>
+                <h3 className="font-syne font-bold text-[1.4rem] text-foreground mt-1">1 por persona en cada modalidad</h3>
+              </div>
+              <p className="text-[0.8rem] text-muted-foreground lg:text-right">
+                1 Jumping + 1 Pilates por persona · $65 cada clase · no transferible · no repetible
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {trialPlans.map((plan) => {
+                const isJumping = plan.classCategory === "jumping";
+                const accent = isJumping ? "#E15CB8" : "#CA71E1";
+                const icon = isJumping ? imgTrampoline : imgPilates;
+                return (
+                  <div key={plan.id} className="rounded-2xl border border-border bg-secondary p-5 flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-12 w-12 rounded-xl border flex items-center justify-center"
+                        style={{ borderColor: `${accent}55`, background: `${accent}18` }}
+                      >
+                        <img src={icon} alt="" className="h-8 w-8 object-contain" />
+                      </div>
+                      <div>
+                        <p className="text-[0.7rem] tracking-[0.15em] uppercase" style={{ color: accent }}>
+                          {isJumping ? "Jumping" : "Pilates"}
+                        </p>
+                        <h4 className="font-syne font-bold text-[1rem] text-foreground">{plan.name}</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-end gap-1">
+                      <span className="font-bebas text-[2.8rem] leading-none text-primary">${plan.price.toLocaleString("es-MX")}</span>
+                      <span className="text-[0.75rem] text-muted-foreground mb-1">MXN</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-[0.67rem]">
+                      <span className="px-2 py-1 rounded-full border border-primary/30 text-primary">{plan.classLimit} clase</span>
+                      <span className="px-2 py-1 rounded-full border border-border text-muted-foreground">{plan.durationDays} días vigencia</span>
+                      {plan.isNonTransferable && <span className="px-2 py-1 rounded-full border border-amber-300/25 text-amber-300">No transferible</span>}
+                      {plan.isNonRepeatable && <span className="px-2 py-1 rounded-full border border-rose-300/25 text-rose-300">No repetible</span>}
+                    </div>
+                    <button
+                      onClick={() => navigate(membershipCtaPath)}
+                      className="mt-2 w-full py-3 rounded-full text-[0.76rem] font-medium tracking-wider uppercase border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all"
+                    >
+                      Quiero mi clase muestra
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
           {/* Category tabs */}
           <div className="flex gap-2 mb-8 flex-wrap">
@@ -688,7 +819,7 @@ const Index = () => {
                     )}
                     <div className="mt-auto">
                       <button
-                        onClick={() => navigate("/auth/register")}
+                        onClick={() => navigate(membershipCtaPath)}
                         className={`w-full py-3 rounded-full text-[0.78rem] font-medium tracking-wider uppercase transition-all ${
                           isUnlimited
                             ? "bg-primary-foreground text-primary hover:bg-primary-foreground/90"
@@ -847,14 +978,14 @@ const Index = () => {
               TE ESPERA
             </h2>
             <p className="text-[1.1rem] text-muted-foreground max-w-[500px] mx-auto mb-10 leading-[1.7]">
-              Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Tu primera clase es gratis.
+              Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Prueba Jumping o Pilates por $65 en tu clase muestra.
             </p>
             <div className="flex gap-4 justify-center items-center flex-wrap">
               <button
-                onClick={() => navigate("/auth/register")}
+                onClick={() => navigate(membershipCtaPath)}
                 className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all"
               >
-                Crear cuenta gratis
+                Reservar clase muestra
                 <span className="w-[22px] h-[22px] bg-primary-foreground/20 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
               </button>
               <a

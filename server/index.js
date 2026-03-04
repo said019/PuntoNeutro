@@ -426,11 +426,13 @@ async function ensureSchema() {
       {
         name: "Sesión suelta (muestra) Jumping",
         classCategory: "jumping",
+        repeatKey: "trial_single_session_jumping",
         sortOrder: 0,
       },
       {
         name: "Sesión suelta (muestra) Pilates",
         classCategory: "pilates",
+        repeatKey: "trial_single_session_pilates",
         sortOrder: 0,
       },
     ];
@@ -447,24 +449,25 @@ async function ensureSchema() {
                is_active = true,
                is_non_transferable = true,
                is_non_repeatable = true,
-               repeat_key = 'trial_single_session',
-               sort_order = $4,
+               repeat_key = $4,
+               sort_order = $5,
                updated_at = NOW()
          WHERE name = $1`,
-        [sp.name, sp.classCategory, features, sp.sortOrder]
+        [sp.name, sp.classCategory, features, sp.repeatKey, sp.sortOrder]
       );
       if (updateRes.rowCount === 0) {
         await pool.query(
           `INSERT INTO plans
             (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
            VALUES
-            ($1, $2, 65, 'MXN', 7, 1, $3, $4::jsonb, true, $5, true, true, 'trial_single_session')`,
+            ($1, $2, 65, 'MXN', 7, 1, $3, $4::jsonb, true, $5, true, true, $6)`,
           [
             sp.name,
             "Sesión de muestra individual. No transferible y no repetible.",
             sp.classCategory,
             features,
             sp.sortOrder,
+            sp.repeatKey,
           ]
         );
       }
@@ -781,6 +784,25 @@ async function ensureSchema() {
         updated_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(device_id, pass_type_id, serial_number)
       );
+    `).catch(() => { });
+    // Backward compatibility: some DBs still have the old wallet schema
+    // (device_id, pass_type_id, membership_id) without serial_number.
+    await pool.query(`ALTER TABLE apple_wallet_devices ADD COLUMN IF NOT EXISTS serial_number VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE apple_wallet_devices ADD COLUMN IF NOT EXISTS pass_type_id VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE apple_wallet_devices ADD COLUMN IF NOT EXISTS push_token VARCHAR(255) NOT NULL DEFAULT ''`).catch(() => { });
+    await pool.query(`
+      UPDATE apple_wallet_devices
+      SET serial_number = CONCAT(
+        'legacy_',
+        REPLACE(COALESCE(membership_id::text, id::text), '-', '')
+      )
+      WHERE serial_number IS NULL OR serial_number = ''
+    `).catch(() => { });
+    await pool.query(`ALTER TABLE apple_wallet_devices ALTER COLUMN serial_number SET NOT NULL`).catch(() => { });
+    await pool.query(`ALTER TABLE apple_wallet_devices ALTER COLUMN membership_id DROP NOT NULL`).catch(() => { });
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_apple_wallet_devices_device_pass_serial
+      ON apple_wallet_devices(device_id, pass_type_id, serial_number)
     `).catch(() => { });
     // ── Review tags table ──────────────────────────────────────────────────
     await pool.query(`
@@ -1587,19 +1609,37 @@ function normalizeQrDataUrl(raw) {
 
 function pickEvolutionQrPayload(payload) {
   if (!payload || typeof payload !== "object") return null;
-  return (
-    payload?.code ||
-    payload?.base64 ||
-    payload?.qrcode?.base64 ||
-    payload?.qrcode?.code ||
-    payload?.qrCode?.base64 ||
-    payload?.qrCode?.code ||
-    payload?.qr?.base64 ||
-    payload?.qr?.code ||
-    payload?.instance?.qrcode?.base64 ||
-    payload?.instance?.qrCode?.base64 ||
-    null
-  );
+  // Evolution often returns both "code" and "base64".
+  // "code" is not always an image payload, so prefer explicit base64/image fields.
+  const candidates = [
+    payload?.base64,
+    payload?.qrcode?.base64,
+    payload?.qrCode?.base64,
+    payload?.qr?.base64,
+    payload?.instance?.qrcode?.base64,
+    payload?.instance?.qrCode?.base64,
+    payload?.instance?.qr?.base64,
+    payload?.code,
+    payload?.qrcode?.code,
+    payload?.qrCode?.code,
+    payload?.qr?.code,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("data:image/")) return trimmed;
+    // Raw base64 image strings should not include separators like comma + '@'
+    // seen in non-image "code" values.
+    const looksLikeRawBase64Image =
+      !trimmed.includes(",") &&
+      !trimmed.includes("@") &&
+      /^[A-Za-z0-9+/=]+$/.test(trimmed) &&
+      trimmed.length > 120;
+    if (looksLikeRawBase64Image) return trimmed;
+  }
+  return null;
 }
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
@@ -5264,10 +5304,14 @@ app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
 // POST /api/evolution/connect — create instance (or fetch QR if already exists)
 app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
   try {
+    const isAlreadyInUseError = (status, rawMessage) =>
+      status === 409 || status === 403 || /already in use|in use|ya existe/i.test(rawMessage || "");
+
     // Try creating the instance
     let createData = null;
     let createErrStatus = null;
     let createErrMessage = "";
+    let createAlreadyInUse = false;
     try {
       const createRes = await evolutionApi.post("/instance/create", {
         instanceName: EVOLUTION_INSTANCE,
@@ -5278,9 +5322,12 @@ app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
     } catch (createErr) {
       createErrStatus = createErr.response?.status ?? null;
       createErrMessage = JSON.stringify(createErr.response?.data || createErr.message || "");
-      // 409 = already exists, ignore; otherwise log
-      if (createErr.response?.status !== 409) {
+      createAlreadyInUse = isAlreadyInUseError(createErrStatus, createErrMessage);
+      // "already in use" is an expected case when the instance already exists.
+      if (!createAlreadyInUse) {
         console.error("[EVOLUTION CREATE]", createErr.response?.data || createErr.message);
+      } else {
+        console.log("[EVOLUTION CREATE] Instance already exists, proceeding to connect:", EVOLUTION_INSTANCE);
       }
     }
 
@@ -5300,8 +5347,24 @@ app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
     }
 
     if (!qrCode) {
-      const alreadyInUse = /already in use|in use|ya existe/i.test(createErrMessage);
-      if (alreadyInUse || createErrStatus === 403 || createErrStatus === 409) {
+      // If there is no QR, check if the instance is already linked/open.
+      try {
+        const stateResp = await evolutionApi.get(`/instance/connectionState/${EVOLUTION_INSTANCE}`);
+        const currentState = stateResp.data?.instance?.state || stateResp.data?.state || "unknown";
+        if (currentState === "open") {
+          return res.json({
+            data: {
+              state: "connected",
+              connected: true,
+              message: "WhatsApp ya está conectado en esta instancia",
+            },
+          });
+        }
+      } catch (_) {
+        // ignore and continue with error mapping below
+      }
+
+      if (createAlreadyInUse) {
         return res.status(409).json({
           message: `No se pudo obtener QR para la instancia "${EVOLUTION_INSTANCE}". Ese nombre ya está en uso. Cambia EVOLUTION_INSTANCE_NAME en Railway por un nombre único (ej. ophelia-jump-studio-2026).`,
         });

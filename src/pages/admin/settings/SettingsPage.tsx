@@ -21,6 +21,8 @@ function normalizeQrDataUrl(raw: unknown): string | null {
   if (!trimmed) return null;
   if (trimmed.startsWith("data:image/")) return trimmed;
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  // Guard against Evolution "code" payloads that are not image data.
+  if (trimmed.includes(",") && trimmed.includes("@")) return null;
   return `data:image/png;base64,${trimmed}`;
 }
 
