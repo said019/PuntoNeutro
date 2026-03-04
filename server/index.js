@@ -4513,24 +4513,31 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     },
   ];
 
-  const compactPrimaryFields = [
-    {
-      key: "compact_title",
-      label: hasEventPass ? "EVENTO" : hasMembership ? "PLAN" : "MIEMBRO",
-      value: hasEventPass
-        ? truncateWalletField(activeEventPass?.eventTitle || "Evento especial", 22)
-        : hasMembership
+  const compactPrimaryFields = hasEventPass
+    ? []
+    : [
+      {
+        key: "compact_title",
+        label: hasMembership ? "PLAN" : "MIEMBRO",
+        value: hasMembership
           ? truncateWalletField(planDisplayName || membershipHeadline, 22)
           : truncateWalletField(memberDisplayName || "Miembro", 22),
-    },
-  ];
+      },
+    ];
 
   const compactSecondaryFields = [];
+  if (hasEventPass) {
+    compactSecondaryFields.push({
+      key: "compact_event_title",
+      label: "EVENTO",
+      value: truncateWalletField(activeEventPass?.eventTitle || "Evento especial", 18),
+    });
+  }
   if (hasEventPass && eventSchedule) {
     compactSecondaryFields.push({
       key: "compact_event_schedule",
       label: "FECHA",
-      value: truncateWalletField(eventSchedule, 24),
+      value: truncateWalletField(eventSchedule, 16),
     });
   } else if (hasMembership && membership.end_date) {
     const endDate = new Date(membership.end_date);
@@ -4619,9 +4626,15 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     "ophelia-logo.png",
   ]);
 
-  const logoPath = findAssetFile(["wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
-  const logo2xPath = findAssetFile(["wallet-logo-black@2x.png", "wallet-logo@2x.png", "wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
-  const logo3xPath = findAssetFile(["wallet-logo-black@3x.png", "wallet-logo@3x.png", "wallet-logo-black@2x.png", "wallet-logo@2x.png", "wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+  const logoPath = hasEventPass
+    ? findAssetFile(["wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"])
+    : findAssetFile(["wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+  const logo2xPath = hasEventPass
+    ? findAssetFile(["wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"])
+    : findAssetFile(["wallet-logo-black@2x.png", "wallet-logo@2x.png", "wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+  const logo3xPath = hasEventPass
+    ? findAssetFile(["wallet-logo@3x.png", "wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"])
+    : findAssetFile(["wallet-logo-black@3x.png", "wallet-logo@3x.png", "wallet-logo-black@2x.png", "wallet-logo@2x.png", "wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
 
   const thumbPath = findAssetFile([
     `wallet-thumb-${assetCategory}.png`,
@@ -4642,31 +4655,32 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     "ophelia-logo.png",
   ]);
 
-  const stripCategory =
-    hasEventPass
-      ? "event"
-      : membershipCategory === "jumping"
-        ? "jumping"
-        : membershipCategory === "pilates"
-          ? "pilates"
+  let dynamicStripName = "none";
+  let stripPath = null;
+  let strip2xPath = null;
+  let strip3xPath = null;
+  if (!hasEventPass) {
+    const stripCategory =
+      membershipCategory === "jumping" ? "jumping"
+        : membershipCategory === "pilates" ? "pilates"
           : "mixto";
-  const dynamicStripName =
-    shouldUseStampStrip
+    dynamicStripName = shouldUseStampStrip
       ? `wallet-strip-${stripCategory}-t${stripStampState.total}-r${stripStampState.remaining}.png`
       : `wallet-strip-${stripCategory}.png`;
-  const dynamicStripPath = shouldUseStampStrip
-    ? findAssetFile([dynamicStripName])
-    : null;
-  const stripCandidates = [`wallet-strip-${stripCategory}.png`, "wallet-strip-mixto.png"];
-  const strip2xCandidates = [`wallet-strip-${stripCategory}@2x.png`, "wallet-strip-mixto@2x.png"];
-  const strip3xCandidates = [`wallet-strip-${stripCategory}@3x.png`, "wallet-strip-mixto@3x.png"];
-  const stripPath = dynamicStripPath || findAssetFile(stripCandidates);
-  const strip2xPath = dynamicStripPath
-    ? findAssetFile([dynamicStripName.replace(".png", "@2x.png")])
-    : findAssetFile(strip2xCandidates);
-  const strip3xPath = dynamicStripPath
-    ? findAssetFile([dynamicStripName.replace(".png", "@3x.png")])
-    : findAssetFile(strip3xCandidates);
+    const dynamicStripPath = shouldUseStampStrip
+      ? findAssetFile([dynamicStripName])
+      : null;
+    const stripCandidates = [`wallet-strip-${stripCategory}.png`, "wallet-strip-mixto.png"];
+    const strip2xCandidates = [`wallet-strip-${stripCategory}@2x.png`, "wallet-strip-mixto@2x.png"];
+    const strip3xCandidates = [`wallet-strip-${stripCategory}@3x.png`, "wallet-strip-mixto@3x.png"];
+    stripPath = dynamicStripPath || findAssetFile(stripCandidates);
+    strip2xPath = dynamicStripPath
+      ? findAssetFile([dynamicStripName.replace(".png", "@2x.png")])
+      : findAssetFile(strip2xCandidates);
+    strip3xPath = dynamicStripPath
+      ? findAssetFile([dynamicStripName.replace(".png", "@3x.png")])
+      : findAssetFile(strip3xCandidates);
+  }
 
   const readAssetBuffer = (assetPath) => (assetPath && fs.existsSync(assetPath) ? fs.readFileSync(assetPath) : null);
   const iconBuffer = readAssetBuffer(iconPath);
