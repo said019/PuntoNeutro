@@ -3024,6 +3024,7 @@ const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
 const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || "Ophelia Jump Studio";
 const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || "Ophelia Club";
 const GW_HEX_BG = process.env.GOOGLE_HEX_BACKGROUND_COLOR || "#1a0b26";
+const GW_HEX_BG_EVENT = process.env.GOOGLE_HEX_BACKGROUND_COLOR_EVENT || "#0c2b26";
 
 /**
  * Parse the Google Service Account private key from various env var formats.
@@ -3196,6 +3197,21 @@ async function ensureGoogleWalletClass() {
   }
 }
 
+function formatWalletEventSchedule(eventPass) {
+  if (!eventPass?.eventDate) return "";
+  const eventDate = new Date(eventPass.eventDate);
+  if (Number.isNaN(eventDate.getTime())) return "";
+  const dateLabel = eventDate.toLocaleDateString("es-MX", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const startTime = eventPass.eventStartTime ? String(eventPass.eventStartTime).slice(0, 5) : "";
+  const endTime = eventPass.eventEndTime ? String(eventPass.eventEndTime).slice(0, 5) : "";
+  const timeLabel = startTime && endTime ? `${startTime} - ${endTime}` : (startTime || "");
+  return `${dateLabel}${timeLabel ? ` · ${timeLabel}` : ""}`.trim();
+}
+
 /** Build a Google Wallet Save URL (JWT) for a user
  *  @param {Object} opts
  *  @param {string} opts.userId
@@ -3204,12 +3220,16 @@ async function ensureGoogleWalletClass() {
  *  @param {string} opts.qrCode
  *  @param {Object|null} opts.membership  - { plan_name, class_limit, classes_remaining, end_date, start_date }
  *  @param {Object|null} opts.nextBooking - { class_name, instructor_name, date, start_time }
+ *  @param {Object|null} opts.activeEventPass - { eventTitle, eventDate, eventStartTime, eventEndTime, eventLocation, passCode }
  */
-function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking }) {
+function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking, activeEventPass }) {
   const objectId = `${GW_ISSUER_ID}.ophelia_${userId.replace(/-/g, "")}`;
 
   // ── Determine pass type and details based on membership ──────────────────
   const hasMembership = !!membership;
+  const hasEventPass = !!activeEventPass;
+  const eventSchedule = formatWalletEventSchedule(activeEventPass);
+  const eventTitle = activeEventPass?.eventTitle || "Evento especial";
   const membershipCategory = hasMembership
     ? normalizeClassCategory(membership.class_category, "all")
     : "all";
@@ -3228,7 +3248,9 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
 
   // Header label
   let passHeader = "OPHELIA CLUB";
-  if (hasMembership) {
+  if (hasEventPass) {
+    passHeader = "PASE DE EVENTO";
+  } else if (hasMembership) {
     if (isTrialSingleSession) passHeader = "CLASE MUESTRA";
     else if (isUnlimited) passHeader = "MEMBRESÍA";
     else if (isPackage) passHeader = "PAQUETE";
@@ -3237,6 +3259,35 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
 
   // ── Build textModulesData rows ───────────────────────────────────────────
   const textModules = [];
+
+  if (hasEventPass) {
+    textModules.push({
+      id: "event_title",
+      header: "EVENTO ACTIVO",
+      body: eventTitle,
+    });
+    if (eventSchedule) {
+      textModules.push({
+        id: "event_schedule",
+        header: "FECHA Y HORA",
+        body: eventSchedule,
+      });
+    }
+    if (activeEventPass?.eventLocation) {
+      textModules.push({
+        id: "event_location",
+        header: "LUGAR",
+        body: activeEventPass.eventLocation,
+      });
+    }
+    if (activeEventPass?.passCode) {
+      textModules.push({
+        id: "event_code",
+        header: "CÓDIGO EVENTO",
+        body: activeEventPass.passCode,
+      });
+    }
+  }
 
   // Row 1: Plan Name
   if (hasMembership) {
@@ -3329,6 +3380,43 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     body: `${points.toLocaleString("es-MX")} pts`,
   });
 
+  const infoRows = [];
+  if (hasEventPass) {
+    infoRows.push({
+      columns: [
+        { label: "Evento", value: eventTitle },
+        { label: "Código", value: activeEventPass.passCode || "—" },
+      ],
+    });
+    infoRows.push({
+      columns: [
+        { label: "Horario", value: eventSchedule || "—" },
+        { label: "Sede", value: activeEventPass.eventLocation || "—" },
+      ],
+    });
+  }
+  if (hasMembership) {
+    infoRows.push({
+      columns: [
+        { label: "Miembro", value: userName },
+        { label: "Plan", value: membership.plan_name || "—" },
+      ],
+    });
+    infoRows.push({
+      columns: [
+        { label: "Modalidad", value: membershipCategoryLabel },
+        { label: "Reglas", value: [nonTransferable ? "No transferible" : "", nonRepeatable ? "No repetible" : ""].filter(Boolean).join(" · ") || "—" },
+      ],
+    });
+  } else {
+    infoRows.push({
+      columns: [
+        { label: "Miembro", value: userName },
+        { label: "Puntos", value: String(points) },
+      ],
+    });
+  }
+
   // ── Build loyaltyObject ──────────────────────────────────────────────────
   const loyaltyObject = {
     id: objectId,
@@ -3336,7 +3424,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     state: "ACTIVE",
     accountId: userId,
     accountName: userName,
-    hexBackgroundColor: GW_HEX_BG,
+    hexBackgroundColor: hasEventPass ? GW_HEX_BG_EVENT : GW_HEX_BG,
     barcode: {
       type: "QR_CODE",
       value: qrCode,
@@ -3357,27 +3445,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     },
     infoModuleData: {
       showLastUpdateTime: true,
-      labelValueRows: hasMembership ? [
-        {
-          columns: [
-            { label: "Miembro", value: userName },
-            { label: "Plan", value: membership.plan_name || "—" },
-          ],
-        },
-        {
-          columns: [
-            { label: "Modalidad", value: membershipCategoryLabel },
-            { label: "Reglas", value: [nonTransferable ? "No transferible" : "", nonRepeatable ? "No repetible" : ""].filter(Boolean).join(" · ") || "—" },
-          ],
-        },
-      ] : [
-        {
-          columns: [
-            { label: "Miembro", value: userName },
-            { label: "Puntos", value: String(points) },
-          ],
-        },
-      ],
+      labelValueRows: infoRows,
     },
   };
 
@@ -3408,86 +3476,13 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
     } catch (classErr) {
       console.error("Google Wallet class ensure error (non-fatal):", classErr.response?.data || classErr.message);
     }
-
-    // Get user info
-    const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1", [req.userId]);
-    if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
-    const user = userRes.rows[0];
-    const userName = user.display_name || user.email;
-
-    // Get points
-    const pointsRes = await pool.query(
-      "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
-      [req.userId]
-    );
-    const points = parseInt(pointsRes.rows[0].total);
-
-    // Get active membership with plan info
-    let membership = null;
-    try {
-      const memRes = await pool.query(
-        `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.end_date,
-                m.plan_name_override, m.class_limit_override,
-                p.name AS plan_name, p.class_limit AS plan_class_limit, p.duration_days,
-                p.class_category, p.is_non_transferable, p.is_non_repeatable, p.repeat_key
-         FROM memberships m
-         LEFT JOIN plans p ON m.plan_id = p.id
-         WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
-         ORDER BY m.end_date DESC
-         LIMIT 1`,
-        [req.userId]
-      );
-      if (memRes.rows.length > 0) {
-        const m = memRes.rows[0];
-        membership = {
-          plan_name: m.plan_name_override || m.plan_name || "Plan Activo",
-          class_limit: m.class_limit_override ?? m.plan_class_limit,
-          classes_remaining: m.classes_remaining,
-          start_date: m.start_date,
-          end_date: m.end_date,
-          class_category: normalizeClassCategory(m.class_category, "all"),
-          is_non_transferable: parseBooleanFlag(m.is_non_transferable),
-          is_non_repeatable: parseBooleanFlag(m.is_non_repeatable),
-          repeat_key: m.repeat_key || null,
-        };
-      }
-    } catch (memErr) {
-      console.error("Wallet: membership query error:", memErr.message);
-    }
-
-    // Get next confirmed booking
-    let nextBooking = null;
-    try {
-      const bookRes = await pool.query(
-        `SELECT c.date, c.start_time, ct.name AS class_name,
-                i.display_name AS instructor_name
-         FROM bookings b
-         JOIN classes c ON b.class_id = c.id
-         JOIN class_types ct ON c.class_type_id = ct.id
-         LEFT JOIN instructors i ON c.instructor_id = i.id
-         WHERE b.user_id = $1
-           AND b.status IN ('confirmed', 'waitlist')
-           AND c.date >= CURRENT_DATE
-         ORDER BY c.date ASC, c.start_time ASC
-         LIMIT 1`,
-        [req.userId]
-      );
-      if (bookRes.rows.length > 0) {
-        nextBooking = bookRes.rows[0];
-      }
-    } catch (bookErr) {
-      console.error("Wallet: booking query error:", bookErr.message);
-    }
-
-    const qrCode = Buffer.from(req.userId).toString("base64");
-    const saveUrl = buildGoogleWalletSaveUrl({
-      userId: req.userId,
-      userName,
-      points,
-      qrCode,
-      membership,
-      nextBooking,
-    });
+    const requestedEventIdRaw = String(req.query?.eventId || "").trim();
+    const requestedEventId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedEventIdRaw)
+      ? requestedEventIdRaw
+      : null;
+    const snapshot = await getWalletSnapshotForUser(req.userId, { eventId: requestedEventId });
+    if (!snapshot) return res.status(404).json({ message: "Usuario no encontrado" });
+    const saveUrl = buildGoogleWalletSaveUrl(snapshot);
     return res.json({ data: { saveUrl } });
   } catch (err) {
     console.error("Google Wallet save-url error:", err.response?.data || err.message, err.stack?.split("\n").slice(0,3).join("\n"));
@@ -3849,7 +3844,7 @@ function sendApplePassUpdatedPush(pushToken, providerToken) {
   });
 }
 
-async function getWalletSnapshotForUser(userId) {
+async function getWalletSnapshotForUser(userId, { eventId = null } = {}) {
   const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1 LIMIT 1", [userId]);
   if (!userRes.rows.length) return null;
   const user = userRes.rows[0];
@@ -3913,6 +3908,60 @@ async function getWalletSnapshotForUser(userId) {
     console.error("[Wallet] next booking snapshot error:", err.message);
   }
 
+  let activeEventPass = null;
+  try {
+    const params = [userId];
+    const where = [
+      "ep.user_id = $1",
+      "ep.status = 'issued'",
+      "e.status <> 'cancelled'",
+    ];
+    if (eventId) {
+      params.push(eventId);
+      where.push(`ep.event_id = $${params.length}`);
+    } else {
+      where.push(`(
+        e.date > CURRENT_DATE
+        OR (e.date = CURRENT_DATE AND (e.end_time IS NULL OR e.end_time >= CURRENT_TIME))
+      )`);
+    }
+    const eventPassRes = await pool.query(
+      `SELECT ep.id,
+              ep.pass_code,
+              ep.status,
+              ep.issued_at,
+              e.id AS event_id,
+              e.title AS event_title,
+              e.date AS event_date,
+              e.start_time AS event_start_time,
+              e.end_time AS event_end_time,
+              e.location AS event_location
+         FROM event_passes ep
+         JOIN events e ON e.id = ep.event_id
+        WHERE ${where.join("\n          AND ")}
+        ORDER BY e.date ASC, e.start_time ASC, ep.issued_at DESC
+        LIMIT 1`,
+      params,
+    );
+    if (eventPassRes.rows.length > 0) {
+      const ev = eventPassRes.rows[0];
+      activeEventPass = {
+        id: ev.id,
+        passCode: ev.pass_code,
+        status: ev.status,
+        issuedAt: ev.issued_at,
+        eventId: ev.event_id,
+        eventTitle: ev.event_title || "Evento especial",
+        eventDate: ev.event_date,
+        eventStartTime: ev.event_start_time,
+        eventEndTime: ev.event_end_time,
+        eventLocation: ev.event_location || "",
+      };
+    }
+  } catch (err) {
+    console.error("[Wallet] active event pass snapshot error:", err.message);
+  }
+
   return {
     userId,
     userName,
@@ -3920,6 +3969,7 @@ async function getWalletSnapshotForUser(userId) {
     qrCode: Buffer.from(String(userId)).toString("base64"),
     membership,
     nextBooking,
+    activeEventPass,
   };
 }
 
@@ -4157,9 +4207,12 @@ function isAppleWebPassAvailable() {
  * Generate a .pkpass file as a Buffer for a given user.
  * Apple .pkpass = ZIP containing: pass.json, manifest.json, signature, icon.png, logo.png, strip.png
  */
-async function generateApplePkpass({ userId, userName, points, qrCode, membership, nextBooking }) {
+async function generateApplePkpass({ userId, userName, points, qrCode, membership, nextBooking, activeEventPass }) {
   const serialNumber = buildAppleWalletSerialFromUserId(userId);
   const hasMembership = !!membership;
+  const hasEventPass = !!activeEventPass;
+  const eventSchedule = formatWalletEventSchedule(activeEventPass);
+  const eventTitle = truncateWalletField(activeEventPass?.eventTitle || "Evento especial", 30);
   const membershipCategory = hasMembership
     ? normalizeClassCategory(membership.class_category, "all")
     : "all";
@@ -4171,13 +4224,17 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const isTrialSingleSession = hasMembership && String(membership.repeat_key || "").startsWith("trial_single_session");
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
-  const passAccent = membershipCategory === "pilates"
-    ? "rgb(197, 214, 144)"
-    : membershipCategory === "jumping"
-      ? "rgb(211, 133, 194)"
-      : membershipCategory === "mixto"
-        ? "rgb(178, 152, 218)"
-        : "rgb(171, 156, 197)";
+  const passAccent = hasEventPass
+    ? "rgb(105, 240, 195)"
+    : membershipCategory === "pilates"
+      ? "rgb(197, 214, 144)"
+      : membershipCategory === "jumping"
+        ? "rgb(211, 133, 194)"
+        : membershipCategory === "mixto"
+          ? "rgb(178, 152, 218)"
+          : "rgb(171, 156, 197)";
+  const passForeground = hasEventPass ? "rgb(236, 255, 248)" : "rgb(247, 245, 255)";
+  const passBackground = hasEventPass ? "rgb(9, 33, 27)" : "rgb(20, 11, 31)";
   const classLimit = hasMembership ? Number(membership.class_limit ?? 0) : 0;
   const classesRemaining = hasMembership
     ? Math.max(0, Number(membership.classes_remaining ?? classLimit ?? 0))
@@ -4192,11 +4249,40 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     hasMembership ? (membership.plan_name || `${membershipCategoryLabel} ${isUnlimited ? "Ilimitado" : ""}`.trim()) : "",
     28,
   );
+  const shouldUseStampStrip = !hasEventPass && hasMembership && !isUnlimited && stripStampState.total > 0;
+  const showFrontTextFields = parseBooleanFlag(process.env.APPLE_WALLET_SHOW_FRONT_TEXT || false);
 
   // Build secondary/auxiliary fields
   const secondaryFields = [];
   const auxiliaryFields = [];
   const backFields = [];
+
+  if (hasEventPass) {
+    secondaryFields.push({
+      key: "event_title",
+      label: "EVENTO",
+      value: eventTitle,
+    });
+    auxiliaryFields.push({
+      key: "event_code",
+      label: "CÓDIGO",
+      value: activeEventPass.passCode || "—",
+    });
+    if (eventSchedule) {
+      auxiliaryFields.push({
+        key: "event_schedule",
+        label: "FECHA Y HORA",
+        value: eventSchedule,
+      });
+    }
+    if (activeEventPass?.eventLocation) {
+      auxiliaryFields.push({
+        key: "event_location",
+        label: "LUGAR",
+        value: truncateWalletField(activeEventPass.eventLocation, 32),
+      });
+    }
+  }
 
   if (hasMembership) {
     secondaryFields.push({
@@ -4225,7 +4311,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     }
     if (isUnlimited) {
       auxiliaryFields.push({ key: "clases", label: "CLASES", value: "♾️ Ilimitadas" });
-    } else if (classLimit > 0 && !hasIconStampMode) {
+    } else if (classLimit > 0 && !hasIconStampMode && !hasEventPass) {
       auxiliaryFields.push({
         key: "clases",
         label: "CLASES",
@@ -4259,21 +4345,109 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     });
   }
 
+  if (!showFrontTextFields) {
+    if (hasMembership) {
+      backFields.unshift(
+        {
+          key: "membership_plan_back",
+          label: "PLAN",
+          value: planDisplayName || `${membershipCategoryLabel}${isUnlimited ? " ilimitado" : ""}`,
+        },
+        {
+          key: "membership_mode_back",
+          label: "MODALIDAD",
+          value: membershipCategoryLabel,
+        },
+      );
+      if (membership.end_date) {
+        const endDate = new Date(membership.end_date);
+        const daysLeft = Math.max(0, Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24)));
+        backFields.unshift({
+          key: "membership_valid_back",
+          label: "VIGENTE HASTA",
+          value: `${endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })} (${daysLeft}d)`,
+        });
+      }
+      if (isUnlimited) {
+        backFields.unshift({ key: "membership_classes_back", label: "CLASES", value: "♾️ Ilimitadas" });
+      } else if (classLimit > 0) {
+        backFields.unshift({
+          key: "membership_classes_back",
+          label: "CLASES",
+          value: `${classesRemaining} / ${classLimit} restantes`,
+        });
+      }
+      const rules = [];
+      if (nonTransferable) rules.push("No transferible");
+      if (nonRepeatable) rules.push("No repetible");
+      if (rules.length) {
+        backFields.unshift({
+          key: "membership_rules_back",
+          label: "REGLAS",
+          value: rules.join(" · "),
+        });
+      }
+    } else {
+      backFields.unshift({ key: "membership_status_back", label: "ESTADO", value: "Sin membresía activa" });
+    }
+  }
+
+  if (hasEventPass) {
+    backFields.push(
+      {
+        key: "event_title_back",
+        label: "EVENTO",
+        value: activeEventPass.eventTitle || "Evento especial",
+      },
+      {
+        key: "event_code_back",
+        label: "CÓDIGO DE CHECK-IN",
+        value: activeEventPass.passCode || "—",
+      },
+    );
+    if (eventSchedule) {
+      backFields.push({
+        key: "event_schedule_back",
+        label: "HORARIO",
+        value: eventSchedule,
+      });
+    }
+    if (activeEventPass?.eventLocation) {
+      backFields.push({
+        key: "event_location_back",
+        label: "UBICACIÓN",
+        value: activeEventPass.eventLocation,
+      });
+    }
+  }
+
   backFields.push(
     { key: "cliente", label: "CLIENTE", value: userName },
     { key: "puntos", label: "PUNTOS OPHELIA CLUB", value: `${points.toLocaleString("es-MX")} pts` },
     { key: "web", label: "RESERVAR EN LÍNEA", value: `${SITE_URL}/app/bookings` },
-    { key: "terms", label: "TÉRMINOS", value: "Válido para clases de trampolín. Presenta tu pase al ingresar." }
+    {
+      key: "terms",
+      label: "TÉRMINOS",
+      value: hasEventPass
+        ? "Pase válido para un acceso al evento indicado. Presenta el QR en recepción."
+        : "Válido para clases de trampolín. Presenta tu pase al ingresar.",
+    }
   );
 
   const primaryFields = [
     {
       key: "headline",
-      label: hasMembership ? "PASE ACTIVO" : "MIEMBRO",
-      value: hasMembership
-        ? truncateWalletField(membershipHeadline, 20)
-        : (memberDisplayName || "Miembro"),
-      changeMessage: hasMembership ? "Tu pase ahora es %@": undefined,
+      label: hasEventPass ? "EVENTO ACTIVO" : (hasMembership ? "PASE ACTIVO" : "MIEMBRO"),
+      value: hasEventPass
+        ? truncateWalletField(activeEventPass.eventTitle || "Evento especial", 20)
+        : hasMembership
+          ? truncateWalletField(membershipHeadline, 20)
+          : (memberDisplayName || "Miembro"),
+      changeMessage: hasEventPass
+        ? "Evento activo: %@"
+        : hasMembership
+          ? "Tu pase ahora es %@"
+          : undefined,
     },
   ];
 
@@ -4284,18 +4458,19 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     serialNumber,
     teamIdentifier: APPLE_TEAM_ID,
     organizationName: "Ophelia Jump Studio",
-    description: `${membershipCategoryLabel} — Ophelia Jump Studio`,
-    logoText: "Ophelia Studio",
-    foregroundColor: "rgb(247, 245, 255)",
-    backgroundColor: "rgb(20, 11, 31)",
+    description: hasEventPass
+      ? `Evento — ${activeEventPass?.eventTitle || "Ophelia Studio"}`
+      : `${membershipCategoryLabel} — Ophelia Jump Studio`,
+    foregroundColor: passForeground,
+    backgroundColor: passBackground,
     labelColor: passAccent,
     storeCard: {
       headerFields: [
         { key: "points", label: "PUNTOS", value: points, textAlignment: "PKTextAlignmentRight", changeMessage: "Ahora tienes %@ puntos" },
       ],
-      primaryFields,
-      secondaryFields,
-      auxiliaryFields,
+      primaryFields: showFrontTextFields ? primaryFields : [],
+      secondaryFields: showFrontTextFields ? secondaryFields : [],
+      auxiliaryFields: showFrontTextFields ? auxiliaryFields : [],
       backFields,
     },
     barcode: {
@@ -4317,28 +4492,38 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 
   // Read image assets with dedicated retina variants to avoid pixelation in Wallet.
   const assetCategory =
-    membershipCategory === "jumping" ? "jumping"
-      : membershipCategory === "pilates" ? "pilates"
-        : "mixto";
+    hasEventPass
+      ? "event"
+      : membershipCategory === "jumping"
+        ? "jumping"
+        : membershipCategory === "pilates"
+          ? "pilates"
+          : "mixto";
 
   const iconPath = findAssetFile([
     `wallet-icon-${assetCategory}.png`,
+    "wallet-icon-event.png",
     "wallet-icon-mixto.png",
     "ophelia-logo.png",
   ]);
   const icon2xPath = findAssetFile([
     `wallet-icon-${assetCategory}@2x.png`,
+    "wallet-icon-event@2x.png",
     "wallet-icon-mixto@2x.png",
     `wallet-icon-${assetCategory}.png`,
+    "wallet-icon-event.png",
     "wallet-icon-mixto.png",
     "ophelia-logo.png",
   ]);
   const icon3xPath = findAssetFile([
     `wallet-icon-${assetCategory}@3x.png`,
+    "wallet-icon-event@3x.png",
     "wallet-icon-mixto@3x.png",
     `wallet-icon-${assetCategory}@2x.png`,
+    "wallet-icon-event@2x.png",
     "wallet-icon-mixto@2x.png",
     `wallet-icon-${assetCategory}.png`,
+    "wallet-icon-event.png",
     "wallet-icon-mixto.png",
     "ophelia-logo.png",
   ]);
@@ -4347,27 +4532,56 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const logo2xPath = findAssetFile(["wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
   const logo3xPath = findAssetFile(["wallet-logo@3x.png", "wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
 
-  const thumbPath = findAssetFile([`wallet-thumb-${assetCategory}.png`, `wallet-icon-${assetCategory}.png`, "ophelia-logo.png"]);
-  const thumb2xPath = findAssetFile([`wallet-thumb-${assetCategory}@2x.png`, `wallet-thumb-${assetCategory}.png`, `wallet-icon-${assetCategory}@2x.png`, `wallet-icon-${assetCategory}.png`, "ophelia-logo.png"]);
+  const thumbPath = findAssetFile([
+    `wallet-thumb-${assetCategory}.png`,
+    "wallet-thumb-event.png",
+    `wallet-icon-${assetCategory}.png`,
+    "wallet-icon-event.png",
+    "ophelia-logo.png",
+  ]);
+  const thumb2xPath = findAssetFile([
+    `wallet-thumb-${assetCategory}@2x.png`,
+    "wallet-thumb-event@2x.png",
+    `wallet-thumb-${assetCategory}.png`,
+    "wallet-thumb-event.png",
+    `wallet-icon-${assetCategory}@2x.png`,
+    "wallet-icon-event@2x.png",
+    `wallet-icon-${assetCategory}.png`,
+    "wallet-icon-event.png",
+    "ophelia-logo.png",
+  ]);
 
   const stripCategory =
-    membershipCategory === "jumping" ? "jumping"
-      : membershipCategory === "pilates" ? "pilates"
-        : "mixto";
+    hasEventPass
+      ? "event"
+      : membershipCategory === "jumping"
+        ? "jumping"
+        : membershipCategory === "pilates"
+          ? "pilates"
+          : "mixto";
   const dynamicStripName =
-    !isUnlimited && stripStampState.total > 0
+    shouldUseStampStrip
       ? `wallet-strip-${stripCategory}-t${stripStampState.total}-r${stripStampState.remaining}.png`
       : `wallet-strip-${stripCategory}.png`;
-  const dynamicStripPath = !isUnlimited && stripStampState.total > 0
+  const dynamicStripPath = shouldUseStampStrip
     ? findAssetFile([dynamicStripName])
     : null;
-  const stripPath = dynamicStripPath || findAssetFile([`wallet-strip-${stripCategory}.png`]);
+  const stripCandidates = hasEventPass
+    ? [`wallet-strip-${stripCategory}.png`]
+    : [`wallet-strip-${stripCategory}.png`, "wallet-strip-mixto.png"];
+  const strip2xCandidates = hasEventPass
+    ? [`wallet-strip-${stripCategory}@2x.png`]
+    : [`wallet-strip-${stripCategory}@2x.png`, "wallet-strip-mixto@2x.png"];
+  const strip3xCandidates = hasEventPass
+    ? [`wallet-strip-${stripCategory}@3x.png`]
+    : [`wallet-strip-${stripCategory}@3x.png`, "wallet-strip-mixto@3x.png"];
+  const stripPath = dynamicStripPath || findAssetFile(stripCandidates);
   const strip2xPath = dynamicStripPath
     ? findAssetFile([dynamicStripName.replace(".png", "@2x.png")])
-    : findAssetFile([`wallet-strip-${stripCategory}@2x.png`]);
+    : findAssetFile(strip2xCandidates);
   const strip3xPath = dynamicStripPath
     ? findAssetFile([dynamicStripName.replace(".png", "@3x.png")])
-    : findAssetFile([`wallet-strip-${stripCategory}@3x.png`]);
+    : findAssetFile(strip3xCandidates);
 
   const readAssetBuffer = (assetPath) => (assetPath && fs.existsSync(assetPath) ? fs.readFileSync(assetPath) : null);
   const iconBuffer = readAssetBuffer(iconPath);
@@ -4486,70 +4700,27 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 // GET /api/wallet/apple/pkpass — generate and download .pkpass (or web pass fallback)
 app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
   try {
-    // Get user info
-    const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1", [req.userId]);
-    if (userRes.rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
-    const user = userRes.rows[0];
-    const userName = user.display_name || user.email;
-
-    const pointsRes = await pool.query(
-      "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
-      [req.userId]
-    );
-    const points = parseInt(pointsRes.rows[0].total);
-
-    let membership = null;
-    try {
-      const memRes = await pool.query(
-        `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.end_date,
-                m.plan_name_override, m.class_limit_override,
-                p.name AS plan_name, p.class_limit AS plan_class_limit,
-                p.class_category, p.is_non_transferable, p.is_non_repeatable, p.repeat_key
-         FROM memberships m
-         LEFT JOIN plans p ON m.plan_id = p.id
-         WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
-         ORDER BY m.end_date DESC LIMIT 1`,
-        [req.userId]
-      );
-      if (memRes.rows.length > 0) {
-        const m = memRes.rows[0];
-        membership = {
-          plan_name: m.plan_name_override || m.plan_name || "Plan Activo",
-          class_limit: m.class_limit_override ?? m.plan_class_limit,
-          classes_remaining: m.classes_remaining,
-          start_date: m.start_date,
-          end_date: m.end_date,
-          class_category: normalizeClassCategory(m.class_category, "all"),
-          is_non_transferable: parseBooleanFlag(m.is_non_transferable),
-          is_non_repeatable: parseBooleanFlag(m.is_non_repeatable),
-          repeat_key: m.repeat_key || null,
-        };
-      }
-    } catch (e) { console.error("Apple Wallet: membership query error:", e.message); }
-
-    let nextBooking = null;
-    try {
-      const bookRes = await pool.query(
-        `SELECT c.date, c.start_time, ct.name AS class_name,
-                i.display_name AS instructor_name
-         FROM bookings b
-         JOIN classes c ON b.class_id = c.id
-         JOIN class_types ct ON c.class_type_id = ct.id
-         LEFT JOIN instructors i ON c.instructor_id = i.id
-         WHERE b.user_id = $1 AND b.status IN ('confirmed','waitlist') AND c.date >= CURRENT_DATE
-         ORDER BY c.date ASC, c.start_time ASC LIMIT 1`,
-        [req.userId]
-      );
-      if (bookRes.rows.length > 0) nextBooking = bookRes.rows[0];
-    } catch (e) { console.error("Apple Wallet: booking query error:", e.message); }
-
-    const qrCode = Buffer.from(req.userId).toString("base64");
+    const requestedEventIdRaw = String(req.query?.eventId || "").trim();
+    const requestedEventId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedEventIdRaw)
+      ? requestedEventIdRaw
+      : null;
+    const snapshot = await getWalletSnapshotForUser(req.userId, { eventId: requestedEventId });
+    if (!snapshot) return res.status(404).json({ message: "Usuario no encontrado" });
+    const { userName, points, qrCode, membership, nextBooking, activeEventPass } = snapshot;
 
     // If Apple Developer certs are configured, generate real .pkpass
     if (isAppleWalletConfigured()) {
       console.log("[Apple Wallet] ✅ Certs detected — generating real .pkpass for user:", req.userId);
       try {
-        const pkpassBuffer = await generateApplePkpass({ userId: req.userId, userName, points, qrCode, membership, nextBooking });
+        const pkpassBuffer = await generateApplePkpass({
+          userId: req.userId,
+          userName,
+          points,
+          qrCode,
+          membership,
+          nextBooking,
+          activeEventPass,
+        });
         console.log("[Apple Wallet] ✅ .pkpass generated, size:", pkpassBuffer.length, "bytes");
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
         res.setHeader("Content-Disposition", `attachment; filename="ophelia-pass.pkpass"`);
@@ -4838,50 +5009,18 @@ app.get("/api/wallet/v1/passes/:passTypeId/:serial", async (req, res) => {
   const userId = parseUserIdFromAppleWalletSerial(serial);
   if (!userId) return res.status(404).send();
   try {
-    const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1", [userId]);
-    if (userRes.rows.length === 0) return res.status(404).send();
-    const user = userRes.rows[0];
-    const userName = user.display_name || user.email;
-    const pointsRes = await pool.query(
-      "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
-      [userId]
-    );
-    const points = parseInt(pointsRes.rows[0].total);
-    let membership = null;
-    try {
-      const memRes = await pool.query(
-        `SELECT m.id, m.classes_remaining, m.start_date, m.end_date, m.plan_name_override, m.class_limit_override,
-                p.name AS plan_name, p.class_limit AS plan_class_limit,
-                p.class_category, p.is_non_transferable, p.is_non_repeatable, p.repeat_key
-         FROM memberships m LEFT JOIN plans p ON m.plan_id = p.id
-         WHERE m.user_id = $1 AND m.status = 'active' AND m.end_date >= CURRENT_DATE
-         ORDER BY m.end_date DESC LIMIT 1`, [userId]);
-      if (memRes.rows.length > 0) {
-        const m = memRes.rows[0];
-        membership = {
-          plan_name: m.plan_name_override || m.plan_name || "Plan Activo",
-          class_limit: m.class_limit_override ?? m.plan_class_limit,
-          classes_remaining: m.classes_remaining,
-          start_date: m.start_date,
-          end_date: m.end_date,
-          class_category: normalizeClassCategory(m.class_category, "all"),
-          is_non_transferable: parseBooleanFlag(m.is_non_transferable),
-          is_non_repeatable: parseBooleanFlag(m.is_non_repeatable),
-          repeat_key: m.repeat_key || null,
-        };
-      }
-    } catch (_) {}
-    let nextBooking = null;
-    try {
-      const bookRes = await pool.query(
-        `SELECT c.date, c.start_time, ct.name AS class_name, i.display_name AS instructor_name
-         FROM bookings b JOIN classes c ON b.class_id = c.id JOIN class_types ct ON c.class_type_id = ct.id LEFT JOIN instructors i ON c.instructor_id = i.id
-         WHERE b.user_id = $1 AND b.status IN ('confirmed','waitlist') AND c.date >= CURRENT_DATE
-         ORDER BY c.date ASC, c.start_time ASC LIMIT 1`, [userId]);
-      if (bookRes.rows.length > 0) nextBooking = bookRes.rows[0];
-    } catch (_) {}
-    const qrCode = Buffer.from(userId).toString("base64");
-    const pkpassBuffer = await generateApplePkpass({ userId, userName, points, qrCode, membership, nextBooking });
+    const snapshot = await getWalletSnapshotForUser(userId);
+    if (!snapshot) return res.status(404).send();
+    const { userName, points, qrCode, membership, nextBooking, activeEventPass } = snapshot;
+    const pkpassBuffer = await generateApplePkpass({
+      userId,
+      userName,
+      points,
+      qrCode,
+      membership,
+      nextBooking,
+      activeEventPass,
+    });
     const touchRes = await pool.query(
       "SELECT MAX(updated_at) AS updated_at FROM apple_wallet_devices WHERE pass_type_id = $1 AND serial_number = $2",
       [effectivePassTypeId, serial],
