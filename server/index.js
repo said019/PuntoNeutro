@@ -3228,6 +3228,8 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   // ── Determine pass type and details based on membership ──────────────────
   const hasMembership = !!membership;
   const hasEventPass = !!activeEventPass;
+  const showFullGooglePassText = parseBooleanFlag(process.env.GOOGLE_WALLET_SHOW_FULL_TEXT || false);
+  const compactEventMode = hasEventPass && !showFullGooglePassText;
   const eventSchedule = formatWalletEventSchedule(activeEventPass);
   const eventTitle = activeEventPass?.eventTitle || "Evento especial";
   const membershipCategory = hasMembership
@@ -3273,14 +3275,14 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
         body: eventSchedule,
       });
     }
-    if (activeEventPass?.eventLocation) {
+    if (!compactEventMode && activeEventPass?.eventLocation) {
       textModules.push({
         id: "event_location",
         header: "LUGAR",
         body: activeEventPass.eventLocation,
       });
     }
-    if (activeEventPass?.passCode) {
+    if (!compactEventMode && activeEventPass?.passCode) {
       textModules.push({
         id: "event_code",
         header: "CÓDIGO EVENTO",
@@ -3289,87 +3291,89 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     }
   }
 
-  // Row 1: Plan Name
-  if (hasMembership) {
-    textModules.push({
-      id: "plan",
-      header: passHeader,
-      body: membership.plan_name || "Plan Activo",
-    });
-    textModules.push({
-      id: "modalidad",
-      header: "MODALIDAD",
-      body: membershipCategoryLabel,
-    });
-  } else {
-    textModules.push({
-      id: "plan",
-      header: "ESTADO",
-      body: "Sin membresía activa",
-    });
-  }
-
-  // Row 2: Vigencia (valid until)
-  if (hasMembership && membership.end_date) {
-    const endDate = new Date(membership.end_date);
-    const now = new Date();
-    const daysLeft = Math.max(0, Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)));
-    const endFormatted = endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
-    textModules.push({
-      id: "vigencia",
-      header: "VIGENTE HASTA",
-      body: `${endFormatted} (${daysLeft} días restantes)`,
-    });
-  }
-
-  // Row 3: Classes info
-  if (hasMembership) {
-    if (isUnlimited) {
+  if (!compactEventMode) {
+    // Row 1: Plan Name
+    if (hasMembership) {
       textModules.push({
-        id: "clases",
-        header: "CLASES",
-        body: "♾️ Ilimitadas",
+        id: "plan",
+        header: passHeader,
+        body: membership.plan_name || "Plan Activo",
       });
-    } else if (membership.class_limit && !hasIconStampMode) {
-      const used = Math.max(0, (membership.class_limit || 0) - (membership.classes_remaining || 0));
       textModules.push({
-        id: "clases",
-        header: "CLASES DISPONIBLES",
-        body: `${membership.classes_remaining ?? 0} de ${membership.class_limit} restantes (${used} usadas)`,
+        id: "modalidad",
+        header: "MODALIDAD",
+        body: membershipCategoryLabel,
+      });
+    } else {
+      textModules.push({
+        id: "plan",
+        header: "ESTADO",
+        body: "Sin membresía activa",
       });
     }
-  }
 
-  // Row 3.1: Membership rules
-  if (hasMembership) {
-    const rules = [];
-    if (nonTransferable) rules.push("No transferible");
-    if (nonRepeatable) rules.push("No repetible");
-    if (rules.length) {
+    // Row 2: Vigencia (valid until)
+    if (hasMembership && membership.end_date) {
+      const endDate = new Date(membership.end_date);
+      const now = new Date();
+      const daysLeft = Math.max(0, Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)));
+      const endFormatted = endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
       textModules.push({
-        id: "reglas",
-        header: "REGLAS",
-        body: rules.join(" · "),
+        id: "vigencia",
+        header: "VIGENTE HASTA",
+        body: `${endFormatted} (${daysLeft} días restantes)`,
       });
     }
-  }
 
-  // Row 4: Next class
-  if (nextBooking) {
-    const bookingDate = new Date(nextBooking.date);
-    const dateStr = bookingDate.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
-    const timeStr = nextBooking.start_time ? String(nextBooking.start_time).substring(0, 5) : "";
-    textModules.push({
-      id: "next_class",
-      header: "PRÓXIMA CLASE",
-      body: `${nextBooking.class_name || "Clase"} — ${dateStr} ${timeStr}`,
-    });
-    if (nextBooking.instructor_name) {
+    // Row 3: Classes info
+    if (hasMembership) {
+      if (isUnlimited) {
+        textModules.push({
+          id: "clases",
+          header: "CLASES",
+          body: "♾️ Ilimitadas",
+        });
+      } else if (membership.class_limit && !hasIconStampMode) {
+        const used = Math.max(0, (membership.class_limit || 0) - (membership.classes_remaining || 0));
+        textModules.push({
+          id: "clases",
+          header: "CLASES DISPONIBLES",
+          body: `${membership.classes_remaining ?? 0} de ${membership.class_limit} restantes (${used} usadas)`,
+        });
+      }
+    }
+
+    // Row 3.1: Membership rules
+    if (hasMembership) {
+      const rules = [];
+      if (nonTransferable) rules.push("No transferible");
+      if (nonRepeatable) rules.push("No repetible");
+      if (rules.length) {
+        textModules.push({
+          id: "reglas",
+          header: "REGLAS",
+          body: rules.join(" · "),
+        });
+      }
+    }
+
+    // Row 4: Next class
+    if (nextBooking) {
+      const bookingDate = new Date(nextBooking.date);
+      const dateStr = bookingDate.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+      const timeStr = nextBooking.start_time ? String(nextBooking.start_time).substring(0, 5) : "";
       textModules.push({
-        id: "instructor",
-        header: "INSTRUCTORA",
-        body: nextBooking.instructor_name,
+        id: "next_class",
+        header: "PRÓXIMA CLASE",
+        body: `${nextBooking.class_name || "Clase"} — ${dateStr} ${timeStr}`,
       });
+      if (nextBooking.instructor_name) {
+        textModules.push({
+          id: "instructor",
+          header: "INSTRUCTORA",
+          body: nextBooking.instructor_name,
+        });
+      }
     }
   }
 
@@ -3381,7 +3385,20 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   });
 
   const infoRows = [];
-  if (hasEventPass) {
+  if (compactEventMode) {
+    infoRows.push({
+      columns: [
+        { label: "Evento", value: eventTitle },
+        { label: "Fecha", value: eventSchedule || "—" },
+      ],
+    });
+    infoRows.push({
+      columns: [
+        { label: "Código", value: activeEventPass?.passCode || "—" },
+        { label: "Puntos", value: String(points) },
+      ],
+    });
+  } else if (hasEventPass) {
     infoRows.push({
       columns: [
         { label: "Evento", value: eventTitle },
@@ -3440,7 +3457,11 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     linksModuleData: {
       uris: [
         { uri: `${SITE_URL}/app/wallet`, description: "Mi Wallet", id: "wallet_link" },
-        { uri: `${SITE_URL}/app/bookings`, description: "Reservar Clase", id: "book_link" },
+        {
+          uri: hasEventPass ? `${SITE_URL}/app/events` : `${SITE_URL}/app/bookings`,
+          description: hasEventPass ? "Mis Eventos" : "Reservar Clase",
+          id: hasEventPass ? "events_link" : "book_link",
+        },
       ],
     },
     infoModuleData: {
