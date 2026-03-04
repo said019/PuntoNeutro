@@ -50,9 +50,9 @@ const DEFAULT_GENERAL_SETTINGS = {
 };
 
 const DEFAULT_POLICIES_SETTINGS = {
-  cancellation_policy: "",
-  terms_of_service: "",
-  privacy_policy: "",
+  cancellation_policy: "Puedes cancelar tu reserva sin penalización hasta 8 horas antes de la clase. Cancelaciones fuera de tiempo o inasistencias pueden consumir tu clase.",
+  terms_of_service: "Al reservar o comprar en Ophelia Studio aceptas el reglamento interno, políticas de seguridad y uso personal e intransferible de tus clases y membresías.",
+  privacy_policy: "Tus datos se usan únicamente para gestionar reservas, pagos y comunicación operativa del estudio. No compartimos tu información personal con terceros sin autorización.",
 };
 
 const DEFAULT_NOTIFICATION_SETTINGS = {
@@ -95,6 +95,50 @@ const DEFAULT_NOTIFICATION_TEMPLATES = {
     body: "Hola {name}, usa este enlace para restablecer tu contraseña: {link}",
   },
 };
+
+const DEFAULT_SETTINGS_BY_KEY = {
+  general_settings: DEFAULT_GENERAL_SETTINGS,
+  policies_settings: DEFAULT_POLICIES_SETTINGS,
+  notification_settings: DEFAULT_NOTIFICATION_SETTINGS,
+  notification_templates: DEFAULT_NOTIFICATION_TEMPLATES,
+};
+
+function isPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function deepMerge(baseValue, overrideValue) {
+  if (!isPlainObject(baseValue)) {
+    return overrideValue === undefined ? baseValue : overrideValue;
+  }
+  if (!isPlainObject(overrideValue)) {
+    return baseValue;
+  }
+  const output = { ...baseValue };
+  for (const [key, val] of Object.entries(overrideValue)) {
+    const baseEntry = output[key];
+    output[key] = isPlainObject(baseEntry) && isPlainObject(val)
+      ? deepMerge(baseEntry, val)
+      : val;
+  }
+  return output;
+}
+
+function mergeSettingsWithDefaults(key, rawValue) {
+  const defaults = DEFAULT_SETTINGS_BY_KEY[key];
+  if (!defaults) return rawValue ?? null;
+  if (!isPlainObject(rawValue)) return JSON.parse(JSON.stringify(defaults));
+  const merged = deepMerge(defaults, rawValue);
+  if (key === "policies_settings") {
+    for (const [fieldKey, defaultValue] of Object.entries(defaults)) {
+      const current = merged[fieldKey];
+      if (typeof defaultValue === "string" && (!current || !String(current).trim())) {
+        merged[fieldKey] = defaultValue;
+      }
+    }
+  }
+  return merged;
+}
 
 // ─── File upload (memory storage, max 10 MB) ────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -829,6 +873,15 @@ async function ensureSchema() {
       `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
       ["notification_templates", JSON.stringify(DEFAULT_NOTIFICATION_TEMPLATES)],
     ).catch(() => { });
+    for (const [settingKey, defaults] of Object.entries(DEFAULT_SETTINGS_BY_KEY)) {
+      await pool.query(
+        `UPDATE settings
+            SET value = $2::jsonb || COALESCE(value, '{}'::jsonb),
+                updated_at = NOW()
+          WHERE key = $1 AND jsonb_typeof(value) = 'object'`,
+        [settingKey, JSON.stringify(defaults)],
+      ).catch(() => { });
+    }
     // ── Loyalty rewards table ──────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS loyalty_rewards (
@@ -879,6 +932,23 @@ async function ensureSchema() {
       CREATE UNIQUE INDEX IF NOT EXISTS ux_apple_wallet_devices_device_pass_serial
       ON apple_wallet_devices(device_id, pass_type_id, serial_number)
     `).catch(() => { });
+    // ── Wallet push notifications log ─────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS wallet_notification_logs (
+        id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id        UUID REFERENCES users(id) ON DELETE SET NULL,
+        reason         VARCHAR(160) NOT NULL DEFAULT 'wallet_update',
+        apple_sent     INTEGER NOT NULL DEFAULT 0,
+        apple_failed   INTEGER NOT NULL DEFAULT 0,
+        google_synced  BOOLEAN NOT NULL DEFAULT false,
+        google_mode    VARCHAR(40),
+        status         VARCHAR(20) NOT NULL DEFAULT 'ok',
+        detail         JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_wallet_notification_logs_user ON wallet_notification_logs(user_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_wallet_notification_logs_created_at ON wallet_notification_logs(created_at DESC)`).catch(() => { });
     // ── Review tags table ──────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS review_tags (
@@ -3981,6 +4051,29 @@ async function notifyApplePassUpdatedForUser(userId, { reason = "wallet_update" 
   return { serial, touched, total: pushResults.length, sent, failed, reason: failed ? "partial_failure" : "ok" };
 }
 
+async function persistWalletNotificationLog(payload) {
+  const userId = payload?.userId || null;
+  const reason = String(payload?.reason || "wallet_update").slice(0, 160);
+  const apple = payload?.apple || {};
+  const google = payload?.google || {};
+  const appleSent = Number(apple.sent || 0);
+  const appleFailed = Number(apple.failed || 0);
+  const googleSynced = !!google.synced;
+  const googleMode = google.mode ? String(google.mode).slice(0, 40) : null;
+  const appleReason = String(apple.reason || "");
+  const googleReason = String(google.reason || "");
+  const appleOk = appleFailed === 0 && !["apns_token_error"].includes(appleReason);
+  const googleOk = googleSynced || ["google_wallet_not_configured", "user_not_found"].includes(googleReason);
+  const status = appleOk && googleOk ? "ok" : (appleOk || googleOk ? "partial" : "failed");
+
+  await pool.query(
+    `INSERT INTO wallet_notification_logs
+      (user_id, reason, apple_sent, apple_failed, google_synced, google_mode, status, detail)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,
+    [userId, reason, appleSent, appleFailed, googleSynced, googleMode, status, JSON.stringify({ apple, google })],
+  );
+}
+
 async function notifyWalletPassesUpdatedForUser(userId, { reason = "wallet_update" } = {}) {
   if (!userId) {
     return { userId, reason, apple: { reason: "missing_user_id" }, google: { reason: "missing_user_id" } };
@@ -3989,12 +4082,16 @@ async function notifyWalletPassesUpdatedForUser(userId, { reason = "wallet_updat
     notifyApplePassUpdatedForUser(userId, { reason }),
     syncGoogleWalletObjectForUser(userId, { reason }),
   ]);
-  return {
+  const result = {
     userId,
     reason,
     apple: appleResult.status === "fulfilled" ? appleResult.value : { reason: appleResult.reason?.message || "apple_notify_failed" },
     google: googleResult.status === "fulfilled" ? googleResult.value : { reason: googleResult.reason?.message || "google_sync_failed" },
   };
+  await persistWalletNotificationLog(result).catch((err) => {
+    console.error("[Wallet] could not persist notification log:", err.message);
+  });
+  return result;
 }
 
 const walletSyncQueue = new Map();
@@ -4071,37 +4168,25 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     membershipCategory === "pilates" ? "Pilates" :
     membershipCategory === "mixto" ? "Mixto" : "General";
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
-  const isPackage = hasMembership && !isUnlimited && membership.class_limit > 1;
   const isTrialSingleSession = hasMembership && String(membership.repeat_key || "").startsWith("trial_single_session");
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
   const passAccent = membershipCategory === "pilates"
-    ? "rgb(231, 235, 110)"
+    ? "rgb(197, 214, 144)"
     : membershipCategory === "jumping"
-      ? "rgb(225, 92, 184)"
+      ? "rgb(211, 133, 194)"
       : membershipCategory === "mixto"
-        ? "rgb(202, 113, 225)"
-        : "rgb(164, 133, 80)";
+        ? "rgb(178, 152, 218)"
+        : "rgb(171, 156, 197)";
   const classLimit = hasMembership ? Number(membership.class_limit ?? 0) : 0;
   const classesRemaining = hasMembership
     ? Math.max(0, Number(membership.classes_remaining ?? classLimit ?? 0))
     : 0;
   const stripStampState = resolveWalletStripStampState(classLimit, classesRemaining);
   const hasIconStampMode = hasMembership && !isUnlimited && stripStampState.total > 0;
-  const stripClassesValue = isUnlimited
-    ? "ILIMITADAS"
-    : classLimit > 0
-      ? `${classesRemaining}/${classLimit}`
-      : "—";
-
-  // Pass header
-  let passHeader = "Ophelia Club";
-  if (hasMembership) {
-    if (isTrialSingleSession) passHeader = "Clase Muestra";
-    else if (isUnlimited) passHeader = "Membresía";
-    else if (isPackage) passHeader = "Paquete";
-    else passHeader = "Clase Individual";
-  }
+  const membershipHeadline = isTrialSingleSession
+    ? "Clase Muestra"
+    : (isUnlimited ? "Membresía" : membershipCategoryLabel);
   const memberDisplayName = truncateWalletField(userName, 22);
   const planDisplayName = truncateWalletField(
     hasMembership ? (membership.plan_name || `${membershipCategoryLabel} ${isUnlimited ? "Ilimitado" : ""}`.trim()) : "",
@@ -4115,14 +4200,19 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 
   if (hasMembership) {
     secondaryFields.push({
-      key: "client_name",
-      label: "CLIENTE",
-      value: memberDisplayName || "Miembro",
+      key: "plan_name",
+      label: "PLAN",
+      value: planDisplayName || `${membershipCategoryLabel}${isUnlimited ? " ilimitado" : ""}`,
     });
     secondaryFields.push({
       key: "modalidad",
       label: "MODALIDAD",
       value: membershipCategoryLabel,
+    });
+    auxiliaryFields.push({
+      key: "client_name",
+      label: "CLIENTE",
+      value: memberDisplayName || "Miembro",
     });
     if (membership.end_date) {
       const endDate = new Date(membership.end_date);
@@ -4179,19 +4269,13 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const primaryFields = [
     {
       key: "headline",
-      label: hasMembership ? passHeader.toUpperCase() : "MIEMBRO",
-      value: hasMembership ? (planDisplayName || "Plan Activo") : (memberDisplayName || "Miembro"),
+      label: hasMembership ? "PASE ACTIVO" : "MIEMBRO",
+      value: hasMembership
+        ? truncateWalletField(membershipHeadline, 20)
+        : (memberDisplayName || "Miembro"),
       changeMessage: hasMembership ? "Tu pase ahora es %@": undefined,
     },
   ];
-  if (hasMembership && !hasIconStampMode) {
-    primaryFields.push({
-      key: "classes_strip",
-      label: "CLASES",
-      value: stripClassesValue,
-      textAlignment: "PKTextAlignmentRight",
-    });
-  }
 
   // Build pass.json
   const passJson = {
@@ -4200,10 +4284,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     serialNumber,
     teamIdentifier: APPLE_TEAM_ID,
     organizationName: "Ophelia Jump Studio",
-    description: `${passHeader} — Ophelia Jump Studio`,
+    description: `${membershipCategoryLabel} — Ophelia Jump Studio`,
     logoText: "Ophelia Studio",
-    foregroundColor: "rgb(255, 255, 255)",
-    backgroundColor: "rgb(26, 11, 38)",
+    foregroundColor: "rgb(247, 245, 255)",
+    backgroundColor: "rgb(20, 11, 31)",
     labelColor: passAccent,
     storeCard: {
       headerFields: [
@@ -4231,18 +4315,41 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     relevantDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  // Read image assets — use category-specific icon + strip for stronger visual identity
-  const iconPath = membershipCategory === "jumping"
-    ? findAssetFile(["wallet-icon-jumping.png", "trampoline_2982156.png", "ophelia-logo.png"])
-    : membershipCategory === "pilates"
-      ? findAssetFile(["wallet-icon-pilates.png", "pilates_2320695.png", "ophelia-logo.png"])
-      : findAssetFile(["wallet-icon-mixto.png", "ophelia-logo.png", "ophelia-logo-full.png"]);
+  // Read image assets with dedicated retina variants to avoid pixelation in Wallet.
+  const assetCategory =
+    membershipCategory === "jumping" ? "jumping"
+      : membershipCategory === "pilates" ? "pilates"
+        : "mixto";
+
+  const iconPath = findAssetFile([
+    `wallet-icon-${assetCategory}.png`,
+    "wallet-icon-mixto.png",
+    "ophelia-logo.png",
+  ]);
+  const icon2xPath = findAssetFile([
+    `wallet-icon-${assetCategory}@2x.png`,
+    "wallet-icon-mixto@2x.png",
+    `wallet-icon-${assetCategory}.png`,
+    "wallet-icon-mixto.png",
+    "ophelia-logo.png",
+  ]);
+  const icon3xPath = findAssetFile([
+    `wallet-icon-${assetCategory}@3x.png`,
+    "wallet-icon-mixto@3x.png",
+    `wallet-icon-${assetCategory}@2x.png`,
+    "wallet-icon-mixto@2x.png",
+    `wallet-icon-${assetCategory}.png`,
+    "wallet-icon-mixto.png",
+    "ophelia-logo.png",
+  ]);
+
   const logoPath = findAssetFile(["wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
-  const thumbPath = membershipCategory === "jumping"
-    ? findAssetFile(["wallet-thumb-jumping.png", "trampoline_2982156.png"])
-    : membershipCategory === "pilates"
-      ? findAssetFile(["wallet-thumb-pilates.png", "pilates_2320695.png"])
-      : findAssetFile(["wallet-thumb-mixto.png", "ophelia-logo.png"]);
+  const logo2xPath = findAssetFile(["wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+  const logo3xPath = findAssetFile(["wallet-logo@3x.png", "wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+
+  const thumbPath = findAssetFile([`wallet-thumb-${assetCategory}.png`, `wallet-icon-${assetCategory}.png`, "ophelia-logo.png"]);
+  const thumb2xPath = findAssetFile([`wallet-thumb-${assetCategory}@2x.png`, `wallet-thumb-${assetCategory}.png`, `wallet-icon-${assetCategory}@2x.png`, `wallet-icon-${assetCategory}.png`, "ophelia-logo.png"]);
+
   const stripCategory =
     membershipCategory === "jumping" ? "jumping"
       : membershipCategory === "pilates" ? "pilates"
@@ -4262,17 +4369,28 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     ? findAssetFile([dynamicStripName.replace(".png", "@3x.png")])
     : findAssetFile([`wallet-strip-${stripCategory}@3x.png`]);
 
-  const iconBuffer = iconPath && fs.existsSync(iconPath) ? fs.readFileSync(iconPath) : null;
-  const logoBuffer = logoPath && fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
-  const thumbBuffer = thumbPath && fs.existsSync(thumbPath) ? fs.readFileSync(thumbPath) : null;
-  const stripBuffer = stripPath && fs.existsSync(stripPath) ? fs.readFileSync(stripPath) : null;
-  const strip2xBuffer = strip2xPath && fs.existsSync(strip2xPath) ? fs.readFileSync(strip2xPath) : null;
-  const strip3xBuffer = strip3xPath && fs.existsSync(strip3xPath) ? fs.readFileSync(strip3xPath) : null;
+  const readAssetBuffer = (assetPath) => (assetPath && fs.existsSync(assetPath) ? fs.readFileSync(assetPath) : null);
+  const iconBuffer = readAssetBuffer(iconPath);
+  const icon2xBuffer = readAssetBuffer(icon2xPath) || iconBuffer;
+  const icon3xBuffer = readAssetBuffer(icon3xPath) || icon2xBuffer || iconBuffer;
+  const logoBuffer = readAssetBuffer(logoPath);
+  const logo2xBuffer = readAssetBuffer(logo2xPath) || logoBuffer;
+  const logo3xBuffer = readAssetBuffer(logo3xPath) || logo2xBuffer || logoBuffer;
+  const thumbBuffer = readAssetBuffer(thumbPath);
+  const thumb2xBuffer = readAssetBuffer(thumb2xPath) || thumbBuffer;
+  const stripBuffer = readAssetBuffer(stripPath);
+  const strip2xBuffer = readAssetBuffer(strip2xPath) || stripBuffer;
+  const strip3xBuffer = readAssetBuffer(strip3xPath) || strip2xBuffer || stripBuffer;
 
   console.log(
     "[Apple Wallet] Assets found — icon:", !!iconBuffer,
+    "icon@2x:", !!icon2xBuffer,
+    "icon@3x:", !!icon3xBuffer,
     "logo:", !!logoBuffer,
+    "logo@2x:", !!logo2xBuffer,
+    "logo@3x:", !!logo3xBuffer,
     "thumbnail:", !!thumbBuffer,
+    "thumbnail@2x:", !!thumb2xBuffer,
     "strip:", !!stripBuffer,
     "stripState:", `${stripStampState.remaining}/${stripStampState.total}`,
     "stripAsset:", dynamicStripName,
@@ -4284,21 +4402,21 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   files["pass.json"] = passJsonBuffer;
   if (iconBuffer) {
     files["icon.png"] = iconBuffer;
-    files["icon@2x.png"] = iconBuffer;
-    files["icon@3x.png"] = iconBuffer;
+    files["icon@2x.png"] = icon2xBuffer || iconBuffer;
+    files["icon@3x.png"] = icon3xBuffer || icon2xBuffer || iconBuffer;
   }
   if (logoBuffer) {
     files["logo.png"] = logoBuffer;
-    files["logo@2x.png"] = logoBuffer;
-    files["logo@3x.png"] = logoBuffer;
+    files["logo@2x.png"] = logo2xBuffer || logoBuffer;
+    files["logo@3x.png"] = logo3xBuffer || logo2xBuffer || logoBuffer;
   }
   if (thumbBuffer) {
     files["thumbnail.png"] = thumbBuffer;
-    files["thumbnail@2x.png"] = thumbBuffer;
+    files["thumbnail@2x.png"] = thumb2xBuffer || thumbBuffer;
   }
   if (stripBuffer) files["strip.png"] = stripBuffer;
-  if (strip2xBuffer || stripBuffer) files["strip@2x.png"] = strip2xBuffer || stripBuffer;
-  if (strip3xBuffer || strip2xBuffer || stripBuffer) files["strip@3x.png"] = strip3xBuffer || strip2xBuffer || stripBuffer;
+  if (strip2xBuffer) files["strip@2x.png"] = strip2xBuffer;
+  if (strip3xBuffer) files["strip@3x.png"] = strip3xBuffer;
 
   // Build manifest.json (SHA1 hashes of each file)
   const manifest = {};
@@ -4802,6 +4920,28 @@ app.delete("/api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serial",
 app.post("/api/wallet/v1/log", (req, res) => {
   console.log("Apple Wallet log:", JSON.stringify(req.body));
   return res.status(200).send();
+});
+
+// GET /api/admin/wallet/notifications — latest wallet push/sync logs
+app.get("/api/admin/wallet/notifications", adminMiddleware, async (req, res) => {
+  try {
+    const parsedLimit = Number(req.query.limit ?? 30);
+    const limit = Math.min(120, Math.max(1, Number.isFinite(parsedLimit) ? parsedLimit : 30));
+    const r = await pool.query(
+      `SELECT l.*,
+              u.display_name,
+              u.email
+         FROM wallet_notification_logs l
+         LEFT JOIN users u ON u.id = l.user_id
+        ORDER BY l.created_at DESC
+        LIMIT $1`,
+      [limit],
+    );
+    return res.json({ data: r.rows });
+  } catch (err) {
+    console.error("[Admin wallet notifications] error:", err.message);
+    return res.status(500).json({ message: "Error obteniendo historial de notificaciones de Wallet" });
+  }
 });
 
 // POST /api/admin/wallet/notify/:userId — force pass update notifications
@@ -5959,14 +6099,20 @@ const PUBLIC_SETTINGS_KEYS = new Set([
   "policies_settings",
 ]);
 
+async function getSettingValueWithDefaults(key) {
+  const r = await pool.query("SELECT value FROM settings WHERE key=$1", [key]);
+  const raw = r.rows.length ? r.rows[0].value : null;
+  return mergeSettingsWithDefaults(key, raw);
+}
+
 app.get("/api/public/settings/:key", async (req, res) => {
   try {
     const { key } = req.params;
     if (!PUBLIC_SETTINGS_KEYS.has(key)) {
       return res.status(403).json({ message: "Configuración no pública" });
     }
-    const r = await pool.query("SELECT value FROM settings WHERE key=$1", [key]);
-    return res.json({ data: r.rows.length ? r.rows[0].value : null });
+    const value = await getSettingValueWithDefaults(key);
+    return res.json({ data: value });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -5974,19 +6120,23 @@ app.get("/api/public/settings/:key", async (req, res) => {
 
 app.get("/api/settings/:key", adminMiddleware, async (req, res) => {
   try {
-    const r = await pool.query("SELECT value FROM settings WHERE key=$1", [req.params.key]);
-    return res.json({ data: r.rows.length ? r.rows[0].value : null });
+    const value = await getSettingValueWithDefaults(req.params.key);
+    return res.json({ data: value });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
   try {
     const { value } = req.body;
+    if (value === undefined) {
+      return res.status(400).json({ message: "Falta `value` en el body" });
+    }
+    const merged = mergeSettingsWithDefaults(req.params.key, value);
     await pool.query(
       "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()",
-      [req.params.key, JSON.stringify(value)]
+      [req.params.key, JSON.stringify(merged)]
     );
-    return res.json({ data: { key: req.params.key, value } });
+    return res.json({ data: { key: req.params.key, value: merged } });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 

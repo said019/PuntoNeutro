@@ -26,45 +26,45 @@ SCALES = {1: "", 2: "@2x", 3: "@3x"}
 
 PALETTES: Dict[str, Dict[str, Tuple[int, int, int]]] = {
     "jumping": {
-        "top": (50, 13, 65),
-        "bottom": (26, 8, 37),
-        "accent": (225, 92, 184),
-        "active_icon": (231, 235, 110),
-        "inactive_icon": (146, 137, 168),
-        "active_bg": (255, 246, 153),
-        "inactive_bg": (46, 33, 62),
-        "active_border": (238, 162, 214),
-        "inactive_border": (128, 111, 151),
+        "top": (34, 14, 49),
+        "bottom": (18, 10, 30),
+        "accent": (202, 129, 190),
+        "active_icon": (246, 243, 255),
+        "inactive_icon": (146, 136, 170),
+        "active_bg": (66, 44, 86),
+        "inactive_bg": (41, 30, 56),
+        "active_border": (202, 129, 190),
+        "inactive_border": (104, 91, 129),
     },
     "pilates": {
-        "top": (30, 36, 16),
-        "bottom": (15, 20, 10),
-        "accent": (231, 235, 110),
-        "active_icon": (225, 92, 184),
-        "inactive_icon": (154, 166, 130),
-        "active_bg": (238, 242, 141),
-        "inactive_bg": (35, 43, 24),
-        "active_border": (245, 245, 182),
-        "inactive_border": (130, 142, 107),
+        "top": (31, 37, 25),
+        "bottom": (18, 22, 14),
+        "accent": (167, 188, 126),
+        "active_icon": (242, 252, 230),
+        "inactive_icon": (146, 157, 130),
+        "active_bg": (53, 63, 41),
+        "inactive_bg": (35, 44, 28),
+        "active_border": (167, 188, 126),
+        "inactive_border": (97, 111, 82),
     },
     "mixto": {
-        "top": (34, 14, 55),
-        "bottom": (20, 9, 34),
-        "accent": (202, 113, 225),
-        "active_icon": (231, 235, 110),
-        "inactive_icon": (150, 133, 170),
-        "active_bg": (233, 172, 246),
-        "inactive_bg": (45, 33, 63),
-        "active_border": (240, 208, 250),
-        "inactive_border": (129, 110, 149),
+        "top": (31, 17, 51),
+        "bottom": (17, 11, 30),
+        "accent": (157, 146, 214),
+        "active_icon": (245, 244, 255),
+        "inactive_icon": (149, 138, 174),
+        "active_bg": (60, 46, 84),
+        "inactive_bg": (39, 30, 56),
+        "active_border": (157, 146, 214),
+        "inactive_border": (103, 90, 129),
     },
 }
 
 
 ICON_PATHS = {
-    "jumping": PUBLIC_DIR / "wallet-icon-jumping.png",
-    "pilates": PUBLIC_DIR / "wallet-icon-pilates.png",
-    "mixto": PUBLIC_DIR / "wallet-icon-mixto.png",
+    "jumping": PUBLIC_DIR / "trampoline_2982156.png",
+    "pilates": PUBLIC_DIR / "pilates_2320695.png",
+    "mixto": PUBLIC_DIR / "trampoline_2982156.png",
 }
 
 
@@ -142,10 +142,23 @@ def draw_strip(category: str, total: int, remaining: int, scale: int) -> Image.I
         color = lerp_color(palette["top"], palette["bottom"], t)
         draw.line((0, y, w, y), fill=(*color, 255))
 
-    # Top accent and separator line
-    draw.rectangle((0, 0, w, max(2, 8 * scale // 1)), fill=(*palette["accent"], 218))
-    sep_y = int(h * 0.42)
-    draw.line((int(w * 0.04), sep_y, int(w * 0.96), sep_y), fill=(255, 255, 255, 60), width=max(1, scale))
+    # Soft depth glow to avoid flat appearance, without loud highlight bands.
+    bloom = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    bloom_draw = ImageDraw.Draw(bloom)
+    bloom_draw.ellipse(
+        (
+            int(-0.08 * w),
+            int(-0.48 * h),
+            int(1.08 * w),
+            int(1.05 * h),
+        ),
+        fill=(*palette["accent"], 28),
+    )
+    bloom = bloom.filter(ImageFilter.GaussianBlur(radius=max(6, int(7 * scale))))
+    strip.alpha_composite(bloom)
+
+    sep_y = int(h * 0.47)
+    draw.line((int(w * 0.05), sep_y, int(w * 0.95), sep_y), fill=(255, 255, 255, 48), width=max(1, scale))
 
     used = max(0, total - remaining)
     positions = compute_stamp_positions(total, w, h)
@@ -162,19 +175,26 @@ def draw_strip(category: str, total: int, remaining: int, scale: int) -> Image.I
         cy = y + size // 2
 
         if is_active:
-            glow_size = int(size * 1.9)
+            glow_size = int(size * 1.75)
             glow = Image.new("RGBA", (glow_size, glow_size), (0, 0, 0, 0))
             glow_draw = ImageDraw.Draw(glow)
-            glow_draw.ellipse((0, 0, glow_size - 1, glow_size - 1), fill=(*palette["accent"], 120))
-            glow = glow.filter(ImageFilter.GaussianBlur(radius=max(2, int(4 * scale))))
+            glow_draw.ellipse((0, 0, glow_size - 1, glow_size - 1), fill=(*palette["accent"], 72))
+            glow = glow.filter(ImageFilter.GaussianBlur(radius=max(2, int(3 * scale))))
             strip.alpha_composite(glow, (cx - glow_size // 2, cy - glow_size // 2))
 
-        draw.ellipse((x, y, x + size, y + size), fill=(*bg_color, 235), outline=(*border, 255), width=max(1, int(scale * 1.2)))
+        draw.ellipse((x, y, x + size, y + size), fill=(*bg_color, 236), outline=(*border, 255), width=max(1, int(scale * 1.1)))
+        if is_active:
+            inner_pad = max(2, int(size * 0.12))
+            draw.ellipse(
+                (x + inner_pad, y + inner_pad, x + size - inner_pad, y + size - inner_pad),
+                outline=(255, 255, 255, 95),
+                width=max(1, int(scale)),
+            )
 
         icon_src = icon_jump if category == "jumping" else icon_pil if category == "pilates" else (icon_jump if i % 2 == 0 else icon_pil)
-        icon_size = int(size * 0.56)
+        icon_size = int(size * 0.54)
         icon_color = palette["active_icon"] if is_active else palette["inactive_icon"]
-        icon_alpha = 1.0 if is_active else 0.55
+        icon_alpha = 1.0 if is_active else 0.52
         icon = tint_icon(icon_src, icon_size, icon_color, alpha_mul=icon_alpha)
         strip.alpha_composite(icon, (cx - icon_size // 2, cy - icon_size // 2))
 
@@ -197,6 +217,15 @@ def main() -> None:
         for scale, suffix in SCALES.items():
             img = draw_strip(category, total, remaining, scale)
             out_name = f"wallet-strip-{category}-t{total}-r{remaining}{suffix}.png"
+            out_path = PUBLIC_DIR / out_name
+            img.save(out_path, format="PNG", optimize=True)
+            generated += 1
+
+    # Static fallback strips (used when no dynamic state is available).
+    for category in ("jumping", "pilates", "mixto"):
+        for scale, suffix in SCALES.items():
+            img = draw_strip(category, total=4, remaining=4, scale=scale)
+            out_name = f"wallet-strip-{category}{suffix}.png"
             out_path = PUBLIC_DIR / out_name
             img.save(out_path, format="PNG", optimize=True)
             generated += 1

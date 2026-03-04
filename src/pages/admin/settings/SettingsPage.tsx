@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Send, Users, MessageSquare, RefreshCw, Wifi, WifiOff, Pencil } from "lucide-react";
+import { Loader2, Send, Users, MessageSquare, RefreshCw, Wifi, WifiOff, Pencil, BellDot } from "lucide-react";
 
 function normalizeQrDataUrl(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -307,6 +307,12 @@ const NotificationTemplates = () => {
     queryFn: async () => (await api.get("/settings/notification_settings")).data,
     staleTime: Infinity,
   });
+  const { data: walletLogsData, refetch: refetchWalletLogs, isFetching: walletLogsFetching } = useQuery({
+    queryKey: ["wallet-notification-logs"],
+    queryFn: async () => (await api.get("/admin/wallet/notifications?limit=30")).data,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
 
   const [config, setConfig] = useState<Record<string, any>>({});
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -317,6 +323,7 @@ const NotificationTemplates = () => {
   }, [configData, configLoaded]);
 
   const templates: Record<string, { subject?: string; body: string }> = tplData?.data ?? {};
+  const walletLogs: any[] = walletLogsData?.data ?? [];
 
   const saveTplMutation = useMutation({
     mutationFn: ({ key, subject, body }: { key: string; subject: string; body: string }) => {
@@ -371,6 +378,50 @@ const NotificationTemplates = () => {
         <Button size="sm" onClick={() => saveConfigMutation.mutate()} disabled={saveConfigMutation.isPending}>
           {saveConfigMutation.isPending ? <Loader2 className="animate-spin mr-1" size={12} /> : null}Guardar
         </Button>
+      </div>
+
+      <div className="rounded-xl border p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <BellDot size={15} />
+            Notificaciones de pase (Wallet)
+          </h3>
+          <Button variant="ghost" size="sm" onClick={() => refetchWalletLogs()} disabled={walletLogsFetching}>
+            <RefreshCw size={14} className={walletLogsFetching ? "animate-spin" : ""} />
+          </Button>
+        </div>
+
+        {!walletLogs.length ? (
+          <p className="text-xs text-muted-foreground">Aún no hay notificaciones de pase registradas.</p>
+        ) : (
+          <div className="space-y-2 max-h-72 overflow-auto pr-1">
+            {walletLogs.map((row) => (
+              <div key={row.id} className="rounded-lg border border-border bg-card/40 px-3 py-2 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium truncate">{row.display_name || row.email || row.user_id || "Usuario"}</p>
+                  <Badge
+                    variant="secondary"
+                    className={
+                      row.status === "ok"
+                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                        : row.status === "partial"
+                          ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                          : "bg-red-500/15 text-red-300 border-red-500/30"
+                    }
+                  >
+                    {row.status === "ok" ? "OK" : row.status === "partial" ? "Parcial" : "Error"}
+                  </Badge>
+                </div>
+                <p className="mt-0.5 text-muted-foreground">
+                  {new Date(row.created_at).toLocaleString("es-MX")} · motivo: {row.reason}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  Apple: {row.apple_sent ?? 0} enviadas / {row.apple_failed ?? 0} fallidas · Google: {row.google_synced ? `sincronizado (${row.google_mode || "updated"})` : "sin sincronizar"}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Templates list */}
