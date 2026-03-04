@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import { format, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
-import { Infinity as InfinityIcon, CalendarDays, Sparkles } from "lucide-react";
+import { Infinity as InfinityIcon, CalendarDays } from "lucide-react";
 import { safeParse } from "@/lib/utils";
 import type { ClientMembership } from "@/types/membership";
 import imgTrampoline from "@/assets/trampoline_2982156.png";
@@ -255,6 +255,7 @@ export function MembershipCard({ membership }: MembershipCardProps) {
   const pal      = PALETTE[category];
 
   const used          = classLimit !== null && classesRemaining !== null ? classLimit - classesRemaining : 0;
+  const hasStampIcons = !isUnlimited && classLimit !== null && classLimit <= 20;
   const daysRemaining = endDate
     ? Math.max(differenceInCalendarDays(safeParse(endDate), new Date()), 0)
     : null;
@@ -305,7 +306,7 @@ export function MembershipCard({ membership }: MembershipCardProps) {
           </div>
 
           {/* Contador de clases */}
-          {!isUnlimited && classesRemaining !== null && classLimit !== null ? (
+          {!isUnlimited && classesRemaining !== null && classLimit !== null && !hasStampIcons ? (
             <div
               className="shrink-0 flex flex-col items-center justify-center rounded-2xl px-3 py-2"
               style={{
@@ -340,24 +341,18 @@ export function MembershipCard({ membership }: MembershipCardProps) {
         {/* ── Sellos o barra ── */}
         {!isUnlimited && classLimit !== null && classesRemaining !== null ? (
           <div className="space-y-3">
-            {/* leyenda */}
-            <div className="flex items-center justify-between">
-              <span className="font-alilato text-[10px] uppercase tracking-[0.12em] text-white/35">
-                {used === 0 ? "Todas disponibles" : `${used} usada${used !== 1 ? "s" : ""} · ${classesRemaining} disponible${classesRemaining !== 1 ? "s" : ""}`}
-              </span>
-              <span className="font-alilato text-[10px]" style={{ color: `${pal.accentLight}` }}>
-                <Sparkles size={10} className="inline mr-1 mb-0.5" />
-                {classesRemaining} restantes
-              </span>
-            </div>
-
             {classLimit <= 20 ? (
-              <StampGrid
-                classLimit={classLimit}
-                classesRemaining={classesRemaining}
-                category={category}
-                pal={pal}
-              />
+              <>
+                <span className="sr-only">
+                  {used} de {classLimit} clases usadas. {classesRemaining} restantes.
+                </span>
+                <StampGrid
+                  classLimit={classLimit}
+                  classesRemaining={classesRemaining}
+                  category={category}
+                  pal={pal}
+                />
+              </>
             ) : (
               /* Planes grandes (> 20): barra de progreso */
               <div className="space-y-2">

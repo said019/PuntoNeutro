@@ -3148,6 +3148,8 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     membershipCategory === "pilates" ? "Pilates" :
     membershipCategory === "mixto" ? "Mixto" : "General";
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
+  const classLimit = Number(membership?.class_limit ?? 0);
+  const hasIconStampMode = hasMembership && !isUnlimited && classLimit > 0;
   const isPackage = hasMembership && !isUnlimited && membership.class_limit > 1;
   const isSingleClass = hasMembership && !isUnlimited && membership.class_limit === 1;
   const isTrialSingleSession = hasMembership && String(membership.repeat_key || "").startsWith("trial_single_session");
@@ -3207,7 +3209,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
         header: "CLASES",
         body: "♾️ Ilimitadas",
       });
-    } else if (membership.class_limit) {
+    } else if (membership.class_limit && !hasIconStampMode) {
       const used = Math.max(0, (membership.class_limit || 0) - (membership.classes_remaining || 0));
       textModules.push({
         id: "clases",
@@ -4079,6 +4081,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     ? Math.max(0, Number(membership.classes_remaining ?? classLimit ?? 0))
     : 0;
   const stripStampState = resolveWalletStripStampState(classLimit, classesRemaining);
+  const hasIconStampMode = hasMembership && !isUnlimited && stripStampState.total > 0;
   const stripClassesValue = isUnlimited
     ? "ILIMITADAS"
     : classLimit > 0
@@ -4122,7 +4125,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     }
     if (isUnlimited) {
       auxiliaryFields.push({ key: "clases", label: "CLASES", value: "♾️ Ilimitadas" });
-    } else if (classLimit > 0) {
+    } else if (classLimit > 0 && !hasIconStampMode) {
       auxiliaryFields.push({
         key: "clases",
         label: "CLASES",
@@ -4165,7 +4168,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const primaryFields = [
     { key: "member", label: passHeader.toUpperCase(), value: userName },
   ];
-  if (hasMembership) {
+  if (hasMembership && !hasIconStampMode) {
     primaryFields.push({
       key: "classes_strip",
       label: "CLASES",
