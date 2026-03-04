@@ -375,7 +375,7 @@ function EventDetail({ eventId, onBack }: { eventId: string; onBack: () => void 
   const handleGoogleWalletAdd = async () => {
     setGoogleLoading(true);
     try {
-      const resp = await api.get("/wallet/google/save-url", { params: { eventId } });
+      const resp = await api.get("/wallet/events/google/save-url", { params: { eventId } });
       const saveUrl = resp.data?.data?.saveUrl || resp.data?.saveUrl;
       if (!saveUrl) throw new Error("No save URL");
       window.open(saveUrl, "_blank", "noopener,noreferrer");
@@ -392,7 +392,7 @@ function EventDetail({ eventId, onBack }: { eventId: string; onBack: () => void 
   const handleAppleWalletAdd = async () => {
     setAppleLoading(true);
     try {
-      const resp = await api.get("/wallet/apple/pkpass", {
+      const resp = await api.get("/wallet/events/apple/pkpass", {
         params: { eventId },
         responseType: "blob",
       });

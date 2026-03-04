@@ -3024,7 +3024,7 @@ const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
 const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || "Ophelia Jump Studio";
 const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || "Ophelia Club";
 const GW_HEX_BG = process.env.GOOGLE_HEX_BACKGROUND_COLOR || "#1a0b26";
-const GW_HEX_BG_EVENT = process.env.GOOGLE_HEX_BACKGROUND_COLOR_EVENT || "#2A0C43";
+const GW_HEX_BG_EVENT = process.env.GOOGLE_HEX_BACKGROUND_COLOR_EVENT || "#1F0047";
 
 /**
  * Parse the Google Service Account private key from various env var formats.
@@ -3222,12 +3222,15 @@ function formatWalletEventSchedule(eventPass) {
  *  @param {Object|null} opts.nextBooking - { class_name, instructor_name, date, start_time }
  *  @param {Object|null} opts.activeEventPass - { eventTitle, eventDate, eventStartTime, eventEndTime, eventLocation, passCode }
  */
-function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking, activeEventPass }) {
-  const objectId = `${GW_ISSUER_ID}.ophelia_${userId.replace(/-/g, "")}`;
+function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking, activeEventPass, passKind = "membership" }) {
+  const isEventPass = String(passKind || "membership") === "event";
+  const objectId = isEventPass
+    ? `${GW_ISSUER_ID}.ophelia_event_${String(activeEventPass?.eventId || "event").replace(/-/g, "")}_${userId.replace(/-/g, "")}`
+    : `${GW_ISSUER_ID}.ophelia_${userId.replace(/-/g, "")}`;
 
   // ── Determine pass type and details based on membership ──────────────────
-  const hasMembership = !!membership;
-  const hasEventPass = !!activeEventPass;
+  const hasMembership = !isEventPass && !!membership;
+  const hasEventPass = isEventPass && !!activeEventPass;
   const showFullGooglePassText = parseBooleanFlag(process.env.GOOGLE_WALLET_SHOW_FULL_TEXT || false);
   const compactEventMode = hasEventPass && !showFullGooglePassText;
   const eventSchedule = formatWalletEventSchedule(activeEventPass);
@@ -3291,7 +3294,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     }
   }
 
-  if (!compactEventMode) {
+  if (!compactEventMode && !isEventPass) {
     // Row 1: Plan Name
     if (hasMembership) {
       textModules.push({
@@ -3497,17 +3500,49 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
     } catch (classErr) {
       console.error("Google Wallet class ensure error (non-fatal):", classErr.response?.data || classErr.message);
     }
-    const requestedEventIdRaw = String(req.query?.eventId || "").trim();
-    const requestedEventId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedEventIdRaw)
-      ? requestedEventIdRaw
-      : null;
-    const snapshot = await getWalletSnapshotForUser(req.userId, { eventId: requestedEventId });
+    const snapshot = await getWalletSnapshotForUser(req.userId);
     if (!snapshot) return res.status(404).json({ message: "Usuario no encontrado" });
-    const saveUrl = buildGoogleWalletSaveUrl(snapshot);
+    const saveUrl = buildGoogleWalletSaveUrl({ ...snapshot, activeEventPass: null, passKind: "membership" });
     return res.json({ data: { saveUrl } });
   } catch (err) {
     console.error("Google Wallet save-url error:", err.response?.data || err.message, err.stack?.split("\n").slice(0,3).join("\n"));
     return res.status(500).json({ message: "Error generando pase de Google Wallet", detail: err.message });
+  }
+});
+
+// GET /api/wallet/events/google/save-url — returns event-specific Save URL for logged-in user
+app.get("/api/wallet/events/google/save-url", authMiddleware, async (req, res) => {
+  if (!isGoogleWalletConfigured()) {
+    return res.status(503).json({ message: "Google Wallet no configurado", detail: { issuer: !!GW_ISSUER_ID, email: !!GW_SA_EMAIL, key: !!GW_SA_PRIVATE_KEY } });
+  }
+  try {
+    const eventIdRaw = String(req.query?.eventId || "").trim();
+    const eventId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventIdRaw)
+      ? eventIdRaw
+      : null;
+    if (!eventId) return res.status(400).json({ message: "eventId inválido" });
+
+    try {
+      await ensureGoogleWalletClass();
+    } catch (classErr) {
+      console.error("Google Wallet class ensure error (non-fatal):", classErr.response?.data || classErr.message);
+    }
+
+    const snapshot = await getWalletSnapshotForUser(req.userId, { eventId });
+    if (!snapshot) return res.status(404).json({ message: "Usuario no encontrado" });
+    if (!snapshot.activeEventPass) {
+      return res.status(404).json({ message: "No existe pase activo para ese evento" });
+    }
+    const saveUrl = buildGoogleWalletSaveUrl({
+      ...snapshot,
+      membership: null,
+      nextBooking: null,
+      passKind: "event",
+    });
+    return res.json({ data: { saveUrl } });
+  } catch (err) {
+    console.error("Google Wallet event save-url error:", err.response?.data || err.message, err.stack?.split("\n").slice(0, 3).join("\n"));
+    return res.status(500).json({ message: "Error generando pase de evento en Google Wallet", detail: err.message });
   }
 });
 
@@ -4019,7 +4054,7 @@ async function syncGoogleWalletObjectForUser(userId, { reason = "wallet_update" 
   const snapshot = await getWalletSnapshotForUser(userId);
   if (!snapshot) return { synced: false, reason: "user_not_found" };
 
-  const saveUrl = buildGoogleWalletSaveUrl(snapshot);
+  const saveUrl = buildGoogleWalletSaveUrl({ ...snapshot, activeEventPass: null, passKind: "membership" });
   const loyaltyObject = extractGoogleLoyaltyObjectFromSaveUrl(saveUrl);
   if (!loyaltyObject?.id) {
     return { synced: false, reason: "google_object_build_failed" };
@@ -4229,9 +4264,13 @@ function isAppleWebPassAvailable() {
  * Apple .pkpass = ZIP containing: pass.json, manifest.json, signature, icon.png, logo.png, strip.png
  */
 async function generateApplePkpass({ userId, userName, points, qrCode, membership, nextBooking, activeEventPass }) {
-  const serialNumber = buildAppleWalletSerialFromUserId(userId);
+  const baseSerialNumber = buildAppleWalletSerialFromUserId(userId);
   const hasMembership = !!membership;
   const hasEventPass = !!activeEventPass;
+  const eventSerialHash = hasEventPass
+    ? crypto.createHash("sha1").update(String(activeEventPass?.eventId || activeEventPass?.passCode || "")).digest("hex").slice(0, 12)
+    : "";
+  const serialNumber = hasEventPass ? `${baseSerialNumber}_ev_${eventSerialHash}` : baseSerialNumber;
   const eventSchedule = formatWalletEventSchedule(activeEventPass);
   const eventTitle = truncateWalletField(activeEventPass?.eventTitle || "Evento especial", 30);
   const membershipCategory = hasMembership
@@ -4246,7 +4285,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
   const passAccent = hasEventPass
-    ? "rgb(225, 92, 184)"
+    ? "rgb(231, 235, 110)"
     : membershipCategory === "pilates"
       ? "rgb(197, 214, 144)"
       : membershipCategory === "jumping"
@@ -4254,8 +4293,8 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
         : membershipCategory === "mixto"
           ? "rgb(178, 152, 218)"
           : "rgb(171, 156, 197)";
-  const passForeground = hasEventPass ? "rgb(248, 243, 255)" : "rgb(247, 245, 255)";
-  const passBackground = hasEventPass ? "rgb(30, 10, 48)" : "rgb(20, 11, 31)";
+  const passForeground = hasEventPass ? "rgb(249, 247, 232)" : "rgb(247, 245, 255)";
+  const passBackground = hasEventPass ? "rgb(31, 0, 71)" : "rgb(20, 11, 31)";
   const classLimit = hasMembership ? Number(membership.class_limit ?? 0) : 0;
   const classesRemaining = hasMembership
     ? Math.max(0, Number(membership.classes_remaining ?? classLimit ?? 0))
@@ -4271,7 +4310,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     28,
   );
   const shouldUseStampStrip = !hasEventPass && hasMembership && !isUnlimited && stripStampState.total > 0;
-  const showFullFrontTextFields = parseBooleanFlag(process.env.APPLE_WALLET_SHOW_FRONT_TEXT || false);
+  const showFullFrontTextFields = hasEventPass
+    ? parseBooleanFlag(process.env.APPLE_WALLET_SHOW_FRONT_TEXT_EVENT || false)
+    : parseBooleanFlag(process.env.APPLE_WALLET_SHOW_FRONT_TEXT_MEMBERSHIP || true);
 
   // Build secondary/auxiliary fields
   const secondaryFields = [];
@@ -4744,13 +4785,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 // GET /api/wallet/apple/pkpass — generate and download .pkpass (or web pass fallback)
 app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
   try {
-    const requestedEventIdRaw = String(req.query?.eventId || "").trim();
-    const requestedEventId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedEventIdRaw)
-      ? requestedEventIdRaw
-      : null;
-    const snapshot = await getWalletSnapshotForUser(req.userId, { eventId: requestedEventId });
+    const snapshot = await getWalletSnapshotForUser(req.userId);
     if (!snapshot) return res.status(404).json({ message: "Usuario no encontrado" });
-    const { userName, points, qrCode, membership, nextBooking, activeEventPass } = snapshot;
+    const { userName, points, qrCode, membership, nextBooking } = snapshot;
 
     // If Apple Developer certs are configured, generate real .pkpass
     if (isAppleWalletConfigured()) {
@@ -4763,7 +4800,7 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
           qrCode,
           membership,
           nextBooking,
-          activeEventPass,
+          activeEventPass: null,
         });
         console.log("[Apple Wallet] ✅ .pkpass generated, size:", pkpassBuffer.length, "bytes");
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
@@ -4874,6 +4911,70 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   } catch (err) {
     console.error("Apple Wallet pkpass error:", err.message);
     return res.status(500).json({ message: "Error generando pase de Apple Wallet" });
+  }
+});
+
+// GET /api/wallet/events/apple/pkpass — generate and download event-specific .pkpass
+app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
+  try {
+    const eventIdRaw = String(req.query?.eventId || "").trim();
+    const eventId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventIdRaw)
+      ? eventIdRaw
+      : null;
+    if (!eventId) return res.status(400).json({ message: "eventId inválido" });
+
+    const snapshot = await getWalletSnapshotForUser(req.userId, { eventId });
+    if (!snapshot) return res.status(404).json({ message: "Usuario no encontrado" });
+    const { userName, points, qrCode, activeEventPass } = snapshot;
+    if (!activeEventPass) return res.status(404).json({ message: "No existe pase activo para ese evento" });
+    const eventSchedule = formatWalletEventSchedule(activeEventPass);
+
+    if (isAppleWalletConfigured()) {
+      const pkpassBuffer = await generateApplePkpass({
+        userId: req.userId,
+        userName,
+        points,
+        qrCode,
+        membership: null,
+        nextBooking: null,
+        activeEventPass,
+      });
+      res.setHeader("Content-Type", "application/vnd.apple.pkpass");
+      res.setHeader("Content-Disposition", `attachment; filename="ophelia-event-pass.pkpass"`);
+      res.setHeader("Content-Length", pkpassBuffer.length);
+      return res.send(pkpassBuffer);
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pase de Evento — Ophelia</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.pass{width:100%;max-width:380px;border-radius:24px;overflow:hidden;background:linear-gradient(160deg,#1F0047 0%,#2D0A40 58%,#1F0047 100%);box-shadow:0 20px 60px rgba(225,92,184,.2),0 0 0 1px rgba(202,113,225,.15)}
+.header{padding:24px 24px 12px}.title{font-weight:800;font-size:18px;color:#E7EB6E}
+.subtitle{font-size:13px;color:#F9F7E8;opacity:.9;margin-top:6px}
+.qr{display:flex;justify-content:center;padding:20px}.qr img{background:#fff;border-radius:18px;padding:12px}
+</style>
+</head>
+<body>
+  <div class="pass">
+    <div class="header">
+      <div class="title">${activeEventPass.eventTitle || "Evento Ophelia"}</div>
+      <div class="subtitle">${eventSchedule || ""}</div>
+    </div>
+    <div class="qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(activeEventPass.passCode || qrCode)}&bgcolor=FFFFFF&color=1F0047" alt="QR"/></div>
+  </div>
+</body>
+</html>`;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.send(html);
+  } catch (err) {
+    console.error("Apple Wallet event pkpass error:", err.message);
+    return res.status(500).json({ message: "Error generando pase de evento Apple Wallet" });
   }
 });
 
@@ -5055,7 +5156,7 @@ app.get("/api/wallet/v1/passes/:passTypeId/:serial", async (req, res) => {
   try {
     const snapshot = await getWalletSnapshotForUser(userId);
     if (!snapshot) return res.status(404).send();
-    const { userName, points, qrCode, membership, nextBooking, activeEventPass } = snapshot;
+    const { userName, points, qrCode, membership, nextBooking } = snapshot;
     const pkpassBuffer = await generateApplePkpass({
       userId,
       userName,
@@ -5063,7 +5164,7 @@ app.get("/api/wallet/v1/passes/:passTypeId/:serial", async (req, res) => {
       qrCode,
       membership,
       nextBooking,
-      activeEventPass,
+      activeEventPass: null,
     });
     const touchRes = await pool.query(
       "SELECT MAX(updated_at) AS updated_at FROM apple_wallet_devices WHERE pass_type_id = $1 AND serial_number = $2",
