@@ -8920,6 +8920,143 @@ function mapRegRow(row) {
   };
 }
 
+const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function safeDecodeBase64ToText(value) {
+  if (!value || typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    const normalized = trimmed.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    return Buffer.from(padded, "base64").toString("utf8").trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+function extractScanTokens(rawCode) {
+  const raw = String(rawCode || "").trim();
+  if (!raw) return [];
+  const tokens = new Set([raw]);
+  const passCodeMatch = raw.match(/EV-[A-Z0-9-]{6,}/i);
+  if (passCodeMatch) tokens.add(passCodeMatch[0].toUpperCase());
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      const params = parsed.searchParams;
+      ["code", "pass", "passCode", "qr", "id", "user", "userId", "token"].forEach((key) => {
+        const value = params.get(key);
+        if (value) tokens.add(value.trim());
+      });
+      parsed.pathname
+        .split("/")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .forEach((part) => tokens.add(part));
+    } catch (_) {
+      // ignore malformed URLs from third-party scanners
+    }
+  }
+  return [...tokens].filter(Boolean);
+}
+
+function extractUserIdFromToken(token) {
+  const raw = String(token || "").trim();
+  if (!raw) return null;
+  if (UUID_V4_RE.test(raw)) return raw;
+  const decoded = safeDecodeBase64ToText(raw);
+  if (UUID_V4_RE.test(decoded)) return decoded;
+  return null;
+}
+
+async function resolveEventRegistrationFromScanCode(eventId, rawCode) {
+  const tokens = extractScanTokens(rawCode);
+  if (!tokens.length) return null;
+
+  for (const token of tokens) {
+    const byEventPass = await pool.query(
+      `SELECT er.*
+         FROM event_registrations er
+         JOIN event_passes ep ON ep.registration_id = er.id
+        WHERE er.event_id = $1
+          AND UPPER(ep.pass_code) = UPPER($2)
+        LIMIT 1`,
+      [eventId, token],
+    );
+    if (byEventPass.rows.length) {
+      return { registration: byEventPass.rows[0], source: "event_pass" };
+    }
+  }
+
+  for (const token of tokens) {
+    if (!UUID_V4_RE.test(token)) continue;
+    const byRegId = await pool.query(
+      `SELECT *
+         FROM event_registrations
+        WHERE event_id = $1 AND id = $2
+        LIMIT 1`,
+      [eventId, token],
+    );
+    if (byRegId.rows.length) {
+      return { registration: byRegId.rows[0], source: "registration_id" };
+    }
+  }
+
+  for (const token of tokens) {
+    const userId = extractUserIdFromToken(token);
+    if (!userId) continue;
+    const byUser = await pool.query(
+      `SELECT *
+         FROM event_registrations
+        WHERE event_id = $1 AND user_id = $2 AND status != 'cancelled'
+        ORDER BY CASE WHEN status = 'confirmed' THEN 0 WHEN status = 'pending' THEN 1 ELSE 2 END, created_at DESC
+        LIMIT 1`,
+      [eventId, userId],
+    );
+    if (byUser.rows.length) {
+      return { registration: byUser.rows[0], source: "wallet_user_qr" };
+    }
+  }
+
+  return null;
+}
+
+async function performEventCheckin({ eventId, registrationId, adminUserId, source = "manual" }) {
+  const regRes = await pool.query(
+    `SELECT *
+       FROM event_registrations
+      WHERE id = $1 AND event_id = $2
+      LIMIT 1`,
+    [registrationId, eventId],
+  );
+  if (!regRes.rows.length) {
+    return { ok: false, code: "not_found", status: 404, message: "Inscripción no encontrada" };
+  }
+  const reg = regRes.rows[0];
+  if (reg.status !== "confirmed") {
+    return { ok: false, code: "not_confirmed", status: 409, message: "Solo puedes hacer check-in a inscripciones confirmadas", registration: reg };
+  }
+  if (reg.checked_in) {
+    return { ok: true, alreadyCheckedIn: true, registration: reg, source };
+  }
+
+  const upd = await pool.query(
+    `UPDATE event_registrations
+        SET checked_in = true,
+            checked_in_at = NOW(),
+            checked_in_by = $1,
+            updated_at = NOW()
+      WHERE id = $2
+      RETURNING *`,
+    [adminUserId, registrationId],
+  );
+  const updated = upd.rows[0];
+  await markEventPassUsedByRegistration({ registrationId: updated.id }).catch(() => { });
+  triggerWalletPassSync(updated.user_id, "event_checked_in");
+  return { ok: true, alreadyCheckedIn: false, registration: updated, source };
+}
+
 // ── GET /api/events — Lista pública (solo published) ──────────────────────────
 app.get("/api/events", async (req, res) => {
   try {
@@ -9331,18 +9468,61 @@ app.put("/api/events/:eventId/registrations/:regId", adminMiddleware, async (req
 // ── POST /api/events/:eventId/checkin/:regId — Check-in ───────────────────────
 app.post("/api/events/:eventId/checkin/:regId", adminMiddleware, async (req, res) => {
   try {
-    const r = await pool.query(
-      `UPDATE event_registrations
-       SET checked_in=true, checked_in_at=NOW(), checked_in_by=$1, updated_at=NOW()
-       WHERE id=$2 AND event_id=$3 RETURNING *`,
-      [req.userId, req.params.regId, req.params.eventId]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Inscripción no encontrada" });
-    await markEventPassUsedByRegistration({ registrationId: r.rows[0].id }).catch(() => { });
-    triggerWalletPassSync(r.rows[0].user_id, "event_checked_in");
-    return res.json({ message: "Check-in exitoso", checkedIn: true });
+    const result = await performEventCheckin({
+      eventId: req.params.eventId,
+      registrationId: req.params.regId,
+      adminUserId: req.userId,
+      source: "manual",
+    });
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ message: result.message || "No se pudo registrar el check-in" });
+    }
+    return res.json({
+      message: result.alreadyCheckedIn ? "Esta inscripción ya tenía check-in" : "Check-in exitoso",
+      checkedIn: true,
+      alreadyCheckedIn: result.alreadyCheckedIn,
+    });
   } catch (err) {
     console.error(err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ── POST /api/events/:eventId/checkin/scan — Check-in por QR/código ─────────
+app.post("/api/events/:eventId/checkin/scan", adminMiddleware, async (req, res) => {
+  try {
+    const code = String(req.body?.code || "").trim();
+    if (!code) {
+      return res.status(400).json({ message: "Debes enviar un código QR para validar" });
+    }
+
+    const resolved = await resolveEventRegistrationFromScanCode(req.params.eventId, code);
+    if (!resolved?.registration?.id) {
+      return res.status(404).json({ message: "No se encontró una inscripción válida para este QR en el evento" });
+    }
+
+    const result = await performEventCheckin({
+      eventId: req.params.eventId,
+      registrationId: resolved.registration.id,
+      adminUserId: req.userId,
+      source: resolved.source,
+    });
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ message: result.message || "No se pudo registrar el check-in" });
+    }
+
+    return res.json({
+      message: result.alreadyCheckedIn ? "La clienta ya tenía check-in registrado" : "Check-in exitoso",
+      data: {
+        registrationId: result.registration.id,
+        name: result.registration.name,
+        email: result.registration.email,
+        alreadyCheckedIn: !!result.alreadyCheckedIn,
+        source: resolved.source,
+      },
+    });
+  } catch (err) {
+    console.error("[Events] scan check-in error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
 });

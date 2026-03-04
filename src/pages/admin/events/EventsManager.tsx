@@ -93,6 +93,19 @@ export default function EventsManager() {
     onError: () => toast({ title: "Error en check-in", variant: "destructive" }),
   });
 
+  const scanCheckinMutation = useMutation({
+    mutationFn: ({ eventId, code }: { eventId: string; code: string }) =>
+      api.post(`/events/${eventId}/checkin/scan`, { code }),
+    onSuccess: (resp) => {
+      invalidate();
+      const data = (resp as any)?.data?.data ?? {};
+      const name = data?.name ? `: ${data.name}` : "";
+      toast({ title: data?.alreadyCheckedIn ? `ℹ️ Ya estaba registrada${name}` : `✅ Check-in por QR${name}` });
+    },
+    onError: (err: any) =>
+      toast({ title: err?.response?.data?.message ?? "Error al validar QR", variant: "destructive" }),
+  });
+
   // ── Render ──
   return (
     <AuthGuard>
@@ -136,6 +149,10 @@ export default function EventsManager() {
                   onCheckin={(regId) =>
                     checkinMutation.mutate({ eventId: selected.id, regId })
                   }
+                  onScanCheckin={async (code) => {
+                    const resp = await scanCheckinMutation.mutateAsync({ eventId: selected.id, code });
+                    return (resp as any)?.data?.data ?? null;
+                  }}
                   onDelete={() => deleteMutation.mutate(selected.id)}
                 />
               )}

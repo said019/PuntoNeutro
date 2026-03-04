@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, Edit, Globe, CheckCircle, XCircle, Clock, Users,
-  MapPin, UserCircle, Calendar, ChevronRight, QrCode, Trash2,
+  MapPin, UserCircle, Calendar, ChevronRight, QrCode, Trash2, Camera, ScanLine, Loader2,
   AlertTriangle, Bell, MessageSquare, Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,13 @@ interface Props {
   onConfirmReg: (regId: string) => void;
   onCancelReg: (regId: string) => void;
   onCheckin: (regId: string) => void;
+  onScanCheckin: (code: string) => Promise<{
+    registrationId: string;
+    name: string;
+    email: string;
+    alreadyCheckedIn?: boolean;
+    source?: string;
+  } | null>;
   onDelete: () => void;
 }
 
@@ -32,10 +39,26 @@ const TABS = ["Resumen", "Inscripciones", "Check-in", "Configuración"] as const
 type Tab = typeof TABS[number];
 
 export default function EventDetailView({
-  event, onBack, onEdit, onUpdateStatus, onConfirmReg, onCancelReg, onCheckin, onDelete,
+  event, onBack, onEdit, onUpdateStatus, onConfirmReg, onCancelReg, onCheckin, onScanCheckin, onDelete,
 }: Props) {
   const [tab, setTab] = useState<Tab>("Resumen");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanBusy, setScanBusy] = useState(false);
+  const [scanHint, setScanHint] = useState("Activa la cámara y apunta al QR del pase.");
+  const [manualCode, setManualCode] = useState("");
+  const [lastScan, setLastScan] = useState<{
+    registrationId: string;
+    name: string;
+    email: string;
+    alreadyCheckedIn?: boolean;
+    source?: string;
+  } | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanIntervalRef = useRef<number | null>(null);
+  const processingRef = useRef(false);
+  const lastCodeRef = useRef("");
 
   const typeInfo = EVENT_TYPES.find((t) => t.value === event.type);
   const color = typeInfo?.color ?? "#E15CB8";
@@ -48,6 +71,109 @@ export default function EventDetailView({
   const waitlist    = event.registrations.filter((r) => r.status === "waitlist");
   const checkedIn   = event.registrations.filter((r) => r.checkedIn);
   const income      = confirmed.reduce((s, r) => s + r.amount, 0);
+
+  function stopScanner() {
+    if (scanIntervalRef.current) {
+      window.clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }
+
+  async function submitScannedCode(rawCode: string) {
+    const code = String(rawCode || "").trim();
+    if (!code || processingRef.current) return;
+    processingRef.current = true;
+    setScanBusy(true);
+    setScanHint("Validando código...");
+    try {
+      const result = await onScanCheckin(code);
+      if (result) {
+        setLastScan(result);
+        setScanHint(result.alreadyCheckedIn
+          ? `${result.name} ya tenía check-in.`
+          : `Check-in registrado: ${result.name}`);
+      } else {
+        setScanHint("Código procesado.");
+      }
+      setManualCode("");
+    } catch (err: any) {
+      setScanHint(err?.response?.data?.message ?? "No se pudo validar este QR.");
+    } finally {
+      setScanBusy(false);
+      processingRef.current = false;
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "Check-in" || !scannerOpen) {
+      stopScanner();
+      return;
+    }
+    let cancelled = false;
+
+    const startScanner = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setScanHint("Tu navegador no permite cámara. Usa captura manual.");
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => { });
+        }
+        const BarcodeDetectorCtor = (window as Window & {
+          BarcodeDetector?: new (options?: { formats?: string[] }) => {
+            detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue?: string }>>;
+          };
+        }).BarcodeDetector;
+
+        if (!BarcodeDetectorCtor) {
+          setScanHint("Tu navegador no soporta escaneo automático. Usa captura manual.");
+          return;
+        }
+
+        const detector = new BarcodeDetectorCtor({ formats: ["qr_code"] });
+        setScanHint("Apunta la cámara al QR del pase.");
+        scanIntervalRef.current = window.setInterval(async () => {
+          if (processingRef.current || !videoRef.current || videoRef.current.readyState < 2) return;
+          try {
+            const codes = await detector.detect(videoRef.current);
+            const rawValue = String(codes?.[0]?.rawValue || "").trim();
+            if (!rawValue) return;
+            if (rawValue === lastCodeRef.current) return;
+            lastCodeRef.current = rawValue;
+            await submitScannedCode(rawValue);
+          } catch (_) {
+            // ignore intermittent detector errors while camera stream stabilizes
+          }
+        }, 850);
+      } catch (_) {
+        setScanHint("No se pudo abrir la cámara. Revisa permisos o usa captura manual.");
+      }
+    };
+
+    startScanner();
+    return () => {
+      cancelled = true;
+      stopScanner();
+    };
+  }, [tab, scannerOpen, onScanCheckin]);
 
   return (
     <div className="space-y-5">
@@ -339,10 +465,93 @@ export default function EventDetailView({
             </div>
           </div>
 
-          {/* QR placeholder */}
-          <div className="rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.01] p-6 flex flex-col items-center gap-3">
-            <QrCode size={32} className="text-white/30" />
-            <p className="text-sm text-muted-foreground">Escáner QR — Próximamente</p>
+          {/* QR scanner */}
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Escáner QR</p>
+                <p className="text-xs text-muted-foreground">Valida pase de evento o QR de wallet del cliente.</p>
+              </div>
+              <button
+                onClick={() => {
+                  if (scannerOpen) {
+                    setScannerOpen(false);
+                    setScanHint("Escáner detenido.");
+                  } else {
+                    lastCodeRef.current = "";
+                    setScannerOpen(true);
+                    setScanHint("Inicializando cámara...");
+                  }
+                }}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all",
+                  scannerOpen
+                    ? "border-[#f87171]/35 bg-[#f87171]/10 text-[#f87171] hover:bg-[#f87171]/15"
+                    : "border-[#CA71E1]/35 bg-[#CA71E1]/10 text-[#CA71E1] hover:bg-[#CA71E1]/15",
+                )}
+              >
+                <Camera size={13} className="inline mr-1.5" />
+                {scannerOpen ? "Detener cámara" : "Iniciar cámara"}
+              </button>
+            </div>
+
+            {scannerOpen ? (
+              <div className="relative overflow-hidden rounded-xl border border-white/[0.12] bg-black/70 aspect-video">
+                <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="h-40 w-40 rounded-2xl border-2 border-[#E7EB6E]/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+                </div>
+                {scanBusy && (
+                  <div className="absolute inset-0 bg-black/55 flex items-center justify-center gap-2 text-xs text-white">
+                    <Loader2 size={14} className="animate-spin" />
+                    Validando QR...
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-white/[0.12] bg-white/[0.01] p-4 text-center">
+                <QrCode size={24} className="text-white/30 mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">Activa cámara o pega el código manualmente.</p>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex-1 rounded-lg border border-white/[0.12] bg-black/20 px-3 py-2">
+                <input
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && manualCode.trim() && !scanBusy) {
+                      void submitScannedCode(manualCode);
+                    }
+                  }}
+                  className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                  placeholder="Pega aquí el código QR / pase"
+                />
+              </div>
+              <button
+                onClick={() => submitScannedCode(manualCode)}
+                disabled={!manualCode.trim() || scanBusy}
+                className="rounded-lg px-3 py-2 text-xs font-semibold border border-[#E7EB6E]/35 bg-[#E7EB6E]/10 text-[#E7EB6E] hover:bg-[#E7EB6E]/15 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ScanLine size={13} className="inline mr-1.5" />
+                Validar
+              </button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">{scanHint}</p>
+
+            {lastScan && (
+              <div className="rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/10 p-3 text-xs">
+                <p className="font-semibold text-[#4ade80]">
+                  {lastScan.alreadyCheckedIn ? "Ya registrado" : "Check-in exitoso"} · {lastScan.name}
+                </p>
+                <p className="text-muted-foreground mt-0.5">{lastScan.email}</p>
+                {lastScan.source && (
+                  <p className="text-muted-foreground mt-0.5">Fuente: {lastScan.source}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Manual check-in */}
