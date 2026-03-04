@@ -3157,11 +3157,11 @@ async function ensureGoogleWalletClass() {
       issuerName: GW_ISSUER_NAME,
       programName: GW_PROGRAM_NAME,
       programLogo: {
-        sourceUri: { uri: `${SITE_URL}/ophelia-logo.png` },
+        sourceUri: { uri: `${SITE_URL}/wallet-program-black.png` },
         contentDescription: { defaultValue: { language: "es", value: "Ophelia Jump Studio" } },
       },
       heroImage: {
-        sourceUri: { uri: `${SITE_URL}/ophelia-logo-full.png` },
+        sourceUri: { uri: `${SITE_URL}/wallet-hero-black.png` },
         contentDescription: { defaultValue: { language: "es", value: "Ophelia Jump Studio" } },
       },
       hexBackgroundColor: GW_HEX_BG,
@@ -4578,9 +4578,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     "ophelia-logo.png",
   ]);
 
-  const logoPath = findAssetFile(["wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
-  const logo2xPath = findAssetFile(["wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
-  const logo3xPath = findAssetFile(["wallet-logo@3x.png", "wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+  const logoPath = findAssetFile(["wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+  const logo2xPath = findAssetFile(["wallet-logo-black@2x.png", "wallet-logo@2x.png", "wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+  const logo3xPath = findAssetFile(["wallet-logo-black@3x.png", "wallet-logo@3x.png", "wallet-logo-black@2x.png", "wallet-logo@2x.png", "wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
 
   const thumbPath = findAssetFile([
     `wallet-thumb-${assetCategory}.png`,
