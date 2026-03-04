@@ -14,6 +14,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { ClientEvent } from "@/pages/admin/events/types";
 import { EVENT_TYPES } from "@/pages/admin/events/types";
 import EventTypeIcon from "@/pages/admin/events/EventTypeIcon";
+import { QRCodeSVG } from "qrcode.react";
 import {
   formatEventDate, formatEventDateShort, formatCurrency,
   occupancyPercent, occupancyColor, calcCurrentPrice,
@@ -352,6 +353,7 @@ function EventDetail({ eventId, onBack }: { eventId: string; onBack: () => void 
   const currentPrice = calcCurrentPrice(event);
   const myReg = event.myRegistration;
   const isFull = event.registered >= event.capacity;
+  const eventPassCode = myReg?.eventPassCode || "";
 
   return (
     <div className="space-y-5">
@@ -460,11 +462,42 @@ function EventDetail({ eventId, onBack }: { eventId: string; onBack: () => void 
           {isFull ? "Inscribirme en lista de espera" : event.price === 0 ? "Registrarme gratis" : `Inscribirme — ${formatCurrency(currentPrice)}`}
         </button>
       ) : myReg.status === "confirmed" ? (
-        <div className="rounded-2xl border border-[#4ade80]/20 bg-[#4ade80]/[0.04] p-4">
+        <div className="rounded-2xl border border-[#4ade80]/20 bg-[#4ade80]/[0.04] p-4 space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle size={16} className="text-[#4ade80]" />
-            <p className="text-sm font-semibold text-[#4ade80]">¡Estás inscrita! Te esperamos en el evento.</p>
+            <p className="text-sm font-semibold text-[#4ade80]">
+              {myReg.checkedIn ? "Check-in registrado. ¡Disfruta el evento!" : "¡Estás inscrita! Te esperamos en el evento."}
+            </p>
           </div>
+          {eventPassCode ? (
+            <div className="rounded-xl border border-[#4ade80]/25 bg-black/20 p-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-xs font-semibold text-[#4ade80] uppercase tracking-wider">Tu pase del evento</p>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(eventPassCode);
+                    toast({ title: "✅ Código del pase copiado" });
+                  }}
+                  className="text-[0.65rem] font-medium text-[#4ade80] hover:opacity-80 transition-opacity"
+                >
+                  Copiar código
+                </button>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <div className="rounded-xl bg-white p-2 shadow-sm">
+                  <QRCodeSVG value={eventPassCode} size={110} />
+                </div>
+                <div className="min-w-0 text-center sm:text-left">
+                  <p className="text-[0.65rem] text-muted-foreground">Presenta este QR en recepción para check-in.</p>
+                  <p className="mt-1 text-xs font-semibold text-[#E7EB6E] break-all">{eventPassCode}</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Tu pase se está generando. Si no aparece en unos segundos, recarga la pantalla.
+            </p>
+          )}
           <button
             onClick={() => cancelMutation.mutate()}
             className="text-xs text-muted-foreground hover:text-[#f87171] transition-colors"
