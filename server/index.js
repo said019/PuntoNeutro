@@ -3638,6 +3638,12 @@ function parseUserIdFromAppleWalletSerial(serial) {
   return raw.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, "$1-$2-$3-$4-$5").toLowerCase();
 }
 
+function truncateWalletField(value, max = 26) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
 /** Find image assets — check both public/ and dist/ directories */
 function findAssetDir() {
   const candidates = [
@@ -4096,6 +4102,11 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     else if (isPackage) passHeader = "Paquete";
     else passHeader = "Clase Individual";
   }
+  const memberDisplayName = truncateWalletField(userName, 22);
+  const planDisplayName = truncateWalletField(
+    hasMembership ? (membership.plan_name || `${membershipCategoryLabel} ${isUnlimited ? "Ilimitado" : ""}`.trim()) : "",
+    28,
+  );
 
   // Build secondary/auxiliary fields
   const secondaryFields = [];
@@ -4104,10 +4115,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 
   if (hasMembership) {
     secondaryFields.push({
-      key: "plan",
-      label: "PLAN",
-      value: membership.plan_name || "Plan Activo",
-      changeMessage: "Tu plan cambió a %@",
+      key: "client_name",
+      label: "CLIENTE",
+      value: memberDisplayName || "Miembro",
     });
     secondaryFields.push({
       key: "modalidad",
@@ -4160,13 +4170,19 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   }
 
   backFields.push(
+    { key: "cliente", label: "CLIENTE", value: userName },
     { key: "puntos", label: "PUNTOS OPHELIA CLUB", value: `${points.toLocaleString("es-MX")} pts` },
     { key: "web", label: "RESERVAR EN LÍNEA", value: `${SITE_URL}/app/bookings` },
     { key: "terms", label: "TÉRMINOS", value: "Válido para clases de trampolín. Presenta tu pase al ingresar." }
   );
 
   const primaryFields = [
-    { key: "member", label: passHeader.toUpperCase(), value: userName },
+    {
+      key: "headline",
+      label: hasMembership ? passHeader.toUpperCase() : "MIEMBRO",
+      value: hasMembership ? (planDisplayName || "Plan Activo") : (memberDisplayName || "Miembro"),
+      changeMessage: hasMembership ? "Tu pase ahora es %@": undefined,
+    },
   ];
   if (hasMembership && !hasIconStampMode) {
     primaryFields.push({
@@ -4235,18 +4251,16 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     !isUnlimited && stripStampState.total > 0
       ? `wallet-strip-${stripCategory}-t${stripStampState.total}-r${stripStampState.remaining}.png`
       : `wallet-strip-${stripCategory}.png`;
-  const stripPath = findAssetFile([
-    dynamicStripName,
-    `wallet-strip-${stripCategory}.png`,
-  ]);
-  const strip2xPath = findAssetFile([
-    dynamicStripName.replace(".png", "@2x.png"),
-    `wallet-strip-${stripCategory}@2x.png`,
-  ]);
-  const strip3xPath = findAssetFile([
-    dynamicStripName.replace(".png", "@3x.png"),
-    `wallet-strip-${stripCategory}@3x.png`,
-  ]);
+  const dynamicStripPath = !isUnlimited && stripStampState.total > 0
+    ? findAssetFile([dynamicStripName])
+    : null;
+  const stripPath = dynamicStripPath || findAssetFile([`wallet-strip-${stripCategory}.png`]);
+  const strip2xPath = dynamicStripPath
+    ? findAssetFile([dynamicStripName.replace(".png", "@2x.png")])
+    : findAssetFile([`wallet-strip-${stripCategory}@2x.png`]);
+  const strip3xPath = dynamicStripPath
+    ? findAssetFile([dynamicStripName.replace(".png", "@3x.png")])
+    : findAssetFile([`wallet-strip-${stripCategory}@3x.png`]);
 
   const iconBuffer = iconPath && fs.existsSync(iconPath) ? fs.readFileSync(iconPath) : null;
   const logoBuffer = logoPath && fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
