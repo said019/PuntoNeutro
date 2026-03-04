@@ -3589,6 +3589,15 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       : membershipCategory === "mixto"
         ? "rgb(202, 113, 225)"
         : "rgb(164, 133, 80)";
+  const classLimit = hasMembership ? Number(membership.class_limit ?? 0) : 0;
+  const classesRemaining = hasMembership
+    ? Math.max(0, Number(membership.classes_remaining ?? classLimit ?? 0))
+    : 0;
+  const stripClassesValue = isUnlimited
+    ? "ILIMITADAS"
+    : classLimit > 0
+      ? `${classesRemaining}/${classLimit}`
+      : "—";
 
   // Pass header
   let passHeader = "Ophelia Club";
@@ -3627,11 +3636,11 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     }
     if (isUnlimited) {
       auxiliaryFields.push({ key: "clases", label: "CLASES", value: "♾️ Ilimitadas" });
-    } else if (membership.class_limit) {
+    } else if (classLimit > 0) {
       auxiliaryFields.push({
         key: "clases",
         label: "CLASES",
-        value: `${membership.classes_remaining ?? 0} / ${membership.class_limit} restantes`,
+        value: `${classesRemaining} / ${classLimit} restantes`,
         changeMessage: "Clases restantes: %@",
       });
     }
@@ -3667,6 +3676,18 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     { key: "terms", label: "TÉRMINOS", value: "Válido para clases de trampolín. Presenta tu pase al ingresar." }
   );
 
+  const primaryFields = [
+    { key: "member", label: passHeader.toUpperCase(), value: userName },
+  ];
+  if (hasMembership) {
+    primaryFields.push({
+      key: "classes_strip",
+      label: "CLASES",
+      value: stripClassesValue,
+      textAlignment: "PKTextAlignmentRight",
+    });
+  }
+
   // Build pass.json
   const passJson = {
     formatVersion: 1,
@@ -3679,13 +3700,11 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     foregroundColor: "rgb(255, 255, 255)",
     backgroundColor: "rgb(26, 11, 38)",
     labelColor: passAccent,
-    generic: {
+    storeCard: {
       headerFields: [
         { key: "points", label: "PUNTOS", value: points, textAlignment: "PKTextAlignmentRight", changeMessage: "Ahora tienes %@ puntos" },
       ],
-      primaryFields: [
-        { key: "member", label: passHeader.toUpperCase(), value: userName },
-      ],
+      primaryFields,
       secondaryFields,
       auxiliaryFields,
       backFields,
@@ -3707,20 +3726,42 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     relevantDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  // Read image assets — prefer wallet-specific files when available
-  const iconPath = findAssetFile(["wallet-icon.png", "ophelia-logo.png", "ophelia-logo-full.png"]);
+  // Read image assets — use category-specific icon + strip for stronger visual identity
+  const iconPath = membershipCategory === "jumping"
+    ? findAssetFile(["wallet-icon-jumping.png", "trampoline_2982156.png", "ophelia-logo.png"])
+    : membershipCategory === "pilates"
+      ? findAssetFile(["wallet-icon-pilates.png", "pilates_2320695.png", "ophelia-logo.png"])
+      : findAssetFile(["wallet-icon-mixto.png", "ophelia-logo.png", "ophelia-logo-full.png"]);
   const logoPath = findAssetFile(["wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
   const thumbPath = membershipCategory === "jumping"
     ? findAssetFile(["wallet-thumb-jumping.png", "trampoline_2982156.png"])
     : membershipCategory === "pilates"
       ? findAssetFile(["wallet-thumb-pilates.png", "pilates_2320695.png"])
       : findAssetFile(["wallet-thumb-mixto.png", "ophelia-logo.png"]);
+  const stripPath = membershipCategory === "jumping"
+    ? findAssetFile(["wallet-strip-jumping.png"])
+    : membershipCategory === "pilates"
+      ? findAssetFile(["wallet-strip-pilates.png"])
+      : findAssetFile(["wallet-strip-mixto.png"]);
+  const strip2xPath = membershipCategory === "jumping"
+    ? findAssetFile(["wallet-strip-jumping@2x.png"])
+    : membershipCategory === "pilates"
+      ? findAssetFile(["wallet-strip-pilates@2x.png"])
+      : findAssetFile(["wallet-strip-mixto@2x.png"]);
+  const strip3xPath = membershipCategory === "jumping"
+    ? findAssetFile(["wallet-strip-jumping@3x.png"])
+    : membershipCategory === "pilates"
+      ? findAssetFile(["wallet-strip-pilates@3x.png"])
+      : findAssetFile(["wallet-strip-mixto@3x.png"]);
 
   const iconBuffer = iconPath && fs.existsSync(iconPath) ? fs.readFileSync(iconPath) : null;
   const logoBuffer = logoPath && fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
   const thumbBuffer = thumbPath && fs.existsSync(thumbPath) ? fs.readFileSync(thumbPath) : null;
+  const stripBuffer = stripPath && fs.existsSync(stripPath) ? fs.readFileSync(stripPath) : null;
+  const strip2xBuffer = strip2xPath && fs.existsSync(strip2xPath) ? fs.readFileSync(strip2xPath) : null;
+  const strip3xBuffer = strip3xPath && fs.existsSync(strip3xPath) ? fs.readFileSync(strip3xPath) : null;
 
-  console.log("[Apple Wallet] Assets found — icon:", !!iconBuffer, "logo:", !!logoBuffer, "thumbnail:", !!thumbBuffer);
+  console.log("[Apple Wallet] Assets found — icon:", !!iconBuffer, "logo:", !!logoBuffer, "thumbnail:", !!thumbBuffer, "strip:", !!stripBuffer);
 
   // Build file map for the pass
   const files = {};
@@ -3740,6 +3781,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     files["thumbnail.png"] = thumbBuffer;
     files["thumbnail@2x.png"] = thumbBuffer;
   }
+  if (stripBuffer) files["strip.png"] = stripBuffer;
+  if (strip2xBuffer || stripBuffer) files["strip@2x.png"] = strip2xBuffer || stripBuffer;
+  if (strip3xBuffer || strip2xBuffer || stripBuffer) files["strip@3x.png"] = strip3xBuffer || strip2xBuffer || stripBuffer;
 
   // Build manifest.json (SHA1 hashes of each file)
   const manifest = {};
