@@ -43,6 +43,8 @@ const PALETTE = {
     border:       "rgba(225,92,184,0.30)",
     stampBg:      "rgba(225,92,184,0.12)",
     stampBorder:  "rgba(225,92,184,0.30)",
+    iconHighlight:"#E7EB6E",
+    iconMuted:    "rgba(255,255,255,0.28)",
     progressFrom: "#E15CB8",
     progressTo:   "#FEA5DC",
     divider:      "rgba(225,92,184,0.15)",
@@ -61,6 +63,8 @@ const PALETTE = {
     border:       "rgba(231,235,110,0.25)",
     stampBg:      "rgba(231,235,110,0.10)",
     stampBorder:  "rgba(231,235,110,0.28)",
+    iconHighlight:"#E15CB8",
+    iconMuted:    "rgba(255,255,255,0.26)",
     progressFrom: "#E7EB6E",
     progressTo:   "#F9F7E8",
     divider:      "rgba(231,235,110,0.13)",
@@ -79,6 +83,8 @@ const PALETTE = {
     border:       "rgba(202,113,225,0.30)",
     stampBg:      "rgba(202,113,225,0.12)",
     stampBorder:  "rgba(202,113,225,0.30)",
+    iconHighlight:"#E7EB6E",
+    iconMuted:    "rgba(255,255,255,0.30)",
     progressFrom: "#CA71E1",
     progressTo:   "#ECD6FB",
     divider:      "rgba(202,113,225,0.15)",
@@ -97,6 +103,8 @@ const PALETTE = {
     border:       "rgba(254,165,220,0.25)",
     stampBg:      "rgba(254,165,220,0.10)",
     stampBorder:  "rgba(254,165,220,0.28)",
+    iconHighlight:"#E7EB6E",
+    iconMuted:    "rgba(255,255,255,0.28)",
     progressFrom: "#E15CB8",
     progressTo:   "#CA71E1",
     divider:      "rgba(254,165,220,0.13)",
@@ -105,7 +113,8 @@ const PALETTE = {
   gradient: string; noise: string; glow1: string; glow2: string;
   accent: string; accentLight: string; badge: string; badgeText: string;
   badgeBorder: string; label: string; border: string; stampBg: string;
-  stampBorder: string; progressFrom: string; progressTo: string; divider: string;
+  stampBorder: string; iconHighlight: string; iconMuted: string;
+  progressFrom: string; progressTo: string; divider: string;
 }>;
 
 // ─────────────────────────────────────────────
@@ -117,6 +126,8 @@ function Stamp({
   accent,
   stampBg,
   stampBorder,
+  iconHighlight,
+  iconMuted,
   size,
 }: {
   active: boolean;
@@ -124,6 +135,8 @@ function Stamp({
   accent: string;
   stampBg: string;
   stampBorder: string;
+  iconHighlight: string;
+  iconMuted: string;
   size: number;
 }) {
   const pad = Math.round(size * 0.18);
@@ -139,17 +152,29 @@ function Stamp({
         transition: "opacity 0.35s, filter 0.35s, box-shadow 0.35s",
         background:  active ? stampBg  : "rgba(255,255,255,0.03)",
         border:      `1.5px solid ${active ? stampBorder : "rgba(255,255,255,0.07)"}`,
-        boxShadow:   active ? `0 0 10px ${accent}55, inset 0 0 6px ${accent}22` : "none",
+        boxShadow:   active ? `0 0 12px ${iconHighlight}66, inset 0 0 7px ${accent}22` : "none",
         opacity:     active ? 1 : 0.30,
-        filter:      active ? "none" : "grayscale(1) brightness(0.45)",
+        filter:      active ? "none" : "saturate(0.3)",
         padding:     pad,
       }}
     >
-      <img
-        src={src}
-        alt=""
-        draggable={false}
-        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+      <span
+        aria-hidden
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "block",
+          background: active ? iconHighlight : iconMuted,
+          filter: active ? `drop-shadow(0 0 4px ${iconHighlight}aa)` : "none",
+          WebkitMaskImage: `url(${src})`,
+          WebkitMaskRepeat: "no-repeat",
+          WebkitMaskPosition: "center",
+          WebkitMaskSize: "contain",
+          maskImage: `url(${src})`,
+          maskRepeat: "no-repeat",
+          maskPosition: "center",
+          maskSize: "contain",
+        }}
       />
     </div>
   );
@@ -202,6 +227,8 @@ function StampGrid({
           accent={pal.accent}
           stampBg={pal.stampBg}
           stampBorder={pal.stampBorder}
+          iconHighlight={pal.iconHighlight}
+          iconMuted={pal.iconMuted}
           size={size}
         />
       ))}

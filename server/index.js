@@ -37,6 +37,64 @@ const evolutionApi = axios.create({
   timeout: 20000,
 });
 
+const DEFAULT_GENERAL_SETTINGS = {
+  studio_name: "Ophelia Studio",
+  address: "",
+  phone: "",
+  instagram: "",
+  facebook: "",
+  timezone: "America/Mexico_City",
+  currency: "MXN",
+  maintenance_mode: false,
+};
+
+const DEFAULT_POLICIES_SETTINGS = {
+  cancellation_policy: "",
+  terms_of_service: "",
+  privacy_policy: "",
+};
+
+const DEFAULT_NOTIFICATION_SETTINGS = {
+  email_reminders: true,
+  whatsapp_reminders: true,
+  reminder_hours_before: 2,
+};
+
+const DEFAULT_NOTIFICATION_TEMPLATES = {
+  booking_confirmed: {
+    subject: "Reserva confirmada",
+    body: "Hola {name}, tu reserva para {class} el {date} a las {time} está confirmada.",
+  },
+  booking_cancelled: {
+    subject: "Reserva cancelada",
+    body: "Hola {name}, tu reserva de {class} del {date} fue cancelada. Crédito devuelto: {creditRestored}.",
+  },
+  membership_activated: {
+    subject: "Membresía activada",
+    body: "Hola {name}, tu membresía {plan} ya está activa. Vigencia: {startDate} al {endDate}.",
+  },
+  transfer_rejected: {
+    subject: "Transferencia rechazada",
+    body: "Hola {name}, no pudimos aprobar tu comprobante. Motivo: {reason}.",
+  },
+  class_reminder: {
+    subject: "Recordatorio de clase",
+    body: "Hola {name}, te recordamos tu clase {class} a las {time}.",
+  },
+  renewal_reminder: {
+    subject: "Recordatorio de renovación",
+    body: "Hola {name}, tu plan {plan} está por vencer el {expiresAt}.",
+  },
+  welcome: {
+    subject: "Bienvenida a Ophelia",
+    body: "Hola {name}, bienvenida a Ophelia Studio. ¡Nos encanta tenerte aquí!",
+  },
+  password_reset: {
+    subject: "Recuperación de contraseña",
+    body: "Hola {name}, usa este enlace para restablecer tu contraseña: {link}",
+  },
+};
+
 // ─── File upload (memory storage, max 10 MB) ────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -754,6 +812,22 @@ async function ensureSchema() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await pool.query(
+      `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
+      ["general_settings", JSON.stringify(DEFAULT_GENERAL_SETTINGS)],
+    ).catch(() => { });
+    await pool.query(
+      `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
+      ["policies_settings", JSON.stringify(DEFAULT_POLICIES_SETTINGS)],
+    ).catch(() => { });
+    await pool.query(
+      `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
+      ["notification_settings", JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS)],
+    ).catch(() => { });
+    await pool.query(
+      `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
+      ["notification_templates", JSON.stringify(DEFAULT_NOTIFICATION_TEMPLATES)],
+    ).catch(() => { });
     // ── Loyalty rewards table ──────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS loyalty_rewards (
@@ -2129,7 +2203,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
 
     // ── Email: booking confirmed / waitlist ────────────────────────────────
     try {
-      const userRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [req.userId]);
+      const userRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [req.userId]);
       const classFullRes = await pool.query(
         `SELECT c.date, c.start_time, ct.name AS class_type_name,
                 i.display_name AS instructor_name
@@ -2145,16 +2219,31 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       if (userRes.rows[0] && classFullRes.rows[0]) {
         const u = userRes.rows[0];
         const cl = classFullRes.rows[0];
-        sendBookingConfirmed({
-          to: u.email,
-          name: u.display_name || "Alumna",
-          className: cl.class_type_name,
-          date: cl.date,
-          startTime: cl.start_time,
-          instructor: cl.instructor_name,
-          classesLeft,
-          isWaitlist,
-        }).catch((e) => console.error("[Email] booking confirmed:", e.message));
+        if (await areEmailNotificationsEnabled()) {
+          sendBookingConfirmed({
+            to: u.email,
+            name: u.display_name || "Alumna",
+            className: cl.class_type_name,
+            date: cl.date,
+            startTime: cl.start_time,
+            instructor: cl.instructor_name,
+            classesLeft,
+            isWaitlist,
+          }).catch((e) => console.error("[Email] booking confirmed:", e.message));
+        }
+        sendConfiguredWhatsAppTemplate({
+          templateKey: "booking_confirmed",
+          phone: u.phone,
+          vars: {
+            name: u.display_name || "Alumna",
+            class: cl.class_type_name || "Clase",
+            date: cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "",
+            time: cl.start_time ? String(cl.start_time).slice(0, 5) : "",
+          },
+          fallbackMessage: isWaitlist
+            ? `Hola ${u.display_name || "Alumna"}, quedaste en lista de espera para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}).`
+            : `Hola ${u.display_name || "Alumna"}, tu reserva para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}) está confirmada.`,
+        }).catch((e) => console.error("[WA] booking confirmed:", e.message));
       }
     } catch (emailErr) {
       console.error("[Email] booking confirmed query error:", emailErr.message);
@@ -2248,20 +2337,34 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
           // Late cancellation: credit is LOST — do not restore
           // Email: cancelled, no credit restored
           try {
-            const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [req.userId]);
+            const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [req.userId]);
             const memAfter = await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id]);
             if (uRes.rows[0]) {
               const u = uRes.rows[0];
-              sendBookingCancelled({
-                to: u.email,
-                name: u.display_name || "Alumna",
-                className: booking.class_type_name || "tu clase",
-                date: booking.date,
-                startTime: booking.start_time,
-                creditRestored: false,
-                isLate: true,
-                classesLeft: memAfter.rows[0]?.classes_remaining ?? null,
-              }).catch((e) => console.error("[Email] booking cancelled late:", e.message));
+              if (await areEmailNotificationsEnabled()) {
+                sendBookingCancelled({
+                  to: u.email,
+                  name: u.display_name || "Alumna",
+                  className: booking.class_type_name || "tu clase",
+                  date: booking.date,
+                  startTime: booking.start_time,
+                  creditRestored: false,
+                  isLate: true,
+                  classesLeft: memAfter.rows[0]?.classes_remaining ?? null,
+                }).catch((e) => console.error("[Email] booking cancelled late:", e.message));
+              }
+              sendConfiguredWhatsAppTemplate({
+                templateKey: "booking_cancelled",
+                phone: u.phone,
+                vars: {
+                  name: u.display_name || "Alumna",
+                  class: booking.class_type_name || "tu clase",
+                  date: booking.date ? new Date(booking.date).toLocaleDateString("es-MX") : "",
+                  time: booking.start_time ? String(booking.start_time).slice(0, 5) : "",
+                  creditRestored: "No",
+                },
+                fallbackMessage: `Hola ${u.display_name || "Alumna"}, cancelamos tu reserva de ${booking.class_type_name || "tu clase"}. Por cancelación tardía, la clase no se devolvió.`,
+              }).catch((e) => console.error("[WA] booking cancelled late:", e.message));
             }
           } catch (emailErr) {
             console.error("[Email] cancelled late query:", emailErr.message);
@@ -2284,22 +2387,38 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
 
     // ── Email: booking cancelled ───────────────────────────────────────────
     try {
-      const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [req.userId]);
+      const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [req.userId]);
       const memAfter = membership
         ? await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id])
         : null;
       if (uRes.rows[0]) {
         const u = uRes.rows[0];
-        sendBookingCancelled({
-          to: u.email,
-          name: u.display_name || "Alumna",
-          className: booking.class_type_name || "tu clase",
-          date: booking.date,
-          startTime: booking.start_time,
-          creditRestored: !isLate,
-          isLate,
-          classesLeft: memAfter?.rows[0]?.classes_remaining ?? null,
-        }).catch((e) => console.error("[Email] booking cancelled:", e.message));
+        if (await areEmailNotificationsEnabled()) {
+          sendBookingCancelled({
+            to: u.email,
+            name: u.display_name || "Alumna",
+            className: booking.class_type_name || "tu clase",
+            date: booking.date,
+            startTime: booking.start_time,
+            creditRestored: !isLate,
+            isLate,
+            classesLeft: memAfter?.rows[0]?.classes_remaining ?? null,
+          }).catch((e) => console.error("[Email] booking cancelled:", e.message));
+        }
+        sendConfiguredWhatsAppTemplate({
+          templateKey: "booking_cancelled",
+          phone: u.phone,
+          vars: {
+            name: u.display_name || "Alumna",
+            class: booking.class_type_name || "tu clase",
+            date: booking.date ? new Date(booking.date).toLocaleDateString("es-MX") : "",
+            time: booking.start_time ? String(booking.start_time).slice(0, 5) : "",
+            creditRestored: !isLate ? "Sí" : "No",
+          },
+          fallbackMessage: isLate
+            ? `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. La clase no se devolvió por cancelación tardía.`
+            : `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. Tu crédito fue devuelto.`,
+        }).catch((e) => console.error("[WA] booking cancelled:", e.message));
       }
     } catch (emailErr) {
       console.error("[Email] cancelled query:", emailErr.message);
@@ -3526,6 +3645,22 @@ function findAssetFile(fileNames = []) {
   return null;
 }
 
+const WALLET_STRIP_TOTAL_BUCKETS = [1, 4, 8, 12, 16, 20];
+
+function resolveWalletStripStampState(classLimitRaw, classesRemainingRaw) {
+  const classLimit = Number(classLimitRaw ?? 0);
+  const classesRemaining = Math.max(0, Number(classesRemainingRaw ?? 0));
+  if (!Number.isFinite(classLimit) || classLimit <= 0) {
+    return { total: 0, remaining: 0 };
+  }
+  const nearestTotal = WALLET_STRIP_TOTAL_BUCKETS.reduce((best, current) =>
+    Math.abs(current - classLimit) < Math.abs(best - classLimit) ? current : best,
+  WALLET_STRIP_TOTAL_BUCKETS[0]);
+  const ratio = classLimit > 0 ? Math.min(1, Math.max(0, classesRemaining / classLimit)) : 0;
+  const remainingBucket = Math.min(nearestTotal, Math.max(0, Math.round(ratio * nearestTotal)));
+  return { total: nearestTotal, remaining: remainingBucket };
+}
+
 console.log("[Apple Wallet] Config check:",
   isAppleWalletConfigured() ? "✅ All certs configured — .pkpass mode" : "⚠️ Missing certs — web pass fallback mode");
 console.log("[Apple Wallet]",
@@ -3593,6 +3728,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const classesRemaining = hasMembership
     ? Math.max(0, Number(membership.classes_remaining ?? classLimit ?? 0))
     : 0;
+  const stripStampState = resolveWalletStripStampState(classLimit, classesRemaining);
   const stripClassesValue = isUnlimited
     ? "ILIMITADAS"
     : classLimit > 0
@@ -3738,21 +3874,26 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     : membershipCategory === "pilates"
       ? findAssetFile(["wallet-thumb-pilates.png", "pilates_2320695.png"])
       : findAssetFile(["wallet-thumb-mixto.png", "ophelia-logo.png"]);
-  const stripPath = membershipCategory === "jumping"
-    ? findAssetFile(["wallet-strip-jumping.png"])
-    : membershipCategory === "pilates"
-      ? findAssetFile(["wallet-strip-pilates.png"])
-      : findAssetFile(["wallet-strip-mixto.png"]);
-  const strip2xPath = membershipCategory === "jumping"
-    ? findAssetFile(["wallet-strip-jumping@2x.png"])
-    : membershipCategory === "pilates"
-      ? findAssetFile(["wallet-strip-pilates@2x.png"])
-      : findAssetFile(["wallet-strip-mixto@2x.png"]);
-  const strip3xPath = membershipCategory === "jumping"
-    ? findAssetFile(["wallet-strip-jumping@3x.png"])
-    : membershipCategory === "pilates"
-      ? findAssetFile(["wallet-strip-pilates@3x.png"])
-      : findAssetFile(["wallet-strip-mixto@3x.png"]);
+  const stripCategory =
+    membershipCategory === "jumping" ? "jumping"
+      : membershipCategory === "pilates" ? "pilates"
+        : "mixto";
+  const dynamicStripName =
+    !isUnlimited && stripStampState.total > 0
+      ? `wallet-strip-${stripCategory}-t${stripStampState.total}-r${stripStampState.remaining}.png`
+      : `wallet-strip-${stripCategory}.png`;
+  const stripPath = findAssetFile([
+    dynamicStripName,
+    `wallet-strip-${stripCategory}.png`,
+  ]);
+  const strip2xPath = findAssetFile([
+    dynamicStripName.replace(".png", "@2x.png"),
+    `wallet-strip-${stripCategory}@2x.png`,
+  ]);
+  const strip3xPath = findAssetFile([
+    dynamicStripName.replace(".png", "@3x.png"),
+    `wallet-strip-${stripCategory}@3x.png`,
+  ]);
 
   const iconBuffer = iconPath && fs.existsSync(iconPath) ? fs.readFileSync(iconPath) : null;
   const logoBuffer = logoPath && fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
@@ -3761,7 +3902,14 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const strip2xBuffer = strip2xPath && fs.existsSync(strip2xPath) ? fs.readFileSync(strip2xPath) : null;
   const strip3xBuffer = strip3xPath && fs.existsSync(strip3xPath) ? fs.readFileSync(strip3xPath) : null;
 
-  console.log("[Apple Wallet] Assets found — icon:", !!iconBuffer, "logo:", !!logoBuffer, "thumbnail:", !!thumbBuffer, "strip:", !!stripBuffer);
+  console.log(
+    "[Apple Wallet] Assets found — icon:", !!iconBuffer,
+    "logo:", !!logoBuffer,
+    "thumbnail:", !!thumbBuffer,
+    "strip:", !!stripBuffer,
+    "stripState:", `${stripStampState.remaining}/${stripStampState.total}`,
+    "stripAsset:", dynamicStripName,
+  );
 
   // Build file map for the pass
   const files = {};
@@ -5441,6 +5589,44 @@ function queueWhatsAppSend(number, text) {
   return run;
 }
 
+async function getSettingsValue(key, fallback = null) {
+  try {
+    const r = await pool.query("SELECT value FROM settings WHERE key = $1 LIMIT 1", [key]);
+    if (!r.rows.length || r.rows[0].value == null) return fallback;
+    return r.rows[0].value;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function renderTemplateVars(template, vars = {}) {
+  if (typeof template !== "string" || !template.trim()) return "";
+  return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_m, key) => {
+    const value = vars[key];
+    return value === undefined || value === null ? "" : String(value);
+  });
+}
+
+async function sendConfiguredWhatsAppTemplate({ templateKey, phone, vars = {}, fallbackMessage = "" }) {
+  if (!phone) return { sent: false, reason: "no_phone" };
+  const notificationSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+  if (notificationSettings?.whatsapp_reminders === false) {
+    return { sent: false, reason: "whatsapp_disabled" };
+  }
+  const templates = await getSettingsValue("notification_templates", DEFAULT_NOTIFICATION_TEMPLATES);
+  const templateBody = templates?.[templateKey]?.body || "";
+  const rendered = renderTemplateVars(templateBody, vars).trim();
+  const text = rendered || String(fallbackMessage || "").trim();
+  if (!text) return { sent: false, reason: "empty_message" };
+  await queueWhatsAppSend(normalisePhone(phone), text);
+  return { sent: true };
+}
+
+async function areEmailNotificationsEnabled() {
+  const notificationSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+  return notificationSettings?.email_reminders !== false;
+}
+
 // Webhook (no auth) — receives Evolution API events
 app.post("/api/webhook/evolution", async (req, res) => {
   try {
@@ -6432,17 +6618,30 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
 
     // ── Email: membership activated ──────────────────────────────────────
     try {
-      const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [userId]);
+      const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [userId]);
       if (uRes.rows[0]) {
         const u = uRes.rows[0];
-        sendMembershipActivated({
-          to: u.email,
-          name: u.display_name || "Alumna",
-          planName: plan.name,
-          startDate: start.toISOString(),
-          endDate: end.toISOString(),
-          classLimit: plan.class_limit ?? null,
-        }).catch((e) => console.error("[Email] membership activated:", e.message));
+        if (await areEmailNotificationsEnabled()) {
+          sendMembershipActivated({
+            to: u.email,
+            name: u.display_name || "Alumna",
+            planName: plan.name,
+            startDate: start.toISOString(),
+            endDate: end.toISOString(),
+            classLimit: plan.class_limit ?? null,
+          }).catch((e) => console.error("[Email] membership activated:", e.message));
+        }
+        sendConfiguredWhatsAppTemplate({
+          templateKey: "membership_activated",
+          phone: u.phone,
+          vars: {
+            name: u.display_name || "Alumna",
+            plan: plan.name || "tu plan",
+            startDate: start.toLocaleDateString("es-MX"),
+            endDate: end.toLocaleDateString("es-MX"),
+          },
+          fallbackMessage: `Hola ${u.display_name || "Alumna"}, tu membresía ${plan.name || ""} ya está activa. Vigencia: ${start.toLocaleDateString("es-MX")} al ${end.toLocaleDateString("es-MX")}.`,
+        }).catch((e) => console.error("[WA] membership activated:", e.message));
       }
     } catch (emailErr) {
       console.error("[Email] membership create query:", emailErr.message);
@@ -6484,17 +6683,30 @@ app.put("/api/memberships/:id/activate", adminMiddleware, async (req, res) => {
 
     // ── Email: membership activated ──────────────────────────────────────
     try {
-      const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [mem.user_id]);
+      const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [mem.user_id]);
       if (uRes.rows[0]) {
         const u = uRes.rows[0];
-        sendMembershipActivated({
-          to: u.email,
-          name: u.display_name || "Alumna",
-          planName: mem.plan_name || mem.plan_name_override || "Tu membresía",
-          startDate: mem.start_date,
-          endDate: mem.end_date,
-          classLimit: mem.plan_class_limit ?? mem.class_limit_override ?? null,
-        }).catch((e) => console.error("[Email] membership activate:", e.message));
+        if (await areEmailNotificationsEnabled()) {
+          sendMembershipActivated({
+            to: u.email,
+            name: u.display_name || "Alumna",
+            planName: mem.plan_name || mem.plan_name_override || "Tu membresía",
+            startDate: mem.start_date,
+            endDate: mem.end_date,
+            classLimit: mem.plan_class_limit ?? mem.class_limit_override ?? null,
+          }).catch((e) => console.error("[Email] membership activate:", e.message));
+        }
+        sendConfiguredWhatsAppTemplate({
+          templateKey: "membership_activated",
+          phone: u.phone,
+          vars: {
+            name: u.display_name || "Alumna",
+            plan: mem.plan_name || mem.plan_name_override || "tu plan",
+            startDate: mem.start_date ? new Date(mem.start_date).toLocaleDateString("es-MX") : "",
+            endDate: mem.end_date ? new Date(mem.end_date).toLocaleDateString("es-MX") : "",
+          },
+          fallbackMessage: `Hola ${u.display_name || "Alumna"}, tu membresía ${mem.plan_name || mem.plan_name_override || ""} ya está activa.`,
+        }).catch((e) => console.error("[WA] membership activate:", e.message));
       }
     } catch (emailErr) {
       console.error("[Email] activate query:", emailErr.message);
@@ -6786,7 +6998,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     await client.query("COMMIT");
 
     try {
-      const userRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [userId]);
+      const userRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [userId]);
       const classFullRes = await pool.query(
         `SELECT c.date, c.start_time, ct.name AS class_type_name,
                 i.display_name AS instructor_name
@@ -6802,16 +7014,31 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       if (userRes.rows[0] && classFullRes.rows[0]) {
         const u = userRes.rows[0];
         const cl = classFullRes.rows[0];
-        sendBookingConfirmed({
-          to: u.email,
-          name: u.display_name || "Alumna",
-          className: cl.class_type_name,
-          date: cl.date,
-          startTime: cl.start_time,
-          instructor: cl.instructor_name,
-          classesLeft,
-          isWaitlist,
-        }).catch((e) => console.error("[Email] booking confirmed (admin):", e.message));
+        if (await areEmailNotificationsEnabled()) {
+          sendBookingConfirmed({
+            to: u.email,
+            name: u.display_name || "Alumna",
+            className: cl.class_type_name,
+            date: cl.date,
+            startTime: cl.start_time,
+            instructor: cl.instructor_name,
+            classesLeft,
+            isWaitlist,
+          }).catch((e) => console.error("[Email] booking confirmed (admin):", e.message));
+        }
+        sendConfiguredWhatsAppTemplate({
+          templateKey: "booking_confirmed",
+          phone: u.phone,
+          vars: {
+            name: u.display_name || "Alumna",
+            class: cl.class_type_name || "Clase",
+            date: cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "",
+            time: cl.start_time ? String(cl.start_time).slice(0, 5) : "",
+          },
+          fallbackMessage: isWaitlist
+            ? `Hola ${u.display_name || "Alumna"}, quedaste en lista de espera para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}).`
+            : `Hola ${u.display_name || "Alumna"}, tu reserva para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}) está confirmada.`,
+        }).catch((e) => console.error("[WA] booking confirmed (admin):", e.message));
       }
     } catch (emailErr) {
       console.error("[Email] booking confirmed (admin) query error:", emailErr.message);
@@ -7087,17 +7314,30 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
       try {
         const end = new Date();
         end.setDate(end.getDate() + (plan.duration_days || 30));
-        const uRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1", [order.user_id]);
+        const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [order.user_id]);
         if (uRes.rows[0]) {
           const u = uRes.rows[0];
-          sendMembershipActivated({
-            to: u.email,
-            name: u.display_name || "Alumna",
-            planName: plan.name,
-            startDate: new Date().toISOString(),
-            endDate: end.toISOString(),
-            classLimit: plan.class_limit ?? null,
-          }).catch((e) => console.error("[Email] admin order verify:", e.message));
+          if (await areEmailNotificationsEnabled()) {
+            sendMembershipActivated({
+              to: u.email,
+              name: u.display_name || "Alumna",
+              planName: plan.name,
+              startDate: new Date().toISOString(),
+              endDate: end.toISOString(),
+              classLimit: plan.class_limit ?? null,
+            }).catch((e) => console.error("[Email] admin order verify:", e.message));
+          }
+          sendConfiguredWhatsAppTemplate({
+            templateKey: "membership_activated",
+            phone: u.phone,
+            vars: {
+              name: u.display_name || "Alumna",
+              plan: plan.name || "tu plan",
+              startDate: new Date().toLocaleDateString("es-MX"),
+              endDate: end.toLocaleDateString("es-MX"),
+            },
+            fallbackMessage: `Hola ${u.display_name || "Alumna"}, tu membresía ${plan.name || ""} ya está activa.`,
+          }).catch((e) => console.error("[WA] admin order verify:", e.message));
         }
       } catch (emailErr) {
         console.error("[Email] admin order verify query:", emailErr.message);
@@ -7153,9 +7393,15 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
         // WhatsApp notification
         if (u.phone) {
           try {
-            const phone = String(u.phone).replace(/\D/g, "");
-            const wa = phone.length === 10 ? "52" + phone : phone;
-            await queueWhatsAppSend(wa, rejMsg);
+            await sendConfiguredWhatsAppTemplate({
+              templateKey: "transfer_rejected",
+              phone: u.phone,
+              vars: {
+                name: userName,
+                reason: rejectionReason,
+              },
+              fallbackMessage: rejMsg,
+            });
           } catch (waErr) {
             console.error("[Reject WhatsApp]", waErr.response?.data || waErr.message);
           }
