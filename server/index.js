@@ -3024,7 +3024,7 @@ const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
 const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || "Ophelia Jump Studio";
 const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || "Ophelia Club";
 const GW_HEX_BG = process.env.GOOGLE_HEX_BACKGROUND_COLOR || "#1a0b26";
-const GW_HEX_BG_EVENT = process.env.GOOGLE_HEX_BACKGROUND_COLOR_EVENT || "#0c2b26";
+const GW_HEX_BG_EVENT = process.env.GOOGLE_HEX_BACKGROUND_COLOR_EVENT || "#2A0C43";
 
 /**
  * Parse the Google Service Account private key from various env var formats.
@@ -4225,7 +4225,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
   const passAccent = hasEventPass
-    ? "rgb(105, 240, 195)"
+    ? "rgb(225, 92, 184)"
     : membershipCategory === "pilates"
       ? "rgb(197, 214, 144)"
       : membershipCategory === "jumping"
@@ -4233,8 +4233,8 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
         : membershipCategory === "mixto"
           ? "rgb(178, 152, 218)"
           : "rgb(171, 156, 197)";
-  const passForeground = hasEventPass ? "rgb(236, 255, 248)" : "rgb(247, 245, 255)";
-  const passBackground = hasEventPass ? "rgb(9, 33, 27)" : "rgb(20, 11, 31)";
+  const passForeground = hasEventPass ? "rgb(248, 243, 255)" : "rgb(247, 245, 255)";
+  const passBackground = hasEventPass ? "rgb(30, 10, 48)" : "rgb(20, 11, 31)";
   const classLimit = hasMembership ? Number(membership.class_limit ?? 0) : 0;
   const classesRemaining = hasMembership
     ? Math.max(0, Number(membership.classes_remaining ?? classLimit ?? 0))
@@ -4250,7 +4250,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     28,
   );
   const shouldUseStampStrip = !hasEventPass && hasMembership && !isUnlimited && stripStampState.total > 0;
-  const showFrontTextFields = parseBooleanFlag(process.env.APPLE_WALLET_SHOW_FRONT_TEXT || false);
+  const showFullFrontTextFields = parseBooleanFlag(process.env.APPLE_WALLET_SHOW_FRONT_TEXT || false);
 
   // Build secondary/auxiliary fields
   const secondaryFields = [];
@@ -4345,7 +4345,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     });
   }
 
-  if (!showFrontTextFields) {
+  if (!showFullFrontTextFields) {
     if (hasMembership) {
       backFields.unshift(
         {
@@ -4451,6 +4451,35 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     },
   ];
 
+  const compactPrimaryFields = [
+    {
+      key: "compact_title",
+      label: hasEventPass ? "EVENTO" : hasMembership ? "PLAN" : "MIEMBRO",
+      value: hasEventPass
+        ? truncateWalletField(activeEventPass?.eventTitle || "Evento especial", 22)
+        : hasMembership
+          ? truncateWalletField(planDisplayName || membershipHeadline, 22)
+          : truncateWalletField(memberDisplayName || "Miembro", 22),
+    },
+  ];
+
+  const compactSecondaryFields = [];
+  if (hasEventPass && eventSchedule) {
+    compactSecondaryFields.push({
+      key: "compact_event_schedule",
+      label: "FECHA",
+      value: truncateWalletField(eventSchedule, 24),
+    });
+  } else if (hasMembership && membership.end_date) {
+    const endDate = new Date(membership.end_date);
+    const daysLeft = Math.max(0, Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24)));
+    compactSecondaryFields.push({
+      key: "compact_valid_until",
+      label: "VIGENCIA",
+      value: `${endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short" })} (${daysLeft}d)`,
+    });
+  }
+
   // Build pass.json
   const passJson = {
     formatVersion: 1,
@@ -4468,9 +4497,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       headerFields: [
         { key: "points", label: "PUNTOS", value: points, textAlignment: "PKTextAlignmentRight", changeMessage: "Ahora tienes %@ puntos" },
       ],
-      primaryFields: showFrontTextFields ? primaryFields : [],
-      secondaryFields: showFrontTextFields ? secondaryFields : [],
-      auxiliaryFields: showFrontTextFields ? auxiliaryFields : [],
+      primaryFields: showFullFrontTextFields ? primaryFields : compactPrimaryFields,
+      secondaryFields: showFullFrontTextFields ? secondaryFields : compactSecondaryFields,
+      auxiliaryFields: showFullFrontTextFields ? auxiliaryFields : [],
       backFields,
     },
     barcode: {
@@ -4566,15 +4595,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const dynamicStripPath = shouldUseStampStrip
     ? findAssetFile([dynamicStripName])
     : null;
-  const stripCandidates = hasEventPass
-    ? [`wallet-strip-${stripCategory}.png`]
-    : [`wallet-strip-${stripCategory}.png`, "wallet-strip-mixto.png"];
-  const strip2xCandidates = hasEventPass
-    ? [`wallet-strip-${stripCategory}@2x.png`]
-    : [`wallet-strip-${stripCategory}@2x.png`, "wallet-strip-mixto@2x.png"];
-  const strip3xCandidates = hasEventPass
-    ? [`wallet-strip-${stripCategory}@3x.png`]
-    : [`wallet-strip-${stripCategory}@3x.png`, "wallet-strip-mixto@3x.png"];
+  const stripCandidates = [`wallet-strip-${stripCategory}.png`, "wallet-strip-mixto.png"];
+  const strip2xCandidates = [`wallet-strip-${stripCategory}@2x.png`, "wallet-strip-mixto@2x.png"];
+  const strip3xCandidates = [`wallet-strip-${stripCategory}@3x.png`, "wallet-strip-mixto@3x.png"];
   const stripPath = dynamicStripPath || findAssetFile(stripCandidates);
   const strip2xPath = dynamicStripPath
     ? findAssetFile([dynamicStripName.replace(".png", "@2x.png")])
