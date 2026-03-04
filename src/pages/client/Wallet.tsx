@@ -208,7 +208,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <div class="points">${points}</div>
 </div>
 <div class="qr-section"><div class="qr-wrap"><img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrCode)}&bgcolor=FFFFFF&color=1a0b26" alt="QR" /></div></div>
-<div class="qr-hint">Muestra este código en recepción</div>
+<div class="qr-hint">Tu código de acceso Ophelia</div>
 <div class="footer"><button class="btn" onclick="window.print()">Imprimir pase</button></div>
 </div>
 </body>
@@ -261,7 +261,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
                   </div>
                 )}
                 <p className="text-xs text-white/40 max-w-[200px] mx-auto leading-relaxed">
-                  Muestra este código QR en recepción al llegar al estudio
+                  Presenta este código QR al ingresar
                 </p>
               </div>
             </div>

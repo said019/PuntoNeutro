@@ -3141,7 +3141,6 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     barcode: {
       type: "QR_CODE",
       value: qrCode,
-      alternateText: "Escanea en recepción",
     },
     loyaltyPoints: {
       balance: { int: points },
@@ -3506,6 +3505,27 @@ function findAssetDir() {
   return candidates[0];
 }
 
+/** Find the first existing asset file by trying file names across common asset dirs. */
+function findAssetFile(fileNames = []) {
+  const dirs = [
+    findAssetDir(),
+    path.join(__dirname, "..", "public"),
+    path.join(__dirname, "..", "src", "assets"),
+    path.join(process.cwd(), "public"),
+    path.join(process.cwd(), "src", "assets"),
+  ];
+  const checked = new Set();
+  for (const dir of dirs) {
+    if (!dir || checked.has(dir)) continue;
+    checked.add(dir);
+    for (const name of fileNames) {
+      const fullPath = path.join(dir, name);
+      if (fs.existsSync(fullPath)) return fullPath;
+    }
+  }
+  return null;
+}
+
 console.log("[Apple Wallet] Config check:",
   isAppleWalletConfigured() ? "✅ All certs configured — .pkpass mode" : "⚠️ Missing certs — web pass fallback mode");
 console.log("[Apple Wallet]",
@@ -3644,7 +3664,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   backFields.push(
     { key: "puntos", label: "PUNTOS OPHELIA CLUB", value: `${points.toLocaleString("es-MX")} pts` },
     { key: "web", label: "RESERVAR EN LÍNEA", value: `${SITE_URL}/app/bookings` },
-    { key: "terms", label: "TÉRMINOS", value: "Válido para clases de trampolín. Presenta tu pase en recepción." }
+    { key: "terms", label: "TÉRMINOS", value: "Válido para clases de trampolín. Presenta tu pase al ingresar." }
   );
 
   // Build pass.json
@@ -3674,14 +3694,12 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       message: qrCode,
       format: "PKBarcodeFormatQR",
       messageEncoding: "iso-8859-1",
-      altText: "Escanea en recepción",
     },
     barcodes: [
       {
         message: qrCode,
         format: "PKBarcodeFormatQR",
         messageEncoding: "iso-8859-1",
-        altText: "Escanea en recepción",
       },
     ],
     webServiceURL: `${SITE_URL}/api/wallet`,
@@ -3689,14 +3707,20 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     relevantDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  // Read image assets — try multiple directories
-  const assetDir = findAssetDir();
-  console.log("[Apple Wallet] Looking for assets in:", assetDir);
-  const iconPath = path.join(assetDir, "ophelia-logo.png");
-  const logoPath = path.join(assetDir, "ophelia-logo-full.png");
-  const iconBuffer = fs.existsSync(iconPath) ? fs.readFileSync(iconPath) : null;
-  const logoBuffer = fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
-  console.log("[Apple Wallet] Assets found — icon:", !!iconBuffer, "logo:", !!logoBuffer);
+  // Read image assets — prefer wallet-specific files when available
+  const iconPath = findAssetFile(["wallet-icon.png", "ophelia-logo.png", "ophelia-logo-full.png"]);
+  const logoPath = findAssetFile(["wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+  const thumbPath = membershipCategory === "jumping"
+    ? findAssetFile(["wallet-thumb-jumping.png", "trampoline_2982156.png"])
+    : membershipCategory === "pilates"
+      ? findAssetFile(["wallet-thumb-pilates.png", "pilates_2320695.png"])
+      : findAssetFile(["wallet-thumb-mixto.png", "ophelia-logo.png"]);
+
+  const iconBuffer = iconPath && fs.existsSync(iconPath) ? fs.readFileSync(iconPath) : null;
+  const logoBuffer = logoPath && fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
+  const thumbBuffer = thumbPath && fs.existsSync(thumbPath) ? fs.readFileSync(thumbPath) : null;
+
+  console.log("[Apple Wallet] Assets found — icon:", !!iconBuffer, "logo:", !!logoBuffer, "thumbnail:", !!thumbBuffer);
 
   // Build file map for the pass
   const files = {};
@@ -3705,10 +3729,16 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   if (iconBuffer) {
     files["icon.png"] = iconBuffer;
     files["icon@2x.png"] = iconBuffer;
+    files["icon@3x.png"] = iconBuffer;
   }
   if (logoBuffer) {
     files["logo.png"] = logoBuffer;
     files["logo@2x.png"] = logoBuffer;
+    files["logo@3x.png"] = logoBuffer;
+  }
+  if (thumbBuffer) {
+    files["thumbnail.png"] = thumbBuffer;
+    files["thumbnail@2x.png"] = thumbBuffer;
   }
 
   // Build manifest.json (SHA1 hashes of each file)
@@ -3934,7 +3964,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
       <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrCode)}&bgcolor=FFFFFF&color=1a0b26" alt="QR Code" />
     </div>
   </div>
-  <div class="qr-hint">Muestra este código en recepción al llegar al estudio</div>
+  <div class="qr-hint">Tu código de acceso Ophelia</div>
   <div class="fields">
     ${membershipHtml}
     ${nextBookingHtml}
