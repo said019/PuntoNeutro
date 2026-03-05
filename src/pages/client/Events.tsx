@@ -221,9 +221,9 @@ function PaymentSection({ event, onDone }: { event: ClientEvent; onDone: () => v
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Datos bancarios</p>
             {[
               { label: "Banco",    value: "BBVA" },
-              { label: "Titular",  value: "Ophelia Jump Studio SA de CV" },
-              { label: "Cuenta",   value: "012 3456 78901 2" },
-              { label: "CLABE",    value: "012 180 0123456789 01" },
+              { label: "Titular",  value: "Montserrath Cornejo Ramírez" },
+              { label: "Cuenta",   value: "157 824 4526" },
+              { label: "CLABE",    value: "012 180 01578244526 8" },
               { label: "Monto",    value: formatCurrency(event.myRegistration?.amount ?? event.price) },
             ].map((item) => (
               <div key={item.label} className="flex items-center justify-between gap-2">

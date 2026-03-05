@@ -48,7 +48,87 @@ const DEFAULT_GENERAL_SETTINGS = {
   timezone: "America/Mexico_City",
   currency: "MXN",
   maintenance_mode: false,
+  venue_media_url: "",
+  venue_media_type: "",
+  venue_media_drive_id: "",
+  venue_media_name: "",
+  venue_media_updated_at: "",
 };
+
+const DEFAULT_BANK_INFO = Object.freeze({
+  bank: "BBVA",
+  account_holder: "Montserrath Cornejo Ramírez",
+  account_number: "157 824 4526",
+  clabe: "012 180 01578244526 8",
+});
+
+function digitsOnly(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function formatClabe(value) {
+  const digits = digitsOnly(value);
+  if (digits.length !== 18) return String(value || "").trim();
+  return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 17)} ${digits.slice(17)}`;
+}
+
+function formatAccountNumber(value) {
+  const digits = digitsOnly(value);
+  if (digits.length === 10) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+  return String(value || "").trim();
+}
+
+function normalizeBankInfo(rawValue) {
+  const raw = rawValue && typeof rawValue === "object" ? rawValue : {};
+  const candidate = {
+    bank: String(raw.bank || raw.bank_name || raw.banco || "").trim(),
+    account_holder: String(raw.account_holder || raw.accountHolder || raw.titular || raw.holder || "").trim(),
+    account_number: String(raw.account_number || raw.accountNumber || raw.cuenta || raw.account || "").trim(),
+    clabe: String(raw.clabe || raw.clabe_interbancaria || "").trim(),
+  };
+
+  const holderLower = candidate.account_holder.toLowerCase();
+  const clabeDigits = digitsOnly(candidate.clabe);
+  const accountDigits = digitsOnly(candidate.account_number);
+  const shouldUseDefault =
+    !candidate.bank ||
+    !candidate.account_holder ||
+    clabeDigits.length !== 18 ||
+    (accountDigits && accountDigits.length < 10) ||
+    clabeDigits === "012180001234567890" ||
+    clabeDigits === "012180012345678901" ||
+    clabeDigits === "710180000068980" ||
+    holderLower.includes("balance studio") ||
+    holderLower.includes("ophelia jump studio sa de cv");
+
+  const base = shouldUseDefault ? DEFAULT_BANK_INFO : candidate;
+  const formattedAccount = formatAccountNumber(base.account_number || DEFAULT_BANK_INFO.account_number);
+  const formattedClabe = formatClabe(base.clabe || DEFAULT_BANK_INFO.clabe);
+  const holder = String(base.account_holder || DEFAULT_BANK_INFO.account_holder).trim();
+  const bank = String(base.bank || DEFAULT_BANK_INFO.bank).trim();
+
+  return {
+    bank,
+    bank_name: bank,
+    account_holder: holder,
+    accountHolder: holder,
+    account_number: formattedAccount,
+    accountNumber: formattedAccount,
+    clabe: formattedClabe,
+  };
+}
+
+async function getConfiguredBankInfo(dbClient = pool) {
+  try {
+    const settingsRes = await dbClient.query(
+      "SELECT value FROM system_settings WHERE key = 'bank_info' LIMIT 1"
+    );
+    const raw = settingsRes.rows.length > 0 ? settingsRes.rows[0].value : null;
+    return normalizeBankInfo(raw);
+  } catch (_) {
+    return normalizeBankInfo(DEFAULT_BANK_INFO);
+  }
+}
 
 const DEFAULT_POLICIES_SETTINGS = {
   cancellation_policy: "Puedes cancelar tu reserva sin penalización hasta 8 horas antes de la clase. Cancelaciones fuera de tiempo o inasistencias pueden consumir tu clase.",
@@ -2905,12 +2985,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     }
 
     const total = subtotal - discount;
-    const settingsRes = await client.query(
-      "SELECT value FROM system_settings WHERE key = 'bank_info'"
-    );
-    const bankInfo = settingsRes.rows.length > 0
-      ? settingsRes.rows[0].value
-      : { clabe: "710180000068980", bank: "Banorte", accountHolder: "Ophelia Studio" };
+    const bankInfo = await getConfiguredBankInfo(client);
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
     const orderRes = await client.query(
       `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount, discount_code_id, bank_info, expires_at)
@@ -2936,7 +3011,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       data: {
         ...order,
         plan_name: plan.name,
-        bank_details: { ...bankInfo, amount: total },
+        bank_details: { ...bankInfo, amount: total, currency: "MXN" },
       }
     });
   } catch (err) {
@@ -4897,15 +4972,30 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     "ophelia-logo.png",
   ]);
 
-  const logoPath = hasEventPass
-    ? findAssetFile(["wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"])
-    : findAssetFile(["wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
-  const logo2xPath = hasEventPass
-    ? findAssetFile(["wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"])
-    : findAssetFile(["wallet-logo-black@2x.png", "wallet-logo@2x.png", "wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
-  const logo3xPath = hasEventPass
-    ? findAssetFile(["wallet-logo@3x.png", "wallet-logo@2x.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"])
-    : findAssetFile(["wallet-logo-black@3x.png", "wallet-logo@3x.png", "wallet-logo-black@2x.png", "wallet-logo@2x.png", "wallet-logo-black.png", "wallet-logo.png", "ophelia-logo-full.png", "ophelia-logo.png"]);
+  const logoPath = findAssetFile([
+    "wallet-logo.png",
+    "ophelia-logo-full.png",
+    "ophelia-logo.png",
+    "wallet-logo-black.png",
+  ]);
+  const logo2xPath = findAssetFile([
+    "wallet-logo@2x.png",
+    "wallet-logo.png",
+    "ophelia-logo-full.png",
+    "ophelia-logo.png",
+    "wallet-logo-black@2x.png",
+    "wallet-logo-black.png",
+  ]);
+  const logo3xPath = findAssetFile([
+    "wallet-logo@3x.png",
+    "wallet-logo@2x.png",
+    "wallet-logo.png",
+    "ophelia-logo-full.png",
+    "ophelia-logo.png",
+    "wallet-logo-black@3x.png",
+    "wallet-logo-black@2x.png",
+    "wallet-logo-black.png",
+  ]);
 
   const thumbPath = findAssetFile([
     `wallet-thumb-${assetCategory}.png`,
@@ -5688,7 +5778,17 @@ app.post("/api/videos/:id/purchase", authMiddleware, async (req, res) => {
        RETURNING *`,
       [req.params.id, req.userId, video.sales_price_mxn]
     );
-    return res.status(201).json({ data: r.rows[0] });
+    const bankInfo = await getConfiguredBankInfo(pool);
+    return res.status(201).json({
+      data: {
+        ...r.rows[0],
+        bank_details: {
+          ...bankInfo,
+          amount: Number(video.sales_price_mxn || 0),
+          currency: "MXN",
+        },
+      },
+    });
   } catch (err) {
     console.error("Video/purchase error:", err);
     return res.status(500).json({ message: "Error interno" });

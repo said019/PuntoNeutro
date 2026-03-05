@@ -423,8 +423,9 @@ const Checkout = () => {
                 <p className="text-xs text-white/40">Realiza la transferencia con los siguientes datos. Luego sube tu comprobante.</p>
                 {[
                   { label: "CLABE", value: bankDetails.clabe },
+                  { label: "Cuenta", value: bankDetails.account_number ?? bankDetails.accountNumber },
                   { label: "Banco", value: bankDetails.bank },
-                  { label: "Titular", value: bankDetails.account_holder },
+                  { label: "Titular", value: bankDetails.account_holder ?? bankDetails.accountHolder },
                   { label: "Monto", value: `$${bankDetails.amount?.toLocaleString("es-MX")} MXN` },
                 ].map(({ label, value }) => value && (
                   <div key={label} className="flex items-center justify-between py-2 border-b border-white/[0.06] last:border-0">

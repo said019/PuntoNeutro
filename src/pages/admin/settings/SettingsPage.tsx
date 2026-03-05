@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Send, MessageSquare, RefreshCw, Wifi, WifiOff, Pencil, BellDot } from "lucide-react";
+import { Loader2, Send, MessageSquare, RefreshCw, Wifi, WifiOff, Pencil, BellDot, Upload, Image as ImageIcon, Video, Trash2 } from "lucide-react";
 
 function normalizeQrDataUrl(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -23,6 +24,21 @@ function normalizeQrDataUrl(raw: unknown): string | null {
   // Guard against Evolution "code" payloads that are not image data.
   if (trimmed.includes(",") && trimmed.includes("@")) return null;
   return `data:image/png;base64,${trimmed}`;
+}
+
+const DRIVE_CHUNK_SIZE = 5 * 1024 * 1024;
+const VENUE_MEDIA_MAX_MB = 500;
+
+function inferVenueMediaType(url: string, explicitType?: string): "image" | "video" | "" {
+  const normalizedType = String(explicitType || "").toLowerCase();
+  if (normalizedType === "image" || normalizedType === "video") return normalizedType;
+  const normalizedUrl = String(url || "").toLowerCase();
+  if (!normalizedUrl) return "";
+  if (normalizedUrl.includes("/api/drive/video/")) return "video";
+  if (normalizedUrl.includes("/api/drive/image/")) return "image";
+  if (/\.(mp4|m4v|mov|webm|ogg)(\?|$)/.test(normalizedUrl)) return "video";
+  if (/\.(png|jpe?g|webp|gif|avif|svg)(\?|$)/.test(normalizedUrl)) return "image";
+  return "";
 }
 
 // Generic settings section — reads { data: <value_object> } from server
@@ -401,6 +417,199 @@ const NotificationTemplates = () => {
   );
 };
 
+const VenueMediaSettings = () => {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const { data: generalData } = useQuery({
+    queryKey: ["settings", "general_settings"],
+    queryFn: async () => (await api.get("/settings/general_settings")).data,
+    staleTime: Infinity,
+  });
+
+  const generalSettings: Record<string, any> = generalData?.data ?? {};
+  const mediaUrl = String(generalSettings.venue_media_url || "");
+  const mediaType = inferVenueMediaType(mediaUrl, generalSettings.venue_media_type);
+
+  const saveGeneralMutation = useMutation({
+    mutationFn: (nextValue: Record<string, any>) => api.put("/settings/general_settings", { value: nextValue }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings", "general_settings"] });
+      toast({ title: "✅ Media del lugar guardada" });
+    },
+    onError: (err: any) => {
+      toast({ title: err?.response?.data?.message || "Error al guardar media", variant: "destructive" });
+    },
+  });
+
+  const handleRemoveMedia = () => {
+    if (!mediaUrl) return;
+    saveGeneralMutation.mutate({
+      ...generalSettings,
+      venue_media_url: "",
+      venue_media_type: "",
+      venue_media_drive_id: "",
+      venue_media_name: "",
+      venue_media_updated_at: "",
+    });
+  };
+
+  const handleUpload = async (file: File) => {
+    if (!file) return;
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      toast({ title: "Solo se permiten archivos de imagen o video.", variant: "destructive" });
+      return;
+    }
+    if (file.size > VENUE_MEDIA_MAX_MB * 1024 * 1024) {
+      toast({ title: `El archivo excede ${VENUE_MEDIA_MAX_MB} MB.`, variant: "destructive" });
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    try {
+      const initResp = await api.post("/drive/init-upload", {
+        fileName: `venue_media_${Date.now()}_${file.name}`,
+        mimeType: file.type || (isVideo ? "video/mp4" : "image/jpeg"),
+        fileSize: file.size,
+      });
+      const sessionId = initResp?.data?.data?.sessionId ?? initResp?.data?.sessionId;
+      if (!sessionId) throw new Error("No se obtuvo sesión de subida");
+
+      let offset = 0;
+      let driveFileId = "";
+      while (offset < file.size) {
+        const end = Math.min(offset + DRIVE_CHUNK_SIZE, file.size);
+        const chunk = file.slice(offset, end);
+        const contentRange = `bytes ${offset}-${end - 1}/${file.size}`;
+        const resp = await api.put(`/drive/upload-chunk/${sessionId}`, chunk, {
+          headers: {
+            "Content-Type": file.type || (isVideo ? "video/mp4" : "image/jpeg"),
+            "Content-Range": contentRange,
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity,
+        });
+
+        if (resp.data?.done) {
+          driveFileId = resp.data?.data?.id;
+          break;
+        }
+        if (resp.data?.range) {
+          const nextOffset = parseInt(String(resp.data.range).split("-")[1], 10) + 1;
+          offset = Number.isFinite(nextOffset) ? nextOffset : end;
+        } else {
+          offset = end;
+        }
+        setUploadProgress(Math.round((offset / file.size) * 95));
+      }
+
+      if (!driveFileId) throw new Error("No se obtuvo el ID del archivo en Drive");
+      setUploadProgress(97);
+      await api.post(`/drive/make-public/${driveFileId}`);
+
+      const nextMediaType = isVideo ? "video" : "image";
+      const nextMediaUrl = nextMediaType === "video" ? `/api/drive/video/${driveFileId}` : `/api/drive/image/${driveFileId}`;
+      await api.put("/settings/general_settings", {
+        value: {
+          ...generalSettings,
+          venue_media_url: nextMediaUrl,
+          venue_media_type: nextMediaType,
+          venue_media_drive_id: driveFileId,
+          venue_media_name: file.name,
+          venue_media_updated_at: new Date().toISOString(),
+        },
+      });
+
+      setUploadProgress(100);
+      qc.invalidateQueries({ queryKey: ["settings", "general_settings"] });
+      toast({ title: "✅ Archivo subido correctamente" });
+    } catch (err: any) {
+      toast({ title: err?.response?.data?.message || err?.message || "Error al subir archivo", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="rounded-xl border p-4 space-y-4 max-w-2xl">
+      <div className="space-y-1">
+        <h3 className="font-semibold text-sm">Media del lugar</h3>
+        <p className="text-xs text-muted-foreground">
+          Sube una imagen o video para mostrar el estudio desde el admin.
+        </p>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleUpload(file);
+        }}
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading || saveGeneralMutation.isPending}
+        >
+          {isUploading ? <Loader2 className="animate-spin mr-2" size={14} /> : <Upload size={14} className="mr-2" />}
+          Subir imagen o video
+        </Button>
+        {mediaUrl ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleRemoveMedia}
+            disabled={isUploading || saveGeneralMutation.isPending}
+          >
+            <Trash2 size={14} className="mr-2" />
+            Quitar archivo
+          </Button>
+        ) : null}
+      </div>
+
+      {isUploading ? (
+        <div className="space-y-2">
+          <Progress value={uploadProgress} />
+          <p className="text-xs text-muted-foreground">{uploadProgress}% subido</p>
+        </div>
+      ) : null}
+
+      {mediaUrl ? (
+        <div className="space-y-2">
+          <div className="rounded-lg border border-border overflow-hidden bg-black/30">
+            {mediaType === "video" ? (
+              <video src={mediaUrl} controls className="w-full max-h-[360px] object-cover bg-black" />
+            ) : (
+              <img src={mediaUrl} alt="Media del lugar" className="w-full max-h-[360px] object-cover" />
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground flex items-center gap-2">
+            {mediaType === "video" ? <Video size={13} /> : <ImageIcon size={13} />}
+            {generalSettings.venue_media_name || "Archivo cargado"}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">
+          Aún no hay media cargada.
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SettingsPage = () => (
   <AuthGuard>
     <AdminLayout>
@@ -415,19 +624,22 @@ const SettingsPage = () => (
           </TabsList>
 
           <TabsContent value="general">
-            <SettingsSection
-              settingKey="general_settings"
-              fields={[
-                { key: "studio_name", label: "Nombre del estudio" },
-                { key: "address", label: "Dirección" },
-                { key: "phone", label: "Teléfono de contacto" },
-                { key: "instagram", label: "Instagram (@usuario)" },
-                { key: "facebook", label: "Facebook (URL o usuario)" },
-                { key: "timezone", label: "Zona horaria (ej: America/Mexico_City)" },
-                { key: "currency", label: "Moneda (ej: MXN)" },
-                { key: "maintenance_mode", label: "Modo mantenimiento", type: "boolean" },
-              ]}
-            />
+            <div className="space-y-6">
+              <SettingsSection
+                settingKey="general_settings"
+                fields={[
+                  { key: "studio_name", label: "Nombre del estudio" },
+                  { key: "address", label: "Dirección" },
+                  { key: "phone", label: "Teléfono de contacto" },
+                  { key: "instagram", label: "Instagram (@usuario)" },
+                  { key: "facebook", label: "Facebook (URL o usuario)" },
+                  { key: "timezone", label: "Zona horaria (ej: America/Mexico_City)" },
+                  { key: "currency", label: "Moneda (ej: MXN)" },
+                  { key: "maintenance_mode", label: "Modo mantenimiento", type: "boolean" },
+                ]}
+              />
+              <VenueMediaSettings />
+            </div>
           </TabsContent>
 
           <TabsContent value="notifications">

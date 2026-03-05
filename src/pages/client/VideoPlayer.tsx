@@ -157,8 +157,9 @@ const VideoPlayer = () => {
                   <CardContent className="space-y-3">
                     {[
                       { label: "CLABE", value: bankDetails.clabe },
+                      { label: "Cuenta", value: bankDetails.account_number ?? bankDetails.accountNumber },
                       { label: "Banco", value: bankDetails.bank },
-                      { label: "Titular", value: bankDetails.account_holder },
+                      { label: "Titular", value: bankDetails.account_holder ?? bankDetails.accountHolder },
                       { label: "Monto", value: `$${bankDetails.amount} ${bankDetails.currency ?? "MXN"}` },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex items-center justify-between text-sm">
