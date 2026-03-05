@@ -1077,9 +1077,8 @@ const Index = () => {
               {/* Social row */}
               <div className="relative z-10 flex gap-3 pt-6 border-t border-[#CA71E1]/15">
                 {[
-                  { label: "Instagram", href: "https://instagram.com/opheliajumping", short: "ig" },
-                  { label: "Facebook",  href: "https://facebook.com/opheliajumping",  short: "fb" },
-                  { label: "TikTok",    href: "https://tiktok.com/@opheliajumping",   short: "tt" },
+                  { label: "Instagram", href: "https://www.instagram.com/ophelia_studiomx/", short: "ig" },
+                  { label: "Facebook",  href: "https://www.facebook.com/profile.php?id=61574872102085", short: "fb" },
                 ].map((s) => (
                   <a
                     key={s.short}
@@ -1122,9 +1121,8 @@ const Index = () => {
               El jumping studio que eleva tu cuerpo y transforma tu vida, salto a salto.
             </p>
             <div className="flex gap-3 mt-6">
-              <a href="https://instagram.com/opheliajumping" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">ig</a>
-              <a href="https://facebook.com/opheliajumping" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">fb</a>
-              <a href="https://tiktok.com/@opheliajumping" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">tt</a>
+              <a href="https://www.instagram.com/ophelia_studiomx/" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">ig</a>
+              <a href="https://www.facebook.com/profile.php?id=61574872102085" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">fb</a>
             </div>
           </div>
           <div>
