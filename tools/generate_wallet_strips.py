@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
-from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFilter
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,37 +26,37 @@ SCALES = {1: "", 2: "@2x", 3: "@3x"}
 
 PALETTES: Dict[str, Dict[str, Tuple[int, int, int]]] = {
     "jumping": {
-        "top": (34, 14, 49),
-        "bottom": (18, 10, 30),
-        "accent": (202, 129, 190),
-        "active_icon": (246, 243, 255),
-        "inactive_icon": (146, 136, 170),
-        "active_bg": (66, 44, 86),
-        "inactive_bg": (41, 30, 56),
-        "active_border": (202, 129, 190),
-        "inactive_border": (104, 91, 129),
+        "top": (31, 0, 71),
+        "bottom": (23, 8, 42),
+        "accent": (225, 92, 184),
+        "active_icon": (249, 247, 232),
+        "inactive_icon": (160, 139, 178),
+        "active_bg": (69, 33, 98),
+        "inactive_bg": (44, 23, 63),
+        "active_border": (202, 113, 225),
+        "inactive_border": (112, 91, 132),
     },
     "pilates": {
-        "top": (31, 37, 25),
-        "bottom": (18, 22, 14),
-        "accent": (167, 188, 126),
-        "active_icon": (242, 252, 230),
-        "inactive_icon": (146, 157, 130),
-        "active_bg": (53, 63, 41),
-        "inactive_bg": (35, 44, 28),
-        "active_border": (167, 188, 126),
-        "inactive_border": (97, 111, 82),
+        "top": (31, 0, 71),
+        "bottom": (25, 10, 50),
+        "accent": (231, 235, 110),
+        "active_icon": (249, 247, 232),
+        "inactive_icon": (174, 167, 118),
+        "active_bg": (73, 63, 26),
+        "inactive_bg": (50, 42, 22),
+        "active_border": (231, 235, 110),
+        "inactive_border": (141, 137, 88),
     },
     "mixto": {
-        "top": (31, 17, 51),
-        "bottom": (17, 11, 30),
-        "accent": (157, 146, 214),
-        "active_icon": (245, 244, 255),
-        "inactive_icon": (149, 138, 174),
-        "active_bg": (60, 46, 84),
-        "inactive_bg": (39, 30, 56),
-        "active_border": (157, 146, 214),
-        "inactive_border": (103, 90, 129),
+        "top": (31, 0, 71),
+        "bottom": (24, 10, 44),
+        "accent": (202, 113, 225),
+        "active_icon": (249, 247, 232),
+        "inactive_icon": (158, 141, 185),
+        "active_bg": (67, 42, 95),
+        "inactive_bg": (44, 25, 66),
+        "active_border": (202, 113, 225),
+        "inactive_border": (112, 93, 139),
     },
 }
 
@@ -77,10 +77,9 @@ def lerp_color(c1: Tuple[int, int, int], c2: Tuple[int, int, int], t: float) -> 
 
 
 def tint_icon(icon_img: Image.Image, size: int, color: Tuple[int, int, int], alpha_mul: float = 1.0) -> Image.Image:
-    resized = icon_img.resize((size, size), Image.Resampling.LANCZOS)
+    resized = icon_img.resize((size, size), Image.Resampling.LANCZOS).convert("RGBA")
     alpha = resized.getchannel("A")
-    gray = ImageOps.grayscale(resized)
-    colored = ImageOps.colorize(gray, black=(20, 18, 28), white=color).convert("RGBA")
+    colored = Image.new("RGBA", (size, size), (*color, 255))
     if alpha_mul < 1.0:
         alpha = alpha.point(lambda px: int(px * alpha_mul))
     colored.putalpha(alpha)

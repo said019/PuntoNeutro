@@ -4542,7 +4542,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const shouldUseStampStrip = !hasEventPass && hasMembership && !isUnlimited && stripStampState.total > 0;
   const showFullFrontTextFields = hasEventPass
     ? parseBooleanFlag(process.env.APPLE_WALLET_SHOW_FRONT_TEXT_EVENT || false)
-    : parseBooleanFlag(process.env.APPLE_WALLET_SHOW_FRONT_TEXT_MEMBERSHIP || true);
+    : parseBooleanFlag(process.env.APPLE_WALLET_SHOW_FRONT_TEXT_MEMBERSHIP || false);
 
   // Build secondary/auxiliary fields
   const secondaryFields = [];
@@ -4820,6 +4820,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     description: hasEventPass
       ? `Evento — ${activeEventPass?.eventTitle || "Ophelia Studio"}`
       : `${membershipCategoryLabel} — Ophelia Jump Studio`,
+    logoText: "",
     foregroundColor: passForeground,
     backgroundColor: passBackground,
     labelColor: passAccent,
@@ -4827,9 +4828,15 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       headerFields: [
         { key: "points", label: "PUNTOS", value: points, textAlignment: "PKTextAlignmentRight", changeMessage: "Ahora tienes %@ puntos" },
       ],
-      primaryFields: showFullFrontTextFields ? primaryFields : compactPrimaryFields,
-      secondaryFields: showFullFrontTextFields ? secondaryFields : compactSecondaryFields,
-      auxiliaryFields: showFullFrontTextFields ? auxiliaryFields : (hasEventPass ? compactAuxiliaryFields : []),
+      primaryFields: hasEventPass
+        ? (showFullFrontTextFields ? primaryFields : compactPrimaryFields)
+        : (showFullFrontTextFields ? primaryFields : []),
+      secondaryFields: hasEventPass
+        ? (showFullFrontTextFields ? secondaryFields : compactSecondaryFields)
+        : secondaryFields,
+      auxiliaryFields: hasEventPass
+        ? (showFullFrontTextFields ? auxiliaryFields : compactAuxiliaryFields)
+        : auxiliaryFields,
       backFields,
     },
     barcode: {

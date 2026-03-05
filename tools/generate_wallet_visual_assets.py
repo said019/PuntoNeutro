@@ -25,16 +25,25 @@ def trim_transparent(img: Image.Image) -> Image.Image:
     return img.crop(bbox) if bbox else img
 
 
-def tint_image(img: Image.Image, color: Tuple[int, int, int], alpha_mul: float = 1.0) -> Image.Image:
+def tint_image(img: Image.Image, color: Tuple[int, int, int] | None, alpha_mul: float = 1.0) -> Image.Image:
     base = trim_transparent(img)
-    gray = ImageOps.grayscale(base)
-    tinted = ImageOps.colorize(gray, black=(16, 16, 16), white=color).convert("RGBA")
     alpha = base.getchannel("A").point(lambda px: int(px * alpha_mul))
+    if color is None:
+        tinted = base.copy()
+        tinted.putalpha(alpha)
+        return tinted
+    tinted = Image.new("RGBA", base.size, (*color, 255))
     tinted.putalpha(alpha)
     return tinted
 
 
-def render_wallet_icon(symbol: Image.Image, size: int, bg_color: Tuple[int, int, int], symbol_color: Tuple[int, int, int]) -> Image.Image:
+def render_wallet_icon(
+    symbol: Image.Image,
+    size: int,
+    bg_color: Tuple[int, int, int],
+    symbol_color: Tuple[int, int, int] | None,
+    border_color: Tuple[int, int, int],
+) -> Image.Image:
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
     radius = max(2, int(size * 0.26))
@@ -42,7 +51,7 @@ def render_wallet_icon(symbol: Image.Image, size: int, bg_color: Tuple[int, int,
         (0, 0, size - 1, size - 1),
         radius=radius,
         fill=(*bg_color, 255),
-        outline=(255, 255, 255, 36),
+        outline=(*border_color, 150),
         width=max(1, size // 24),
     )
     icon_size = int(size * 0.62)
@@ -51,7 +60,13 @@ def render_wallet_icon(symbol: Image.Image, size: int, bg_color: Tuple[int, int,
     return canvas
 
 
-def render_wallet_thumb(symbol: Image.Image, size: int, bg_color: Tuple[int, int, int], symbol_color: Tuple[int, int, int]) -> Image.Image:
+def render_wallet_thumb(
+    symbol: Image.Image,
+    size: int,
+    bg_color: Tuple[int, int, int],
+    symbol_color: Tuple[int, int, int] | None,
+    border_color: Tuple[int, int, int],
+) -> Image.Image:
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
     pad = max(2, size // 20)
@@ -60,7 +75,7 @@ def render_wallet_thumb(symbol: Image.Image, size: int, bg_color: Tuple[int, int
         (pad, pad, size - pad - 1, size - pad - 1),
         radius=radius,
         fill=(*bg_color, 230),
-        outline=(255, 255, 255, 45),
+        outline=(*border_color, 170),
         width=max(1, size // 32),
     )
     icon_size = int(size * 0.5)
@@ -71,10 +86,23 @@ def render_wallet_thumb(symbol: Image.Image, size: int, bg_color: Tuple[int, int
 
 def composite_mixto_icon(jump_symbol: Image.Image, pilates_symbol: Image.Image) -> Image.Image:
     base = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
-    jump = tint_image(jump_symbol, (255, 255, 255)).resize((620, 620), Image.Resampling.LANCZOS)
-    pil = tint_image(pilates_symbol, (224, 236, 208)).resize((620, 620), Image.Resampling.LANCZOS)
-    base.alpha_composite(jump, (85, 205))
-    base.alpha_composite(pil, (320, 205))
+    jump = tint_image(jump_symbol, (225, 92, 184)).resize((660, 660), Image.Resampling.LANCZOS)
+    pil = tint_image(pilates_symbol, (231, 235, 110)).resize((660, 660), Image.Resampling.LANCZOS)
+
+    left_mask = Image.new("L", (660, 660), 0)
+    ImageDraw.Draw(left_mask).rectangle((0, 0, 330, 660), fill=255)
+    right_mask = Image.new("L", (660, 660), 0)
+    ImageDraw.Draw(right_mask).rectangle((330, 0, 660, 660), fill=255)
+
+    jump_half = Image.new("RGBA", (660, 660), (0, 0, 0, 0))
+    jump_half.paste(jump, (0, 0), left_mask)
+    pil_half = Image.new("RGBA", (660, 660), (0, 0, 0, 0))
+    pil_half.paste(pil, (0, 0), right_mask)
+
+    x = (1024 - 660) // 2
+    y = (1024 - 660) // 2
+    base.alpha_composite(jump_half, (x, y))
+    base.alpha_composite(pil_half, (x, y))
     return base
 
 
@@ -90,20 +118,32 @@ def make_wallet_icons() -> None:
     mixto_src = composite_mixto_icon(jump_src, pilates_src)
 
     categories = {
-        "jumping": (jump_src, (30, 16, 46), (244, 232, 255)),
-        "pilates": (pilates_src, (24, 30, 20), (224, 240, 200)),
-        "mixto": (mixto_src, (25, 16, 45), (236, 231, 255)),
+        "jumping": (jump_src, (31, 0, 71), (225, 92, 184), (202, 113, 225)),
+        "pilates": (pilates_src, (31, 0, 71), (231, 235, 110), (202, 113, 225)),
+        "mixto": (mixto_src, (31, 0, 71), None, (202, 113, 225)),
     }
     icon_sizes = [(29, ""), (58, "@2x"), (87, "@3x")]
     thumb_sizes = [(90, ""), (180, "@2x")]
 
-    for category, (symbol, bg_color, symbol_color) in categories.items():
+    for category, (symbol, bg_color, symbol_color, border_color) in categories.items():
         for size, suffix in icon_sizes:
-            icon = render_wallet_icon(symbol, size=size, bg_color=bg_color, symbol_color=symbol_color)
+            icon = render_wallet_icon(
+                symbol,
+                size=size,
+                bg_color=bg_color,
+                symbol_color=symbol_color,
+                border_color=border_color,
+            )
             save_png(icon, f"wallet-icon-{category}{suffix}.png")
 
         for size, suffix in thumb_sizes:
-            thumb = render_wallet_thumb(symbol, size=size, bg_color=bg_color, symbol_color=symbol_color)
+            thumb = render_wallet_thumb(
+                symbol,
+                size=size,
+                bg_color=bg_color,
+                symbol_color=symbol_color,
+                border_color=border_color,
+            )
             save_png(thumb, f"wallet-thumb-{category}{suffix}.png")
 
 
