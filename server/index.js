@@ -6407,6 +6407,51 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
+// DELETE /api/classes/week — clear classes in date range
+app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.body || {};
+    const start = typeof startDate === "string" ? startDate.slice(0, 10) : null;
+    const end = typeof endDate === "string" ? endDate.slice(0, 10) : null;
+
+    if (!start || !end) {
+      return res.status(400).json({ message: "startDate y endDate requeridos" });
+    }
+    if (start > end) {
+      return res.status(400).json({ message: "Rango de fechas inválido" });
+    }
+
+    const activeBookingsRes = await pool.query(
+      `SELECT COUNT(*)::INT AS total
+       FROM bookings b
+       JOIN classes c ON c.id = b.class_id
+       WHERE c.date >= $1 AND c.date <= $2
+         AND b.status != 'cancelled'`,
+      [start, end]
+    );
+    const activeBookings = Number(activeBookingsRes.rows?.[0]?.total ?? 0);
+    if (activeBookings > 0) {
+      return res.status(409).json({
+        message: "No se puede limpiar esta semana porque hay reservas activas.",
+        activeBookings,
+      });
+    }
+
+    const deleted = await pool.query(
+      "DELETE FROM classes WHERE date >= $1 AND date <= $2 RETURNING id",
+      [start, end]
+    );
+    return res.json({
+      deleted: deleted.rowCount ?? deleted.rows.length,
+      startDate: start,
+      endDate: end,
+    });
+  } catch (err) {
+    console.error("DELETE /classes/week error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
 // POST /api/classes/generate — bulk generate
 app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
   try {

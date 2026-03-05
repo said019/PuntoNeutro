@@ -312,6 +312,22 @@ function CalendarTab({
     },
   });
 
+  const clearWeekMutation = useMutation({
+    mutationFn: () => api.delete("/classes/week", { data: { startDate: start, endDate: end } }),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["classes"] });
+      const deleted = Number(res?.data?.deleted ?? 0);
+      toast({
+        title: deleted === 1 ? "1 clase eliminada de la semana" : `${deleted} clases eliminadas de la semana`,
+      });
+      setSheetOpen(false);
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message ?? "No se pudo limpiar la semana";
+      toast({ title: message, variant: "destructive" });
+    },
+  });
+
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const classesForDay = (date: Date) =>
     classes.filter((c) => c.startTime?.startsWith(format(date, "yyyy-MM-dd")));
@@ -335,22 +351,45 @@ function CalendarTab({
     if (isMobile) setMobileDay(format(next, "yyyy-MM-dd"));
   };
 
+  const weekLabel = `${format(weekStart, "d MMM", { locale: es })} – ${format(addDays(weekStart, 6), "d MMM yyyy", { locale: es })}`;
+
+  const handleClearWeek = () => {
+    if (classes.length === 0 || clearWeekMutation.isPending) return;
+    const confirmed = window.confirm(
+      `Esto eliminará todas las clases de la semana (${weekLabel}). Esta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+    clearWeekMutation.mutate();
+  };
+
   const mobileDayDate = parseISO(mobileDay);
   const mobileClasses = classes.filter((c) => c.startTime?.startsWith(mobileDay));
 
   return (
     <>
       {/* Week nav */}
-      <div className="mb-4 flex items-center justify-center gap-2 sm:mb-6 sm:gap-3">
-        <Button variant="outline" size="icon" onClick={() => shiftWeek(-7)}>
-          <ChevronLeft size={14} />
-        </Button>
-        <span className="text-center text-xs font-medium sm:text-sm">
-          {format(weekStart, "d MMM", { locale: es })} – {format(addDays(weekStart, 6), "d MMM yyyy", { locale: es })}
-        </span>
-        <Button variant="outline" size="icon" onClick={() => shiftWeek(7)}>
-          <ChevronRight size={14} />
-        </Button>
+      <div className="mb-4 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
+          <Button variant="outline" size="icon" onClick={() => shiftWeek(-7)}>
+            <ChevronLeft size={14} />
+          </Button>
+          <span className="text-center text-xs font-medium sm:text-sm">{weekLabel}</span>
+          <Button variant="outline" size="icon" onClick={() => shiftWeek(7)}>
+            <ChevronRight size={14} />
+          </Button>
+        </div>
+        <div className="flex justify-center sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClearWeek}
+            disabled={clearWeekMutation.isPending || classes.length === 0}
+            className="min-h-[44px] border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          >
+            {clearWeekMutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
+            Limpiar semana
+          </Button>
+        </div>
       </div>
 
       {isMobile ? (
