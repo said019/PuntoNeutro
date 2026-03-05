@@ -6459,8 +6459,9 @@ app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
     if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
 
     const created = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // Append T00:00:00 to parse as local midnight (not UTC)
+    const start = new Date(startDate + "T00:00:00");
+    const end = new Date(endDate + "T00:00:00");
 
     // If classTypeId + daysOfWeek provided → generate from form data
     if (classTypeId && Array.isArray(daysOfWeek) && daysOfWeek.length && startTime && endTime) {
@@ -9456,8 +9457,9 @@ app.post("/api/admin/classes/generate", adminMiddleware, async (req, res) => {
     const classTypeRes = await pool.query("SELECT id, name, category FROM class_types WHERE is_active = true");
     const classTypes = classTypeRes.rows;
     const created = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // Append T00:00:00 to parse as local midnight (not UTC)
+    const start = new Date(startDate + "T00:00:00");
+    const end = new Date(endDate + "T00:00:00");
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay(); // Mon=1..Sun=7
       const daySlots = slots.filter(s => s.day_of_week === dayOfWeek);
