@@ -58,6 +58,32 @@ interface Plan extends PlanFormData {
   id: string;
 }
 
+function normalizePlanRow(row: any): Plan {
+  return {
+    id: String(row?.id ?? ""),
+    name: String(row?.name ?? ""),
+    description: String(row?.description ?? ""),
+    price: Number(row?.price ?? 0),
+    currency: String(row?.currency ?? "MXN"),
+    durationDays: Number(row?.durationDays ?? row?.duration_days ?? 30),
+    classLimit: (() => {
+      const raw = row?.classLimit ?? row?.class_limit ?? row?.class_limit_override;
+      if (raw === "" || raw === undefined || raw === null) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : null;
+    })(),
+    classCategory: ((row?.classCategory ?? row?.class_category ?? "all") as CategoryValue),
+    features: Array.isArray(row?.features)
+      ? row.features.join(", ")
+      : String(row?.features ?? ""),
+    isActive: Boolean(row?.isActive ?? row?.is_active ?? true),
+    isNonTransferable: Boolean(row?.isNonTransferable ?? row?.is_non_transferable ?? false),
+    isNonRepeatable: Boolean(row?.isNonRepeatable ?? row?.is_non_repeatable ?? false),
+    repeatKey: String(row?.repeatKey ?? row?.repeat_key ?? ""),
+    sortOrder: Number(row?.sortOrder ?? row?.sort_order ?? 0),
+  };
+}
+
 const EMPTY: PlanFormData = {
   name: "", description: "", price: 0, currency: "MXN",
   durationDays: 30, classLimit: null, classCategory: "all",
@@ -97,7 +123,7 @@ const PlansList = () => {
     queryKey: ["plans"],
     queryFn: async () => (await api.get("/plans")).data,
   });
-  const plans = Array.isArray(data?.data) ? data.data : [];
+  const plans = Array.isArray(data?.data) ? data.data.map(normalizePlanRow) : [];
 
   const form = useForm<PlanFormData>({ resolver: zodResolver(planSchema), defaultValues: EMPTY });
 
@@ -114,7 +140,8 @@ const PlansList = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/plans/${id}`),
+    mutationFn: ({ id, cascade }: { id: string; cascade?: boolean }) =>
+      api.delete(`/plans/${id}${cascade ? "?cascade=true" : ""}`),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["plans"] });
       const msg = res?.data?.message ?? "Plan eliminado";
@@ -198,7 +225,25 @@ const PlansList = () => {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
                             <DropdownMenuItem onClick={() => openEdit(p)}>Editar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este plan?")) deleteMutation.mutate(p.id); }}>Eliminar</DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => updateMutation.mutate({ ...p, isActive: !p.isActive })}
+                            >
+                              {p.isActive ? "Desactivar" : "Activar"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => {
+                                const isLegacySession = p.name === "Sesión Extra (Socias o Inscritas)";
+                                const msg = isLegacySession
+                                  ? "¿Eliminar esta sesión y todos sus datos relacionados?"
+                                  : "¿Eliminar este plan?";
+                                if (window.confirm(msg)) {
+                                  deleteMutation.mutate({ id: p.id, cascade: isLegacySession });
+                                }
+                              }}
+                            >
+                              Eliminar
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

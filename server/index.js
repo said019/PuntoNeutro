@@ -27,6 +27,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || "ophelia_secret_2026";
+const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://ophelia-studio.com.mx").replace(/\/+$/, "");
 
 // ─── Evolution API (WhatsApp) config ────────────────────────────────────────
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "https://evolution-api-production-c1cb.up.railway.app";
@@ -292,6 +293,26 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_weekly_summary BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => { });
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10)`).catch(() => { });
+    // ── Password reset tokens ───────────────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token       VARCHAR(255) NOT NULL UNIQUE,
+        expires_at  TIMESTAMP WITH TIME ZONE NOT NULL,
+        used        BOOLEAN NOT NULL DEFAULT false,
+        created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => { });
+    await pool.query(`ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS used BOOLEAN NOT NULL DEFAULT false`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reset_tokens_token ON password_reset_tokens(token)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens(user_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reset_tokens_expires ON password_reset_tokens(expires_at)`).catch(() => { });
+    // Cleanup best-effort to keep table compact.
+    await pool.query(`
+      DELETE FROM password_reset_tokens
+      WHERE used = true OR expires_at < NOW() - INTERVAL '7 days'
+    `).catch(() => { });
     // Ensure referrals table exists
     await pool.query(`
       CREATE TABLE IF NOT EXISTS referral_codes (
@@ -502,6 +523,37 @@ async function ensureSchema() {
         'Siete Sesiones (28 al Mes)'
       );
     `).catch(() => { });
+    // Remove legacy plan "Sesión Extra (Socias o Inscritas)" and all related data.
+    // This keeps admin clean and avoids accidental reuse of an obsolete plan.
+    try {
+      const legacyPlanName = "Sesión Extra (Socias o Inscritas)";
+      const legacyRes = await pool.query(`SELECT id FROM plans WHERE name = $1`, [legacyPlanName]);
+      if (legacyRes.rows.length) {
+        const legacyIds = legacyRes.rows.map((row) => row.id);
+        const cleanupClient = await pool.connect();
+        try {
+          await cleanupClient.query("BEGIN");
+          await cleanupClient.query(
+            `UPDATE memberships
+                SET order_id = NULL
+              WHERE order_id IN (SELECT id FROM orders WHERE plan_id = ANY($1::uuid[]))`,
+            [legacyIds]
+          ).catch(() => {});
+          await cleanupClient.query(`DELETE FROM discount_codes WHERE plan_id = ANY($1::uuid[])`, [legacyIds]).catch(() => {});
+          await cleanupClient.query(`DELETE FROM memberships WHERE plan_id = ANY($1::uuid[])`, [legacyIds]).catch(() => {});
+          await cleanupClient.query(`DELETE FROM orders WHERE plan_id = ANY($1::uuid[])`, [legacyIds]).catch(() => {});
+          await cleanupClient.query(`DELETE FROM plans WHERE id = ANY($1::uuid[])`, [legacyIds]);
+          await cleanupClient.query("COMMIT");
+        } catch (legacyErr) {
+          await cleanupClient.query("ROLLBACK").catch(() => {});
+          console.warn("[schema] Legacy session cleanup skipped:", legacyErr?.message || legacyErr);
+        } finally {
+          cleanupClient.release();
+        }
+      }
+    } catch (legacyTopErr) {
+      console.warn("[schema] Legacy session lookup failed:", legacyTopErr?.message || legacyTopErr);
+    }
     const plCount = await pool.query("SELECT COUNT(*) FROM plans WHERE is_active = true");
     if (parseInt(plCount.rows[0].count) === 0) {
       await pool.query(`
@@ -1881,6 +1933,15 @@ function signToken(userId) {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: "30d" });
 }
 
+function normalizeEmailAddress(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isStrongPassword(password) {
+  const candidate = String(password || "");
+  return candidate.length >= 8 && /[A-Z]/.test(candidate) && /[0-9]/.test(candidate);
+}
+
 async function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ message: "No autorizado" });
@@ -2010,7 +2071,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 
 // POST /api/auth/forgot-password
 app.post("/api/auth/forgot-password", async (req, res) => {
-  const { email } = req.body;
+  const email = normalizeEmailAddress(req.body?.email);
   if (!email) return res.status(400).json({ message: "Email es requerido" });
 
   try {
@@ -2020,11 +2081,18 @@ app.post("/api/auth/forgot-password", async (req, res) => {
       return res.json({ message: "Si el correo existe, recibirás un enlace de recuperación." });
     }
 
-    const token = crypto.randomUUID();
+    const token = crypto.randomBytes(32).toString("hex");
     // Expiration set to 2 hours from now
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 2);
 
+    // Invalidate older active reset links before creating a new one.
+    await pool.query(
+      `UPDATE password_reset_tokens
+       SET used = true
+       WHERE user_id = $1 AND used = false`,
+      [user.rows[0].id],
+    );
     await pool.query(
       `INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
       [user.rows[0].id, token, expiresAt]
@@ -2032,8 +2100,9 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 
     await sendPasswordResetEmail({
       to: email,
-      name: user.rows[0].display_name,
+      name: user.rows[0].display_name || "Clienta",
       token,
+      resetUrl: `${APP_PUBLIC_URL}/auth/reset-password?token=${encodeURIComponent(token)}`,
     });
 
     return res.json({ message: "Si el correo existe, recibirás un enlace de recuperación." });
@@ -2045,32 +2114,61 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 
 // POST /api/auth/reset-password
 app.post("/api/auth/reset-password", async (req, res) => {
-  const { token, password } = req.body;
+  const token = String(req.body?.token || "").trim();
+  const password = String(req.body?.password || "");
   if (!token || !password) return res.status(400).json({ message: "Datos incompletos" });
+  if (!isStrongPassword(password)) {
+    return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres, una mayúscula y un número." });
+  }
 
+  const client = await pool.connect();
   try {
+    await client.query("BEGIN");
     // Check token validity
-    const t = await pool.query(
-      `SELECT user_id, expires_at, used FROM password_reset_tokens WHERE token = $1`,
+    const t = await client.query(
+      `SELECT user_id, expires_at, used FROM password_reset_tokens WHERE token = $1 FOR UPDATE`,
       [token]
     );
-    if (t.rows.length === 0) return res.status(400).json({ message: "El enlace es inválido o ha expirado." });
+    if (t.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "El enlace es inválido o ha expirado." });
+    }
 
     const dbToken = t.rows[0];
-    if (dbToken.used) return res.status(400).json({ message: "Este enlace ya fue utilizado. Solicita uno nuevo." });
-    if (new Date() > new Date(dbToken.expires_at)) return res.status(400).json({ message: "Este enlace ha expirado." });
+    if (dbToken.used) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "Este enlace ya fue utilizado. Solicita uno nuevo." });
+    }
+    if (new Date() > new Date(dbToken.expires_at)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "Este enlace ha expirado." });
+    }
 
     // Hash new password and update
-    const hash = await bcrypt.hash(password, 10);
-    await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [hash, dbToken.user_id]);
+    const hash = await bcrypt.hash(password, 12);
+    const userUpdate = await client.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [hash, dbToken.user_id]);
+    if (!userUpdate.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "El enlace es inválido o ha expirado." });
+    }
 
-    // Mark token as used
-    await pool.query(`UPDATE password_reset_tokens SET used = true WHERE token = $1`, [token]);
+    // Mark current and any still-active tokens as used for this user.
+    await client.query(
+      `UPDATE password_reset_tokens
+       SET used = true
+       WHERE user_id = $1 AND used = false`,
+      [dbToken.user_id],
+    );
+
+    await client.query("COMMIT");
 
     return res.json({ message: "Contraseña restablecida con éxito." });
   } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (_) { }
     console.error("Auth /reset-password error:", err);
     return res.status(500).json({ message: "Error al actualizar la contraseña." });
+  } finally {
+    client.release();
   }
 });
 
@@ -6445,9 +6543,24 @@ app.get("/api/reports/overview", adminMiddleware, async (req, res) => {
 app.get("/api/reports/revenue", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT DATE_TRUNC('month', created_at) AS month, SUM(total_amount) AS total, COUNT(*) AS count
-       FROM orders WHERE status='approved'
-       GROUP BY month ORDER BY month DESC LIMIT 12`
+      `WITH months AS (
+         SELECT DATE_TRUNC('month', CURRENT_DATE) - (INTERVAL '1 month' * gs.n) AS month_start
+         FROM generate_series(0, 11) AS gs(n)
+       ),
+       orders_by_month AS (
+         SELECT DATE_TRUNC('month', created_at) AS month_start,
+                COALESCE(SUM(total_amount), 0) AS total,
+                COUNT(*) AS count
+           FROM orders
+          WHERE status = 'approved'
+          GROUP BY 1
+       )
+       SELECT m.month_start AS month,
+              COALESCE(o.total, 0) AS amount,
+              COALESCE(o.count, 0) AS count
+         FROM months m
+         LEFT JOIN orders_by_month o ON o.month_start = m.month_start
+        ORDER BY m.month_start ASC`
     );
     return res.json({ data: r.rows });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
@@ -6456,13 +6569,15 @@ app.get("/api/reports/revenue", adminMiddleware, async (req, res) => {
 app.get("/api/reports/classes", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT ct.name, COUNT(b.id) AS bookings, COUNT(CASE WHEN b.status='checked_in' THEN 1 END) AS attended
+      `SELECT ct.name,
+              COUNT(b.id)::INT AS bookings,
+              COUNT(CASE WHEN b.status='checked_in' THEN 1 END)::INT AS attended
        FROM classes c
        JOIN class_types ct ON c.class_type_id=ct.id
        LEFT JOIN bookings b ON b.class_id=c.id
        GROUP BY ct.name ORDER BY bookings DESC LIMIT 10`
     );
-    return res.json({ data: r.rows });
+    return res.json({ data: camelRows(r.rows) });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
@@ -6473,20 +6588,24 @@ app.get("/api/reports/retention", adminMiddleware, async (req, res) => {
               COUNT(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 END) AS new_this_month
        FROM users WHERE role='client'`
     );
-    return res.json({ data: r.rows[0] });
+    return res.json({ data: camelRow(r.rows[0]) });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 app.get("/api/reports/instructors", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT i.display_name, COUNT(c.id) AS classes_taught, COUNT(b.id) AS total_students
+      `SELECT i.id,
+              i.display_name AS name,
+              COUNT(c.id)::INT AS class_count,
+              COUNT(b.id)::INT AS total_students
        FROM instructors i
        LEFT JOIN classes c ON c.instructor_id=i.id
        LEFT JOIN bookings b ON b.class_id=c.id
-       GROUP BY i.id, i.display_name ORDER BY classes_taught DESC`
+       GROUP BY i.id, i.display_name
+       ORDER BY class_count DESC`
     );
-    return res.json({ data: r.rows });
+    return res.json({ data: camelRows(r.rows) });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
@@ -7854,22 +7973,50 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
 
 // DELETE /api/plans/:id
 app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
+  const cascade = parseBooleanFlag(
+    req.query?.cascade ?? req.query?.purgeRelated ?? req.body?.cascade ?? req.body?.purgeRelated
+  );
+  const client = await pool.connect();
   try {
-    // Try hard-delete first; if FK constraint, soft-delete
-    try {
-      await pool.query("DELETE FROM plans WHERE id = $1", [req.params.id]);
-    } catch (delErr) {
-      if (delErr.code === '23503') {
-        // Foreign key violation — soft delete
-        await pool.query("UPDATE plans SET is_active = false, updated_at = NOW() WHERE id = $1", [req.params.id]);
-        return res.json({ message: "Plan desactivado (tiene registros asociados)" });
-      }
-      throw delErr;
+    await client.query("BEGIN");
+
+    if (cascade) {
+      await client.query(
+        `UPDATE memberships
+            SET order_id = NULL
+          WHERE order_id IN (SELECT id FROM orders WHERE plan_id = $1)`,
+        [req.params.id]
+      ).catch(() => {});
+      await client.query("DELETE FROM discount_codes WHERE plan_id = $1", [req.params.id]).catch(() => {});
+      await client.query("DELETE FROM memberships WHERE plan_id = $1", [req.params.id]).catch(() => {});
+      await client.query("DELETE FROM orders WHERE plan_id = $1", [req.params.id]).catch(() => {});
+    }
+
+    const del = await client.query("DELETE FROM plans WHERE id = $1 RETURNING id", [req.params.id]);
+    if (!del.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Plan no encontrado" });
+    }
+
+    await client.query("COMMIT");
+    if (cascade) {
+      return res.json({ message: "Plan y datos relacionados eliminados" });
     }
     return res.json({ message: "Plan eliminado" });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    if (!cascade && err?.code === "23503") {
+      try {
+        await pool.query("UPDATE plans SET is_active = false, updated_at = NOW() WHERE id = $1", [req.params.id]);
+        return res.json({ message: "Plan desactivado (tiene registros asociados)" });
+      } catch (softErr) {
+        console.error("[DELETE /plans soft-delete]", softErr?.message || softErr);
+      }
+    }
     console.error("[DELETE /plans]", err.message);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -8722,7 +8869,7 @@ app.get("/api/products", adminMiddleware, async (req, res) => {
     }
     q += " ORDER BY created_at DESC";
     const r = await pool.query(q, params);
-    return res.json({ data: r.rows });
+    return res.json({ data: camelRows(r.rows) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -8731,13 +8878,14 @@ app.get("/api/products", adminMiddleware, async (req, res) => {
 // POST /api/products
 app.post("/api/products", adminMiddleware, async (req, res) => {
   try {
-    const { name, price, category, stock = 0, sku, isActive = true } = req.body;
+    const { name, price, category, stock = 0, sku } = req.body;
+    const isActive = parseBooleanFlag(req.body?.isActive ?? req.body?.is_active ?? true);
     if (!name) return res.status(400).json({ message: "Nombre requerido" });
     const r = await pool.query(
       "INSERT INTO products (name, price, category, stock, sku, is_active) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
       [name, price || 0, category || "accesorios", stock, sku || null, isActive]
     );
-    return res.status(201).json({ data: r.rows[0] });
+    return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -8746,13 +8894,14 @@ app.post("/api/products", adminMiddleware, async (req, res) => {
 // PUT /api/products/:id
 app.put("/api/products/:id", adminMiddleware, async (req, res) => {
   try {
-    const { name, price, category, stock, sku, isActive } = req.body;
+    const { name, price, category, stock, sku } = req.body;
+    const isActive = parseBooleanFlag(req.body?.isActive ?? req.body?.is_active ?? true);
     const r = await pool.query(
       "UPDATE products SET name=$1, price=$2, category=$3, stock=$4, sku=$5, is_active=$6, updated_at=NOW() WHERE id=$7 RETURNING *",
-      [name, price, category, stock, sku || null, isActive !== false, req.params.id]
+      [name, price, category, stock, sku || null, isActive, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Producto no encontrado" });
-    return res.json({ data: r.rows[0] });
+    return res.json({ data: camelRow(r.rows[0]) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }

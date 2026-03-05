@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
@@ -33,9 +34,35 @@ const ReportsPage = () => {
     queryFn: async () => (await api.get("/reports/instructors")).data,
   });
 
+  const { data: reviewsData } = useQuery({
+    queryKey: ["reports-evaluations"],
+    queryFn: async () => (await api.get("/admin/reviews")).data,
+  });
+
   const o = overview?.data ?? overview ?? {};
 
   const safeArray = (v: any) => (Array.isArray(v) ? v : []);
+  const fmtMonth = (raw: any) => {
+    if (!raw) return "—";
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return String(raw);
+    return new Intl.DateTimeFormat("es-MX", { month: "short", year: "2-digit" }).format(d);
+  };
+
+  const revenueRows = safeArray(revenue?.data ?? revenue);
+  const revenueDataRaw = revenueRows.map((row: any) => ({
+    month: fmtMonth(row.month),
+    amount: Number(row.amount ?? row.total ?? 0),
+    count: Number(row.count ?? 0),
+  })).reverse();
+  const revenueData = revenueDataRaw.length
+    ? revenueDataRaw
+    : Array.from({ length: 6 }).map((_, idx) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - (5 - idx));
+        return { month: fmtMonth(d), amount: 0, count: 0 };
+      });
+
   const classesData = safeArray(classes?.data ?? classes).map((row: any) => ({
     label: row.name ?? row.week ?? "—",
     bookings: Number(row.bookings ?? row.count ?? 0),
@@ -50,6 +77,23 @@ const ReportsPage = () => {
           { month: "Nuevos", rate: Number(retentionRaw.new_this_month ?? retentionRaw.newThisMonth ?? 0) },
         ]
       : [];
+  const instructorsData = safeArray(instructors?.data ?? instructors).map((ins: any, idx: number) => ({
+    id: String(ins.id ?? `ins-${idx}`),
+    name: String(ins.name ?? ins.display_name ?? "Instructor"),
+    classCount: Number(ins.classCount ?? ins.classes_taught ?? 0),
+    totalStudents: Number(ins.totalStudents ?? ins.total_students ?? 0),
+  }));
+  const reviews = safeArray(reviewsData?.data ?? reviewsData)
+    .slice(0, 8)
+    .map((row: any, idx: number) => ({
+      id: String(row.id ?? `review-${idx}`),
+      userName: String(row.user_name ?? row.userName ?? "Clienta"),
+      classTypeName: String(row.class_type_name ?? row.classTypeName ?? "Clase"),
+      rating: Number(row.rating ?? 0),
+      comment: String(row.comment ?? "").trim(),
+      isApproved: Boolean(row.is_approved ?? row.isApproved),
+      createdAt: row.created_at ?? row.createdAt ?? null,
+    }));
 
   const metric = (label: string, value: string | number | undefined, suffix = "") => (
     <Card>
@@ -90,12 +134,12 @@ const ReportsPage = () => {
                 <CardHeader><CardTitle>Ingresos mensuales</CardTitle></CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={safeArray(revenue?.data ?? revenue)}>
+                    <BarChart data={revenueData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Ingresos" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -142,7 +186,7 @@ const ReportsPage = () => {
                 <CardHeader><CardTitle>Clases por instructor</CardTitle></CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {safeArray(instructors?.data ?? instructors).map((ins: any) => (
+                    {instructorsData.map((ins) => (
                       <div key={ins.id} className="flex items-center justify-between text-sm">
                         <span>{ins.name}</span>
                         <div className="flex items-center gap-3">
@@ -158,6 +202,41 @@ const ReportsPage = () => {
               </Card>
             </TabsContent>
           </Tabs>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Evaluaciones recientes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {reviews.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aún no hay evaluaciones registradas.</p>
+              ) : (
+                <div className="space-y-3">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="flex flex-col gap-2 rounded-xl border border-border/70 p-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">
+                          {review.userName} · {review.classTypeName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {review.createdAt ? new Date(review.createdAt).toLocaleString("es-MX") : "Fecha no disponible"}
+                        </p>
+                        <p className="mt-1 text-sm text-foreground/90">
+                          {review.comment || "Sin comentario"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{review.rating}/5</Badge>
+                        <Badge variant={review.isApproved ? "default" : "secondary"}>
+                          {review.isApproved ? "Aprobada" : "Pendiente"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </AdminLayout>
     </AuthGuard>

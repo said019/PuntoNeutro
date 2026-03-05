@@ -425,19 +425,26 @@ async function sendRenewalReminder(opts) {
  * @param {string} opts.to
  * @param {string} opts.name
  * @param {string} opts.token
+ * @param {string=} opts.resetUrl
  */
 async function sendPasswordResetEmail(opts) {
-  const { to, name, token } = opts;
+  const { to, name, token, resetUrl } = opts;
+  const safeName = String(name || "Clienta");
+  const firstName = safeName.trim().split(/\s+/)[0] || "Clienta";
+  const resolvedResetUrl = String(
+    resetUrl || `${SITE_URL}/auth/reset-password?token=${encodeURIComponent(token)}`,
+  );
   const content = `
-    ${h1(`Recupera tu contraseña, ${name.split(" ")[0]} 🔐`)}
+    ${h1(`Recupera tu contraseña, ${firstName} 🔐`)}
     ${p("Hemos recibido una solicitud para cambiar la contraseña de tu cuenta en Ophelia Studio.")}
     ${p("Si fuiste tú, haz clic en el siguiente enlace para crear una contraseña nueva. Este enlace expirará en 2 horas.")}
     ${p("Si no solicitaste este cambio, puedes ignorar este correo; tu cuenta seguirá segura.")}
+    ${small(`Si el botón no abre, copia y pega este enlace en tu navegador:<br><a href="${resolvedResetUrl}" style="color:${B.magenta};word-break:break-all;">${resolvedResetUrl}</a>`)}
   `;
   const html = baseLayout({
     preheader: "Recupera el acceso a tu cuenta de Ophelia Studio",
     content,
-    ctaUrl: `${SITE_URL}/auth/reset-password?token=${token}`,
+    ctaUrl: resolvedResetUrl,
     ctaText: "Reestablecer mi contraseña",
   });
   await sendEmail({ to, subject: "🔐 Restablecer contraseña — Ophelia Studio", html });

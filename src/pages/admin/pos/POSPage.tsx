@@ -33,6 +33,18 @@ interface Product extends ProductFormData { id: string }
 
 interface CartItem { product: Product; qty: number }
 
+function normalizeProduct(row: any): Product {
+  return {
+    id: String(row?.id ?? ""),
+    name: String(row?.name ?? ""),
+    price: Number(row?.price ?? 0),
+    category: (row?.category ?? "accesorios") as ProductFormData["category"],
+    stock: Number(row?.stock ?? 0),
+    sku: String(row?.sku ?? ""),
+    isActive: Boolean(row?.isActive ?? row?.is_active ?? true),
+  };
+}
+
 // ── Products CRUD ────────────────────────────────────────
 const ProductsPage = () => {
   const { toast } = useToast();
@@ -46,7 +58,7 @@ const ProductsPage = () => {
     queryKey: ["products", debouncedSearch],
     queryFn: async () => (await api.get(`/products?search=${debouncedSearch}`)).data,
   });
-  const products = Array.isArray(data?.data) ? data.data : [];
+  const products = Array.isArray(data?.data) ? data.data.map(normalizeProduct) : [];
 
   const form = useForm<ProductFormData>({ resolver: zodResolver(productSchema), defaultValues: { isActive: true, category: "suplementos" } });
 
@@ -79,7 +91,7 @@ const ProductsPage = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => { form.reset(p); setEditing(p); setOpen(true); }}>Editar</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { form.reset(normalizeProduct(p)); setEditing(p); setOpen(true); }}>Editar</DropdownMenuItem>
                     <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este producto?")) deleteMutation.mutate(p.id); }}>Eliminar</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -100,7 +112,7 @@ const ProductsPage = () => {
             </div>
             <div className="space-y-1">
               <Label>Categoría</Label>
-              <Select defaultValue={form.getValues("category")} onValueChange={(v) => form.setValue("category", v as "suplementos")}>
+              <Select value={form.watch("category")} onValueChange={(v) => form.setValue("category", v as ProductFormData["category"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="suplementos">Suplementos</SelectItem>
@@ -136,7 +148,7 @@ const POSTerminal = () => {
     queryKey: ["products", debouncedSearch],
     queryFn: async () => (await api.get(`/products?search=${debouncedSearch}&active=true`)).data,
   });
-  const products = Array.isArray(data?.data) ? data.data : [];
+  const products = Array.isArray(data?.data) ? data.data.map(normalizeProduct) : [];
 
   const addToCart = (p: Product) => {
     setCart((prev) => {
