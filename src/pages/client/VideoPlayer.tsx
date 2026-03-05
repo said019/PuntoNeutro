@@ -59,12 +59,14 @@ const VideoEmbed = ({ url }: { url: string }) => {
   const m = url?.match(/drive\.google\.com\/file\/d\/([^/]+)\/preview/);
   if (m) videoSrc = `/api/drive/video/${m[1]}`;
   return (
-    <video
-      src={videoSrc}
-      controls
-      playsInline
-      className="w-full rounded-xl aspect-video bg-black"
-    />
+    <div className="w-full rounded-xl overflow-hidden bg-black flex items-center justify-center">
+      <video
+        src={videoSrc}
+        controls
+        playsInline
+        className="max-h-[78vh] w-auto max-w-full object-contain"
+      />
+    </div>
   );
 };
 

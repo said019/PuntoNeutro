@@ -610,7 +610,7 @@ const Index = () => {
                       <video
                         ref={(el) => { videoRefs.current[v.id] = el; }}
                         src={videoUrl}
-                        className="absolute inset-0 w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-contain bg-black"
                         controls
                         autoPlay
                         playsInline
@@ -633,7 +633,7 @@ const Index = () => {
                         ) : (
                           <video
                             src={videoUrl}
-                            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                            className="absolute inset-0 w-full h-full object-contain bg-black pointer-events-none"
                             preload="metadata"
                             muted
                             playsInline
