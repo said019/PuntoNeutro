@@ -883,7 +883,7 @@ function GenerateTab({
   const [endTime, setEndTime] = useState("10:00");
   const [classTypeId, setClassTypeId] = useState("");
   const [instructorId, setInstructorId] = useState("");
-  const [maxCapacity, setMaxCapacity] = useState(20);
+  const [maxCapacity, setMaxCapacity] = useState(10);
 
   const selectedType = types.find((t) => t.id === classTypeId);
   const selectedInstructor = instructors.find((i) => i.id === instructorId);

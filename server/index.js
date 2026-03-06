@@ -433,7 +433,7 @@ async function ensureSchema() {
         intensity    VARCHAR(20)  DEFAULT 'media' CHECK (intensity IN ('ligera','media','pesada','todas')),
         level        VARCHAR(50)  DEFAULT 'Todos los niveles',
         duration_min INTEGER      DEFAULT 50,
-        capacity     INTEGER      DEFAULT 15,
+        capacity     INTEGER      DEFAULT 10,
         color        VARCHAR(50)  DEFAULT '#c026d3',
         emoji        VARCHAR(10)  DEFAULT '🏃',
         is_active    BOOLEAN      DEFAULT true,
@@ -447,7 +447,8 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS intensity VARCHAR(20) DEFAULT 'media'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS level VARCHAR(50) DEFAULT 'Todos los niveles'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS duration_min INTEGER DEFAULT 50`).catch(() => { });
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 10`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ALTER COLUMN capacity SET DEFAULT 10`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS color VARCHAR(50) DEFAULT '#c026d3'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS emoji VARCHAR(10) DEFAULT '🏃'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => { });
@@ -5911,7 +5912,7 @@ app.post("/api/admin/class-types", adminMiddleware, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [name.trim(), subtitle || null, description || null,
       category || "jumping", intensity || "media",
-      level || "Todos los niveles", duration_min || 50, capacity || 15,
+      level || "Todos los niveles", duration_min || 50, capacity || 10,
       color || "#c026d3", emoji || "🏃", sort_order ?? 0]
     );
     return res.status(201).json({ data: r.rows[0] });
@@ -6329,7 +6330,7 @@ app.post("/api/class-types", adminMiddleware, async (req, res) => {
     const r = await pool.query(
       `INSERT INTO class_types (name, color, category, duration_min, capacity, is_active, sort_order)
        VALUES ($1,$2,$3,$4,$5,$6,0) RETURNING *`,
-      [name.trim(), color || "#c026d3", cat, defaultDuration || 60, maxCapacity || 20, isActive !== false]
+      [name.trim(), color || "#c026d3", cat, defaultDuration || 60, maxCapacity || 10, isActive !== false]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
