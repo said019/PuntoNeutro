@@ -172,6 +172,16 @@ function instructorPayload(d: InstructorFormData) {
   };
 }
 
+function getFocusFromPointerEvent(event: React.PointerEvent<HTMLElement>) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const nextX = ((event.clientX - rect.left) / rect.width) * 100;
+  const nextY = ((event.clientY - rect.top) / rect.height) * 100;
+  return {
+    x: clampFocus(nextX),
+    y: clampFocus(nextY),
+  };
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PAGE
    ═══════════════════════════════════════════════════════════════════ */
@@ -1256,6 +1266,11 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const focusX = clampFocus(form.watch("photoFocusX"));
   const focusY = clampFocus(form.watch("photoFocusY"));
+  const applyPreviewFocus = (event: React.PointerEvent<HTMLElement>) => {
+    const next = getFocusFromPointerEvent(event);
+    form.setValue("photoFocusX", next.x, { shouldDirty: true, shouldTouch: true });
+    form.setValue("photoFocusY", next.y, { shouldDirty: true, shouldTouch: true });
+  };
 
   return (
     <>
@@ -1299,7 +1314,12 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       {ins.photoUrl ? (
-                        <img src={ins.photoUrl} className="h-9 w-9 rounded-full object-cover ring-2 ring-[#CA71E1]/30" alt="" />
+                        <img
+                          src={ins.photoUrl}
+                          className="h-9 w-9 rounded-full object-cover ring-2 ring-[#CA71E1]/30"
+                          style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }}
+                          alt=""
+                        />
                       ) : (
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#CA71E1] to-[#E15CB8] text-xs font-bold text-white">
                           {ins.displayName?.[0]?.toUpperCase()}
@@ -1367,7 +1387,12 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
                   <TableRow key={ins.id}>
                     <TableCell>
                       {ins.photoUrl ? (
-                        <img src={ins.photoUrl} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#CA71E1]/30" alt="" />
+                        <img
+                          src={ins.photoUrl}
+                          className="w-9 h-9 rounded-full object-cover ring-2 ring-[#CA71E1]/30"
+                          style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }}
+                          alt=""
+                        />
                       ) : (
                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#CA71E1] to-[#E15CB8] flex items-center justify-center text-xs font-bold text-white">
                           {ins.displayName?.[0]?.toUpperCase()}
@@ -1489,16 +1514,39 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
               />
             </div>
             {editing?.photoUrl && (
-              <div className="space-y-1">
-                <Label>Vista previa</Label>
-                <div className="h-36 rounded-xl overflow-hidden border border-border">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Vista previa y enfoque</Label>
+                  <span className="text-[11px] text-muted-foreground">Haz clic o arrastra sobre la cara</span>
+                </div>
+                <button
+                  type="button"
+                  onPointerDown={applyPreviewFocus}
+                  onPointerMove={(event) => {
+                    if (event.buttons !== 1 && event.pointerType !== "touch") return;
+                    applyPreviewFocus(event);
+                  }}
+                  className="group relative mx-auto block h-[360px] w-full max-w-[300px] touch-none overflow-hidden rounded-[28px] border border-white/10 bg-black/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CA71E1]"
+                  aria-label="Seleccionar enfoque de la foto"
+                >
                   <img
                     src={editing.photoUrl}
                     alt={editing.displayName}
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                     style={{ objectPosition: `${focusX}% ${focusY}%` }}
                   />
-                </div>
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+                  <div
+                    className="pointer-events-none absolute h-8 w-8 rounded-full border border-white/80 bg-white/10 shadow-[0_0_0_1px_rgba(0,0,0,0.2)] backdrop-blur-sm"
+                    style={{ left: `${focusX}%`, top: `${focusY}%`, transform: "translate(-50%, -50%)" }}
+                  >
+                    <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+                  </div>
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between px-4 py-3 text-[11px] font-medium text-white/80">
+                    <span>X {focusX}%</span>
+                    <span>Y {focusY}%</span>
+                  </div>
+                </button>
               </div>
             )}
             <div className="flex items-center gap-3">
