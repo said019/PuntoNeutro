@@ -915,7 +915,11 @@ function GenerateTab({
         maxCapacity,
       }),
     onSuccess: (res: any) => toast({ title: `✨ ${res.data?.created ?? 0} clases generadas` }),
-    onError: () => toast({ title: "Error generando clases", variant: "destructive" }),
+    onError: (error: any) =>
+      toast({
+        title: error?.response?.data?.message ?? "Error generando clases",
+        variant: "destructive",
+      }),
   });
 
   const toggleDay = (v: number) => {

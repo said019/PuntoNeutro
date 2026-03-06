@@ -6452,11 +6452,50 @@ app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
   }
 });
 
+function toDbDateString(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function addMinutesToTimeString(timeValue, minutesToAdd) {
+  const [hours, minutes] = String(timeValue || "00:00").split(":").map(Number);
+  const totalMinutes = (hours * 60) + minutes + minutesToAdd;
+  const normalizedMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+  return `${String(Math.floor(normalizedMinutes / 60)).padStart(2, "0")}:${String(normalizedMinutes % 60).padStart(2, "0")}`;
+}
+
+function parseTimeSlotTo24Hour(timeValue) {
+  const raw = String(timeValue || "").trim().toLowerCase();
+  if (!raw) return null;
+
+  const match = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap]m)?$/i);
+  if (!match) return null;
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  const meridiem = match[3];
+
+  if (meridiem === "pm" && hours !== 12) hours += 12;
+  if (meridiem === "am" && hours === 12) hours = 0;
+  if (hours > 23 || minutes > 59) return null;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 // POST /api/classes/generate — bulk generate
 app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
   try {
     const { startDate, endDate, classTypeId, instructorId, daysOfWeek, startTime, endTime, maxCapacity = 10 } = req.body;
     if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
+    if (!classTypeId) return res.status(400).json({ message: "classTypeId requerido" });
+    if (!instructorId) return res.status(400).json({ message: "instructorId requerido" });
+    if (!Array.isArray(daysOfWeek) || !daysOfWeek.length) return res.status(400).json({ message: "Selecciona al menos un día" });
+    if (!/^\d{2}:\d{2}$/.test(String(startTime || "")) || !/^\d{2}:\d{2}$/.test(String(endTime || ""))) {
+      return res.status(400).json({ message: "startTime y endTime deben tener formato HH:mm" });
+    }
 
     const created = [];
     // Append T00:00:00 to parse as local midnight (not UTC)
@@ -6465,18 +6504,19 @@ app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
 
     // If classTypeId + daysOfWeek provided → generate from form data
     if (classTypeId && Array.isArray(daysOfWeek) && daysOfWeek.length && startTime && endTime) {
-      const [sh, sm] = startTime.split(":").map(Number);
-      const [eh, em] = endTime.split(":").map(Number);
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const jsDay = d.getDay(); // 0=Sun,1=Mon...
         if (!daysOfWeek.includes(jsDay)) continue;
-        const classStart = new Date(d); classStart.setHours(sh, sm, 0, 0);
-        const classEnd = new Date(d); classEnd.setHours(eh, em, 0, 0);
-        const exists = await pool.query("SELECT id FROM classes WHERE start_time=$1 AND class_type_id=$2", [classStart.toISOString(), classTypeId]);
+        const classDate = toDbDateString(d);
+        const exists = await pool.query(
+          "SELECT id FROM classes WHERE date = $1 AND start_time = $2 AND class_type_id = $3",
+          [classDate, startTime, classTypeId]
+        );
         if (exists.rows.length) continue;
         const r = await pool.query(
-          "INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, status) VALUES ($1,$2,$3,$4,$5,'scheduled') RETURNING *",
-          [classTypeId, instructorId || null, classStart.toISOString(), classEnd.toISOString(), maxCapacity]
+          `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, status)
+           VALUES ($1,$2,$3,$4,$5,$6,'scheduled') RETURNING *`,
+          [classTypeId, instructorId, classDate, startTime, endTime, maxCapacity]
         );
         created.push(r.rows[0]);
       }
@@ -6491,22 +6531,23 @@ app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
       const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay();
       const daySlots = slotsRes.rows.filter(s => s.day_of_week === dayOfWeek);
       for (const slot of daySlots) {
-        const timeStr = slot.time_slot.toLowerCase();
-        const isPM = timeStr.includes("pm");
-        const cleanTime = timeStr.replace(/[apm\s]/g, "");
-        const [h, m = 0] = cleanTime.split(":").map(Number);
-        const hour = isPM && h !== 12 ? h + 12 : (!isPM && h === 12 ? 0 : h);
-        const classDate = new Date(d); classDate.setHours(hour, m, 0, 0);
-        const endDate2 = new Date(classDate); endDate2.setMinutes(endDate2.getMinutes() + 55);
+        const startTimeValue = parseTimeSlotTo24Hour(slot.time_slot);
+        if (!startTimeValue) continue;
+        const classDate = toDbDateString(d);
+        const endTimeValue = addMinutesToTimeString(startTimeValue, 55);
         const label = slot.class_label?.toLowerCase();
         let ct = classTypes.find(c => c.category?.toLowerCase() === label || c.name?.toLowerCase().includes(label));
         if (!ct) ct = classTypes[0];
         if (!ct) continue;
-        const exists = await pool.query("SELECT id FROM classes WHERE start_time=$1 AND class_type_id=$2", [classDate.toISOString(), ct.id]);
+        const exists = await pool.query(
+          "SELECT id FROM classes WHERE date = $1 AND start_time = $2 AND class_type_id = $3",
+          [classDate, startTimeValue, ct.id]
+        );
         if (exists.rows.length) continue;
         const r = await pool.query(
-          "INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, status) VALUES ($1,$2,$3,$4,10,'scheduled') RETURNING *",
-          [ct.id, instructorId || null, classDate.toISOString(), endDate2.toISOString()]
+          `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, status)
+           VALUES ($1,$2,$3,$4,$5,10,'scheduled') RETURNING *`,
+          [ct.id, instructorId, classDate, startTimeValue, endTimeValue]
         );
         created.push(r.rows[0]);
       }
@@ -9389,10 +9430,10 @@ app.get("/api/admin/classes", adminMiddleware, async (req, res) => {
              LEFT JOIN instructors i ON c.instructor_id = i.id
              WHERE 1=1`;
     const params = [];
-    if (startDate) { params.push(startDate); q += ` AND c.start_time >= $${params.length}`; }
-    if (endDate) { params.push(endDate); q += ` AND c.start_time <= $${params.length}`; }
+    if (startDate) { params.push(startDate); q += ` AND c.date >= $${params.length}`; }
+    if (endDate) { params.push(endDate); q += ` AND c.date <= $${params.length}`; }
     if (instructorId) { params.push(instructorId); q += ` AND c.instructor_id = $${params.length}`; }
-    q += " ORDER BY c.start_time ASC LIMIT 200";
+    q += " ORDER BY c.date ASC, c.start_time ASC LIMIT 200";
     const r = await pool.query(q, params);
     return res.json({ data: r.rows });
   } catch (err) {
@@ -9449,6 +9490,7 @@ app.post("/api/admin/classes/generate", adminMiddleware, async (req, res) => {
   try {
     const { startDate, endDate, instructorId } = req.body;
     if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
+    if (!instructorId) return res.status(400).json({ message: "instructorId requerido" });
     // Get schedule slots
     const slotsRes = await pool.query("SELECT * FROM schedule_templates WHERE is_active = true");
     const slots = slotsRes.rows;
@@ -9464,23 +9506,25 @@ app.post("/api/admin/classes/generate", adminMiddleware, async (req, res) => {
       const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay(); // Mon=1..Sun=7
       const daySlots = slots.filter(s => s.day_of_week === dayOfWeek);
       for (const slot of daySlots) {
-        const [hour, min] = slot.time_slot.replace(/[ap]m/i, "").split(":").map(Number);
-        const isPM = slot.time_slot.toLowerCase().includes("pm") && hour !== 12;
-        const classDate = new Date(d);
-        classDate.setHours(isPM ? hour + 12 : hour, min || 0, 0, 0);
-        const endDate2 = new Date(classDate);
-        endDate2.setMinutes(endDate2.getMinutes() + 55);
+        const classDate = toDbDateString(d);
+        const startTimeValue = parseTimeSlotTo24Hour(slot.time_slot);
+        if (!startTimeValue) continue;
+        const endTimeValue = addMinutesToTimeString(startTimeValue, 55);
         // Pick class type by label
         const label = slot.class_label?.toUpperCase();
         let ct = classTypes.find(ct => ct.category?.toLowerCase() === label?.toLowerCase());
         if (!ct) ct = classTypes[0];
         if (!ct) continue;
         // Check no duplicate
-        const exists = await pool.query("SELECT id FROM classes WHERE start_time = $1 AND class_type_id = $2", [classDate.toISOString(), ct.id]);
+        const exists = await pool.query(
+          "SELECT id FROM classes WHERE date = $1 AND start_time = $2 AND class_type_id = $3",
+          [classDate, startTimeValue, ct.id]
+        );
         if (exists.rows.length) continue;
         const r = await pool.query(
-          "INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, status) VALUES ($1,$2,$3,$4,10,'scheduled') RETURNING *",
-          [ct.id, instructorId || null, classDate.toISOString(), endDate2.toISOString()]
+          `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, status)
+           VALUES ($1,$2,$3,$4,$5,10,'scheduled') RETURNING *`,
+          [ct.id, instructorId, classDate, startTimeValue, endTimeValue]
         );
         created.push(r.rows[0]);
       }

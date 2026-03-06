@@ -57,7 +57,11 @@ const GenerateClasses = () => {
   const generateMutation = useMutation({
     mutationFn: (d: GenerateFormData) => api.post("/classes/generate", d),
     onSuccess: (res: any) => toast({ title: `${res.data?.created ?? "N"} clases generadas` }),
-    onError: () => toast({ title: "Error generando clases", variant: "destructive" }),
+    onError: (error: any) =>
+      toast({
+        title: error?.response?.data?.message ?? "Error generando clases",
+        variant: "destructive",
+      }),
   });
 
   const toggleDay = (v: number) => {
