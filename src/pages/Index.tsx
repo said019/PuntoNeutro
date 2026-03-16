@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import Schedule from "@/components/Schedule";
-import { Dumbbell, Music, Waves, Flame, Zap, Heart, Activity, Sparkles, type LucideIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Dumbbell, Music, Waves, Flame, Zap, Heart, Activity, Sparkles, Flower2, type LucideIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import ophelia14 from "@/assets/ophelia-14.jpg";
 import ophelia15 from "@/assets/ophelia-15.jpg";
 import ophelia28 from "@/assets/ophelia-28.jpg";
@@ -64,7 +64,7 @@ const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
   { id: "c5", name: "Pilates Mat", subtitle: "Core & Postura", description: "Conecta con tu cuerpo, fortalece tu core y mejora tu postura. Pilates en colchoneta desde la base.", category: "pilates", intensity: "ligera", color: "#CA71E1", emoji: "waves", level: "Principiante", duration_min: 50, capacity: 10, is_active: true, sort_order: 5 },
   { id: "c6", name: "Flow Pilates · Sculpt", subtitle: "Fluir & Esculpir", description: "Secuencias fluidas que conectan movimiento y respiración. Esculpe tu cuerpo con control y elegancia.", category: "pilates", intensity: "media", color: "#CA71E1", emoji: "sparkles", level: "Todos los niveles", duration_min: 55, capacity: 10, is_active: true, sort_order: 6 },
   { id: "c7", name: "Hot Pilates · Barralates", subtitle: "Alta Intensidad", description: "Pilates de alta intensidad con accesorios y movimientos de barre. Quema, fortalece, transforma.", category: "pilates", intensity: "pesada", color: "#CA71E1", emoji: "flame", level: "Avanzado", duration_min: 55, capacity: 10, is_active: true, sort_order: 7 },
-  { id: "c8", name: "Yoga", subtitle: "Cuerpo, Mente & Espíritu", description: "Unión del cuerpo, mente y espíritu a través de asanas, pranayama y meditación. Tu momento de paz.", category: "mixto", intensity: "ligera", color: "#E7EB6E", emoji: "heart", level: "Todos los niveles", duration_min: 60, capacity: 10, is_active: true, sort_order: 8 },
+  { id: "c8", name: "Yoga", subtitle: "Cuerpo, Mente & Espíritu", description: "Unión del cuerpo, mente y espíritu a través de asanas, pranayama y meditación. Tu momento de paz.", category: "mixto", intensity: "ligera", color: "#E7EB6E", emoji: "flower2", level: "Todos los niveles", duration_min: 60, capacity: 10, is_active: true, sort_order: 8 },
 ];
 
 const FALLBACK_PACKAGES: PackageRow[] = [
@@ -97,13 +97,15 @@ const GALLERY_IMAGES = [ophelia31, ophelia14, ophelia50, ophelia28, ophelia15, o
 const ICON_MAP: Record<string, LucideIcon> = {
   dumbbell: Dumbbell, music: Music, waves: Waves, flame: Flame,
   zap: Zap, heart: Heart, activity: Activity, sparkles: Sparkles,
+  flower2: Flower2,
 };
 function getCardIcon(emoji?: string, title?: string): LucideIcon {
   if (emoji && ICON_MAP[emoji]) return ICON_MAP[emoji];
   const t = (title || "").toLowerCase();
+  if (t.includes("yoga") || t.includes("mindful") || t.includes("meditation")) return Flower2;
   if (t.includes("fitness") || t.includes("tone") || t.includes("strong")) return Dumbbell;
   if (t.includes("dance") || t.includes("music")) return Music;
-  if (t.includes("pilates") || t.includes("flow") || t.includes("mindful")) return Waves;
+  if (t.includes("pilates") || t.includes("flow")) return Waves;
   if (t.includes("hot") || t.includes("burn")) return Flame;
   if (t.includes("jump") || t.includes("cardio")) return Zap;
   return Activity;
@@ -364,16 +366,22 @@ const Index = () => {
 
       {/* ── DISCIPLINAS — JUMP · PILATES · YOGA ── */}
       <div className="bg-secondary border-t border-b border-border">
-        <div className="grid grid-cols-1 sm:grid-cols-3 text-center">
-          {[
-            { name: "JUMP", color: "#E15CB8", icon: "⚡", desc: "Cardio en trampolín" },
-            { name: "PILATES", color: "#CA71E1", icon: "🧘‍♀️", desc: "Fuerza y control" },
-            { name: "YOGA", color: "#E7EB6E", icon: "🕊️", desc: "Cuerpo, mente y espíritu" },
-          ].map((d, i) => (
-            <div key={i} className="py-10 px-5 border-b sm:border-b-0 sm:border-r border-border last:border-r-0 last:border-b-0 hover:bg-[hsl(var(--primary)/0.03)] transition-colors group cursor-default">
-              <div className="text-[2.8rem] mb-3 group-hover:scale-110 transition-transform">{d.icon}</div>
-              <div className="font-bebas text-[2rem] leading-none mb-2" style={{ color: d.color }}>{d.name}</div>
-              <div className="text-[0.78rem] text-muted-foreground tracking-wide">{d.desc}</div>
+        <div className="grid grid-cols-3 text-center">
+          {([
+            { name: "JUMP", color: "#E15CB8", Icon: Zap, desc: "Cardio en trampolín" },
+            { name: "PILATES", color: "#CA71E1", Icon: Activity, desc: "Fuerza y control" },
+            { name: "YOGA", color: "#E7EB6E", Icon: Flower2, desc: "Cuerpo, mente y espíritu" },
+          ] as const).map((d, i) => (
+            <div key={i} className="py-8 sm:py-10 px-3 sm:px-5 border-r border-border last:border-r-0 hover:bg-[hsl(var(--primary)/0.03)] transition-colors group cursor-default">
+              <div className="flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center"
+                  style={{ backgroundColor: d.color + "15", border: "1px solid " + d.color + "30" }}>
+                  <d.Icon size={28} className="sm:hidden" style={{ color: d.color }} strokeWidth={1.8} />
+                  <d.Icon size={32} className="hidden sm:block" style={{ color: d.color }} strokeWidth={1.8} />
+                </div>
+              </div>
+              <div className="font-bebas text-[1.4rem] sm:text-[2rem] leading-none mb-1 sm:mb-2" style={{ color: d.color }}>{d.name}</div>
+              <div className="text-[0.65rem] sm:text-[0.78rem] text-muted-foreground tracking-wide">{d.desc}</div>
             </div>
           ))}
         </div>
