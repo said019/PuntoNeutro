@@ -269,7 +269,7 @@ const Index = () => {
         }`}
       >
         <a href="#" className="flex items-center">
-          <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 sm:h-20 lg:h-24 w-auto object-contain" />
+          <img src={opheliaLogo} alt="Ophelia Studio" className="h-20 sm:h-24 lg:h-32 w-auto object-contain" />
         </a>
         <ul className="hidden lg:flex gap-8 list-none">
           {[
@@ -428,10 +428,10 @@ const Index = () => {
             </p>
           </div>
           {/* Main carousel */}
-          <div className="relative rounded-3xl overflow-hidden aspect-[16/9] mb-5 group">
+          <div className="relative rounded-3xl overflow-hidden bg-black h-[400px] sm:h-[500px] lg:h-[600px] mb-5 group">
             {GALLERY_IMAGES.map((img, i) => (
               <img key={i} src={img} alt={"Ophelia Studio momento " + (i + 1)}
-                className={"absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 " + (i === galleryIdx ? "opacity-100" : "opacity-0")} />
+                className={"absolute inset-0 w-full h-full object-contain transition-opacity duration-1000 " + (i === galleryIdx ? "opacity-100" : "opacity-0")} />
             ))}
             <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
             <button onClick={() => setGalleryIdx((prev) => (prev - 1 + GALLERY_IMAGES.length) % GALLERY_IMAGES.length)}
