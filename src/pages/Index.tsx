@@ -328,7 +328,7 @@ const Index = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
         </div>
         <div className="relative z-10 text-center px-6 lg:px-[60px] pt-[140px] pb-20 max-w-[900px] mx-auto">
-          <p className="font-gulfs italic text-[clamp(1.1rem,2.2vw,1.6rem)] text-[#F9F7E8]/80 mb-6 animate-fade-up delay-200 tracking-wide">
+          <p className="font-alilato italic text-[clamp(1.1rem,2.2vw,1.6rem)] text-[#F9F7E8]/80 mb-6 animate-fade-up delay-200 tracking-wide">
             &ldquo;Where Focus Goes, Energy Flows&rdquo;
           </p>
           <h1 className="font-bebas text-[clamp(3.5rem,8vw,7rem)] leading-[0.9] tracking-tight text-[#F9F7E8] animate-fade-up delay-400 mb-8">
@@ -405,7 +405,7 @@ const Index = () => {
             que la impulse. No importa tu nivel, tu edad ni tu experiencia —
             aquí cada salto cuenta, cada respiración importa.
           </p>
-          <p className="text-[1rem] text-foreground/80 leading-[1.8] italic font-gulfs">
+          <p className="text-[1rem] text-foreground/80 leading-[1.8] italic font-alilato">
             &ldquo;Creemos en el poder de moverse con intención, en entrenar con alegría
             y en que la mejor versión de ti misma se construye salto a salto.&rdquo;
           </p>
@@ -428,7 +428,7 @@ const Index = () => {
             </p>
           </div>
           {/* Main carousel */}
-          <div className="relative rounded-3xl overflow-hidden aspect-[16/7] mb-5 group">
+          <div className="relative rounded-3xl overflow-hidden aspect-[16/9] mb-5 group">
             {GALLERY_IMAGES.map((img, i) => (
               <img key={i} src={img} alt={"Ophelia Studio momento " + (i + 1)}
                 className={"absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 " + (i === galleryIdx ? "opacity-100" : "opacity-0")} />
@@ -753,6 +753,7 @@ const Index = () => {
               ? instructors.map((inst) => ({
                   key: inst.id,
                   label: inst.displayName,
+                  coachTitle: null as string | null,
                   sub: Array.isArray(inst.specialties)
                     ? (inst.specialties as unknown as string[]).join(" & ")
                     : typeof inst.specialties === "string" && inst.specialties ? inst.specialties : "Instructora",
@@ -763,13 +764,15 @@ const Index = () => {
                   photoFocusY: clampFocus(inst.photoFocusY),
                 }))
               : [
-                  { key: "emi", label: "Emi", sub: "Jumping & Yoga",
-                    bio: "Instructora certificada que combina la energía explosiva del jumping con la calma profunda del yoga. Cada clase con ella es una aventura.",
-                    funFact: "Siempre dice que ya es la última repetición… pero no es verdad 😅",
+                  { key: "emi", label: "Emi", coachTitle: "COACH EMI",
+                    sub: "Hot Pilates · Flow Pilates · Pilates Mat · Jumping Fitness · Jumping Dance",
+                    bio: "Especialista en Pilates y entrenamiento funcional. Enfocada en técnica, control corporal y bienestar integral.",
+                    funFact: "Siempre dice que ya es la última repetición… pero no es verdad",
                     photoUrl: null, photoFocusX: 50, photoFocusY: 50 },
-                  { key: "mon", label: "Mon", sub: "Jumping & Pilates",
-                    bio: "Creadora de Ophelia Studio. Su pasión por el movimiento y su energía contagiosa hacen de cada sesión una experiencia transformadora.",
-                    funFact: "Siempre dice que estará tranquila la clase, pero al final sales temblando 💪",
+                  { key: "mon", label: "Montse", coachTitle: "COACH MON",
+                    sub: "Jumping Fitness · Jumping Dance · Jump & Tone · Strong Jump · Mindful Jump",
+                    bio: "Certificada en Jumping Fitness y Pilates. Apasionada por motivar a cada alumna a dar su mejor versión.",
+                    funFact: "Siempre dice que estará tranquila la clase, pero al final sales temblando",
                     photoUrl: null, photoFocusX: 50, photoFocusY: 50 },
                 ]
             ).map((inst) => (
@@ -792,9 +795,14 @@ const Index = () => {
                   )}
                 </div>
                 <div className="p-7">
+                  {inst.coachTitle && (
+                    <div className="font-bebas text-[1.6rem] tracking-wide leading-none mb-1" style={{ color: "#E7EB6E" }}>
+                      {inst.coachTitle}
+                    </div>
+                  )}
                   <h3 className="font-syne font-bold text-[1.2rem] text-foreground mb-1">{inst.label}</h3>
-                  <p className="text-primary text-[0.85rem] tracking-wide font-medium">{inst.sub}</p>
-                  {inst.bio && <p className="text-[0.8rem] text-muted-foreground mt-2 leading-relaxed line-clamp-3">{inst.bio}</p>}
+                  <p className="text-primary text-[0.78rem] tracking-wide font-medium leading-relaxed">{inst.sub}</p>
+                  {inst.bio && <p className="text-[0.8rem] text-muted-foreground mt-3 leading-relaxed">{inst.bio}</p>}
                   {inst.funFact && (
                     <div className="mt-3 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20">
                       <p className="text-[0.75rem] text-primary italic leading-relaxed">
@@ -820,7 +828,7 @@ const Index = () => {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
               </div>
               <div className="absolute -bottom-4 -right-4 lg:-right-8 bg-primary/90 backdrop-blur-sm rounded-2xl px-6 py-4 shadow-[0_20px_60px_hsl(var(--primary)/0.3)]">
-                <p className="font-gulfs italic text-[1.1rem] text-primary-foreground leading-tight">
+                <p className="font-alilato italic text-[1.1rem] text-primary-foreground leading-tight">
                   &ldquo;Ella era mi<br />lugar seguro&rdquo;
                 </p>
               </div>
@@ -841,7 +849,7 @@ const Index = () => {
                 <p>Este estudio lleva su nombre porque quiero que cada persona que entre
                   sienta lo que yo sentía con ella: <span className="text-foreground font-medium">que pertenece,
                   que es suficiente y que es capaz de todo.</span></p>
-                <p className="font-gulfs italic text-foreground text-[1.1rem]">
+                <p className="font-alilato italic text-foreground text-[1.1rem]">
                   Ophelia es más que un estudio — es un abrazo en forma de movimiento.</p>
               </div>
               <div className="mt-8 flex items-center gap-3">
@@ -876,6 +884,54 @@ const Index = () => {
                 <div className="font-bebas text-[2.5rem] text-foreground/[0.07] leading-none -mb-1">{p.num}</div>
                 <h4 className="font-syne font-bold text-[0.92rem] text-foreground mb-2">{p.title}</h4>
                 <p className="text-[0.8rem] text-muted-foreground leading-[1.65]">{p.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TESTIMONIOS ── */}
+      <section className="py-16 lg:py-24 px-6 lg:px-[60px] bg-secondary">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
+          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
+            <span className="w-[30px] h-[1px] bg-primary inline-block" />
+            Lo que dicen nuestras alumnas
+          </div>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
+            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">EXPERIENCIAS<br />REALES</h2>
+            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
+              Cada historia nos inspira a seguir creando un espacio único.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { name: "Ana García", time: "Alumna desde 2024", text: "Ophelia me cambió la vida. Llegué sin saber nada de jumping y ahora no puedo vivir sin mis clases. El ambiente es increíble y las coaches te motivan como nadie.", stars: 5 },
+              { name: "Laura Martínez", time: "Alumna desde 2025", text: "El pilates con Emi es otra cosa. Salgo de cada clase sintiéndome más fuerte y más conectada con mi cuerpo. Es mi momento favorito de la semana.", stars: 5 },
+              { name: "Sofía Hernández", time: "Alumna desde 2024", text: "Lo que más me gusta de Ophelia es la comunidad. Aquí no te juzgan, te impulsan. Las clases de Mon son pura energía y cada una es diferente.", stars: 5 },
+              { name: "Daniela Ríos", time: "Alumna desde 2025", text: "Probé la clase muestra de jumping y quedé enganchada. La música, la energía, el trampolín… es una experiencia completa. ¡Ya voy por mi tercer paquete!", stars: 5 },
+              { name: "Mariana López", time: "Alumna desde 2024", text: "Nunca pensé que entrenar pudiera ser tan divertido. En Ophelia cada clase se siente como una fiesta. Mis amigas ya se unieron también.", stars: 5 },
+              { name: "Valeria Torres", time: "Alumna desde 2025", text: "El estudio es hermoso, las instalaciones están increíbles y las coaches realmente se preocupan por ti. Ophelia no es un gym, es un espacio para ti.", stars: 5 },
+            ].map((t, i) => (
+              <div key={i} className="rounded-2xl border border-border bg-background p-6 hover:border-primary/30 transition-all flex flex-col gap-4">
+                <div className="flex gap-0.5">
+                  {Array.from({ length: t.stars }).map((_, s) => (
+                    <svg key={s} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-[#E7EB6E]">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  ))}
+                </div>
+                <p className="text-[0.88rem] text-muted-foreground leading-[1.7] flex-1 italic">
+                  &ldquo;{t.text}&rdquo;
+                </p>
+                <div className="flex items-center gap-3 pt-3 border-t border-border">
+                  <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-[0.8rem] font-bold text-primary">
+                    {t.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                  </div>
+                  <div>
+                    <div className="text-[0.85rem] font-medium text-foreground">{t.name}</div>
+                    <div className="text-[0.7rem] text-muted-foreground">{t.time}</div>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

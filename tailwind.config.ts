@@ -65,10 +65,10 @@ export default {
       },
       fontFamily: {
         /* ── Official brand fonts ── */
-        gulfs:   ['"Gulfs"', '"Cormorant Garamond"', 'serif'],
+        gulfs:   ['"Gulfs"', '"Bebas Neue"', 'sans-serif'],
         alilato: ['"Alilato"', '"Jost"', 'sans-serif'],
         /* ── Backwards-compat aliases ── */
-        bebas:   ['"Gulfs"', '"Cormorant Garamond"', 'serif'],
+        bebas:   ['"Gulfs"', '"Bebas Neue"', 'sans-serif'],
         syne:    ['"Alilato"', '"Jost"', 'sans-serif'],
         dm:      ['"Alilato"', '"Jost"', 'sans-serif'],
       },

@@ -4,12 +4,12 @@
    Alilato        →  body / text         (font-alilato)
 
    Fuentes fallback vía Google Fonts @import:
-     Gulfs   → Cormorant Garamond (serif display elegante)
-     Alilato → Jost (geometric sans limpio)
+     Gulfs Display → Bebas Neue (condensed display sans)
+     Alilato       → Jost (geometric sans limpio)
    Las fuentes propietarias Gulfs/Alilato se pueden añadir
    después colocando los archivos en public/fonts/
    ────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Jost:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Jost:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -19,9 +19,9 @@
    sin hardcodear URLs de gstatic que pueden cambiar de versión ── */
 @font-face {
   font-family: 'Gulfs';
-  src: local('Cormorant Garamond SemiBold'),
-       local('Cormorant Garamond');
-  font-weight: 600;
+  src: local('Bebas Neue'),
+       local('BebasNeue-Regular');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
@@ -107,12 +107,12 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Gulfs', 'Cormorant Garamond', serif;
-    font-weight: 600;
+    font-family: 'Gulfs', 'Bebas Neue', sans-serif;
+    font-weight: 400;
   }
 
   .font-gulfs {
-    font-family: 'Gulfs', 'Cormorant Garamond', serif;
+    font-family: 'Gulfs', 'Bebas Neue', sans-serif;
   }
 
   .font-alilato {
@@ -121,8 +121,8 @@
 
   /* Keep legacy classes working */
   .font-bebas {
-    font-family: 'Gulfs', 'Cormorant Garamond', serif;
-    font-weight: 700;
+    font-family: 'Gulfs', 'Bebas Neue', sans-serif;
+    font-weight: 400;
     letter-spacing: 0.02em;
   }
 
