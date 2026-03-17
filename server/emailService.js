@@ -5,7 +5,14 @@
 
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend = null;
+if (process.env.RESEND_API_KEY) {
+  try {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  } catch (err) {
+    console.warn("[Email] Not setting up Resend. Missing or invalid key.");
+  }
+}
 
 // IMPORTANT: Use onboarding@resend.dev until ophelia-studio.com.mx is verified in Resend dashboard
 // Once verified, change this back to: process.env.EMAIL_FROM || "Ophelia Studio <notificaciones@ophelia-studio.com.mx>"
@@ -168,7 +175,7 @@ function fmtTime(timeStr) {
 
 // ─── Core send function ───────────────────────────────────────────────────────
 async function sendEmail({ to, subject, html }) {
-  if (!process.env.RESEND_API_KEY) {
+  if (!resend) {
     console.log(`[Email] RESEND_API_KEY not set — skipping email to ${to} (${subject})`);
     return;
   }
