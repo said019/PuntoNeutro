@@ -1340,10 +1340,11 @@ const SECURITY_AUTH_MAX = Math.max(5, Number(process.env.AUTH_RATE_LIMIT_MAX || 
 app.disable("x-powered-by");
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow non-browser / same-origin server requests (no Origin header).
     if (!origin) return callback(null, true);
     if (CORS_ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-    return callback(new Error("Origen no permitido por CORS"));
+    if (origin.endsWith(".up.railway.app")) return callback(null, true);
+    // Evita lanzar un error 500. Se retorna false para no enviar cabeceras CORS.
+    return callback(null, false);
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
