@@ -743,50 +743,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ── HISTORIA DE OPHELIA ── */}
-      <section className="py-20 lg:py-28 px-6 lg:px-[60px] bg-secondary relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_50%,hsl(var(--primary)/0.06)_0%,transparent_50%)] pointer-events-none" />
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            <div className="relative">
-              <div className="rounded-3xl overflow-hidden aspect-[4/5] relative">
-                <img src={ophelia50} alt="Punto Neutro" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-              </div>
-              <div className="absolute -bottom-4 -right-4 lg:-right-8 bg-primary/90 backdrop-blur-sm rounded-2xl px-6 py-4 shadow-[0_20px_60px_hsl(var(--primary)/0.3)]">
-                <p className="font-alilato italic text-[1.1rem] text-primary-foreground leading-tight">
-                  &ldquo;Ella era mi<br />lugar seguro&rdquo;
-                </p>
-              </div>
-            </div>
-            <div>
-              <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
-                <span className="w-[30px] h-[1px] bg-primary inline-block" />
-                Nuestra historia
-              </div>
-              <h2 className="font-bebas text-[clamp(2.5rem,4vw,4rem)] leading-[0.95] text-foreground mb-8">
-                ¿POR QUÉ<br /><span className="text-primary">&ldquo;OPHELIA&rdquo;?</span>
-              </h2>
-              <div className="space-y-5 text-[0.95rem] text-muted-foreground leading-[1.85]">
-                <p>El nombre <span className="text-foreground font-medium">Punto Neutro</span> viene de mi abuela
-                  <span className="text-primary font-medium"> Ofelia</span> — una mujer fuerte, amorosa y llena de vida.</p>
-                <p>Ella era mi lugar seguro. Su risa llenaba la casa, su abrazo curaba todo
-                  y su fortaleza me enseñó que ser mujer es un superpoder.</p>
-                <p>Este estudio lleva su nombre porque quiero que cada persona que entre
-                  sienta lo que yo sentía con ella: <span className="text-foreground font-medium">que pertenece,
-                    que es suficiente y que es capaz de todo.</span></p>
-                <p className="font-alilato italic text-foreground text-[1.1rem]">
-                  Punto Neutro es más que un estudio — es un abrazo en forma de movimiento.</p>
-              </div>
-              <div className="mt-8 flex items-center gap-3">
-                <div className="w-12 h-[1px] bg-primary" />
-                <span className="text-[0.78rem] text-primary font-medium tracking-wide">Mon — Fundadora</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── POLÍTICAS ── */}
       <section id="politicas" className="py-16 lg:py-24 px-6 lg:px-[60px]">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
@@ -869,8 +825,8 @@ const Index = () => {
               </div>
               <div className="relative z-10 flex gap-3 pt-6 border-t border-[#b5bf9c]/15">
                 {[
-                  { label: "Instagram", href: "https://www.instagram.com/ophelia_studiomx/", short: "ig" },
-                  { label: "Facebook", href: "https://www.facebook.com/profile.php?id=61574872102085", short: "fb" },
+                  { label: "Instagram", href: "https://www.instagram.com/punto_neutro/", short: "ig" },
+                  { label: "Facebook", href: "https://www.facebook.com/puntoneutromx/", short: "fb" },
                 ].map((s) => (
                   <a key={s.short} href={s.href} target="_blank" rel="noopener noreferrer"
                     className="w-10 h-10 rounded-full border border-[#94867a]/30 flex items-center justify-center text-[0.8rem] text-[#94867a]/70 hover:bg-[#94867a]/15 hover:text-[#94867a] transition-all no-underline">{s.short}</a>
@@ -896,8 +852,8 @@ const Index = () => {
               Aquí no solo entrenas… aquí vuelves a ti. Salto a salto, respiración a respiración.
             </p>
             <div className="flex gap-3 mt-6">
-              <a href="https://www.instagram.com/ophelia_studiomx/" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">ig</a>
-              <a href="https://www.facebook.com/profile.php?id=61574872102085" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">fb</a>
+              <a href="https://www.instagram.com/punto_neutro/" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">ig</a>
+              <a href="https://www.facebook.com/puntoneutromx/" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">fb</a>
             </div>
           </div>
           <div>
