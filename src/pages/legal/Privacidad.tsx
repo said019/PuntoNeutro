@@ -20,7 +20,7 @@ const Privacidad = () => {
       {/* Nav */}
       <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border px-6 lg:px-[60px] py-4 flex items-center justify-between">
         <button onClick={() => navigate("/")} className="flex items-center bg-transparent border-none cursor-pointer">
-          <img src={opheliaLogo} alt="Ophelia Jumping Studio" className="h-14 w-auto object-contain" />
+          <img src={opheliaLogo} alt="Punto Neutro" className="h-14 w-auto object-contain" />
         </button>
         <button
           onClick={() => navigate(-1)}
@@ -56,7 +56,7 @@ const Privacidad = () => {
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">1. Responsable del tratamiento</h2>
           <p>
-            <strong className="text-foreground">Ophelia Jumping Studio</strong>, con domicilio en San Juan del Río, Querétaro, México, es responsable del tratamiento de los datos personales que recabamos de usted, en los términos de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).
+            <strong className="text-foreground">Punto Neutro</strong>, con domicilio en San Juan del Río, Querétaro, México, es responsable del tratamiento de los datos personales que recabamos de usted, en los términos de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).
           </p>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">2. Datos personales que recabamos</h2>
@@ -93,7 +93,7 @@ const Privacidad = () => {
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">5. Derechos ARCO</h2>
           <p>
-            Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse (derechos ARCO) al tratamiento de sus datos personales. Para ejercer estos derechos, envíe una solicitud al correo electrónico <strong className="text-primary">info@opheliajumping.mx</strong> indicando:
+            Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse (derechos ARCO) al tratamiento de sus datos personales. Para ejercer estos derechos, envíe una solicitud al correo electrónico <strong className="text-primary">contacto@puntoneutro.mx</strong> indicando:
           </p>
           <ul className="list-disc pl-6 space-y-2">
             <li>Nombre completo y datos de contacto.</li>
@@ -124,7 +124,7 @@ const Privacidad = () => {
             Si tiene alguna duda o comentario sobre este Aviso de Privacidad, puede contactarnos en:
           </p>
           <ul className="list-none space-y-1">
-            <li><strong className="text-foreground">Email:</strong> info@opheliajumping.mx</li>
+            <li><strong className="text-foreground">Email:</strong> contacto@puntoneutro.mx</li>
             <li><strong className="text-foreground">Teléfono:</strong> +52 442 123 4567</li>
             <li><strong className="text-foreground">Dirección:</strong> San Juan del Río, Querétaro, México</li>
           </ul>
@@ -134,7 +134,7 @@ const Privacidad = () => {
 
       {/* Footer */}
       <footer className="border-t border-border px-6 lg:px-[60px] py-6 text-center">
-        <p className="text-xs text-muted-foreground/50">© 2026 Ophelia Jumping Studio. Todos los derechos reservados.</p>
+        <p className="text-xs text-muted-foreground/50">© 2026 Punto Neutro. Todos los derechos reservados.</p>
       </footer>
     </div>
   );

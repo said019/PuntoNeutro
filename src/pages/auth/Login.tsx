@@ -61,7 +61,7 @@ const Login = () => {
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <img
           src={ophelia31}
-          alt="Ophelia Studio"
+          alt="Punto Neutro"
           className="absolute inset-0 w-full h-full object-cover scale-105"
         />
         {/* gradient overlay */}
@@ -72,7 +72,7 @@ const Login = () => {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* logo */}
           <Link to="/" className="block">
-            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
+            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
 
           {/* quote */}
@@ -88,7 +88,7 @@ const Login = () => {
               <span className="[-webkit-text-stroke:2px_hsl(var(--foreground)/0.5)] text-transparent">SALTO</span>
             </h2>
             <p className="text-muted-foreground text-[0.9rem] leading-[1.7] max-w-[340px]">
-              Más de 500 alumnas ya eligieron transformar su cuerpo y liberar su mente en Ophelia Studio.
+              Más de 500 alumnas ya eligieron transformar su cuerpo y liberar su mente en Punto Neutro.
             </p>
             {/* stats */}
             <div className="flex gap-6 mt-8">
@@ -113,7 +113,7 @@ const Login = () => {
 
           {/* Mobile logo */}
           <Link to="/" className="lg:hidden block mb-10">
-            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
+            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
 
           {/* heading */}
@@ -210,7 +210,7 @@ const Login = () => {
           </Link>
 
           <p className="text-center text-xs text-muted-foreground/50 mt-8">
-            © {new Date().getFullYear()} Ophelia Studio · San Juan del Río, Qro.
+            © {new Date().getFullYear()} Punto Neutro · San Juan del Río, Qro.
           </p>
         </div>
       </div>

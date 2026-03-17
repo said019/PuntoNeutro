@@ -14,28 +14,16 @@ import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 
-// Client pages
 import Dashboard from "./pages/client/Dashboard";
 import BookClasses from "./pages/client/BookClasses";
 import BookClassConfirm from "./pages/client/BookClassConfirm";
 import MyBookings from "./pages/client/MyBookings";
 import Checkout from "./pages/client/Checkout";
-import Orders from "./pages/client/Orders";
-import OrderDetail from "./pages/client/OrderDetail";
-import Wallet from "./pages/client/Wallet";
-import WalletHistory from "./pages/client/WalletHistory";
-import WalletRewards from "./pages/client/WalletRewards";
 import Profile from "./pages/client/Profile";
 import ProfileEdit from "./pages/client/ProfileEdit";
-import ProfileMembership from "./pages/client/ProfileMembership";
 import ProfilePreferences from "./pages/client/ProfilePreferences";
-import ReferFriends from "./pages/client/ReferFriends";
-import VideoLibrary from "./pages/client/VideoLibrary";
-import VideoPlayer from "./pages/client/VideoPlayer";
 import Notifications from "./pages/client/Notifications";
-import Events from "./pages/client/Events";
 
-// Admin pages
 import AdminDashboard from "./pages/admin/Dashboard";
 import PlansList from "./pages/admin/plans/PlansList";
 import MembershipsList from "./pages/admin/memberships/MembershipsList";
@@ -47,18 +35,7 @@ import GenerateClasses from "./pages/admin/classes/GenerateClasses";
 import BookingsList from "./pages/admin/bookings/BookingsList";
 import Waitlist from "./pages/admin/bookings/Waitlist";
 import PaymentsPage from "./pages/admin/payments/PaymentsPage";
-import OrdersVerification from "./pages/admin/orders/OrdersVerification";
-import POSPage from "./pages/admin/pos/POSPage";
-import DiscountCodes from "./pages/admin/discount-codes/DiscountCodes";
-import LoyaltyPage from "./pages/admin/loyalty/LoyaltyPage";
-import Referrals from "./pages/admin/referrals/Referrals";
-import VideoList from "./pages/admin/videos/VideoList";
-import VideoUpload from "./pages/admin/videos/VideoUpload";
-import VideoSalesVerification from "./pages/admin/videos/VideoSalesVerification";
-import ReportsPage from "./pages/admin/reports/ReportsPage";
-import AdminReviewsDashboard from "./pages/admin/reviews/AdminReviewsDashboard";
 import SettingsPage from "./pages/admin/settings/SettingsPage";
-import EventsManager from "./pages/admin/events/EventsManager";
 
 // Legal pages
 import Privacidad from "./pages/legal/Privacidad";
@@ -104,19 +81,9 @@ const App = () => (
           <Route path="/app/classes/:classId" element={<BookClassConfirm />} />
           <Route path="/app/bookings" element={<MyBookings />} />
           <Route path="/app/checkout" element={<Checkout />} />
-          <Route path="/app/orders" element={<Orders />} />
-          <Route path="/app/orders/:orderId" element={<OrderDetail />} />
-          <Route path="/app/wallet" element={<Wallet />} />
-          <Route path="/app/wallet/history" element={<WalletHistory />} />
-          <Route path="/app/wallet/rewards" element={<WalletRewards />} />
-          <Route path="/app/videos" element={<VideoLibrary />} />
-          <Route path="/app/videos/:videoId" element={<VideoPlayer />} />
-          <Route path="/app/events" element={<Events />} />
           <Route path="/app/profile" element={<Profile />} />
           <Route path="/app/profile/edit" element={<ProfileEdit />} />
-          <Route path="/app/profile/membership" element={<ProfileMembership />} />
           <Route path="/app/profile/preferences" element={<ProfilePreferences />} />
-          <Route path="/app/profile/refer" element={<ReferFriends />} />
           <Route path="/app/notifications" element={<Notifications />} />
 
           {/* Admin panel */}
@@ -134,18 +101,7 @@ const App = () => (
           <Route path="/admin/bookings/waitlist" element={<Waitlist />} />
           <Route path="/admin/staff" element={<Navigate to="/admin/classes" replace />} />
           <Route path="/admin/payments" element={<PaymentsPage />} />
-          <Route path="/admin/orders" element={<OrdersVerification />} />
-          <Route path="/admin/pos" element={<POSPage />} />
-          <Route path="/admin/discount-codes" element={<DiscountCodes />} />
-          <Route path="/admin/loyalty" element={<LoyaltyPage />} />
-          <Route path="/admin/referrals" element={<Referrals />} />
-          <Route path="/admin/videos" element={<VideoList />} />
-          <Route path="/admin/videos/upload" element={<VideoUpload />} />
-          <Route path="/admin/videos/ventas" element={<VideoSalesVerification />} />
-          <Route path="/admin/reports" element={<ReportsPage />} />
-          <Route path="/admin/reviews" element={<AdminReviewsDashboard />} />
           <Route path="/admin/settings" element={<SettingsPage />} />
-          <Route path="/admin/events" element={<EventsManager />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />

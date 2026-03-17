@@ -164,7 +164,7 @@ const ClientsList = () => {
             </div>
             <button
               onClick={() => setManualOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 transition-opacity"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity"
             >
               <UserPlus size={15} /> Nueva clienta
             </button>
@@ -174,7 +174,7 @@ const ClientsList = () => {
           <div className="relative mb-5 max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
             <Input
-              className="pl-8 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/25 focus:border-[#E15CB8]/40"
+              className="pl-8 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/25 focus:border-[#94867a]/40"
               placeholder="Buscar clienta..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -286,7 +286,7 @@ const ClientsList = () => {
                 <Button
                   type="submit"
                   disabled={updateMutation.isPending}
-                  className="bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white border-0"
+                  className="bg-gradient-to-r from-[#94867a] to-[#b5bf9c] text-white border-0"
                 >
                   Actualizar
                 </Button>
@@ -300,7 +300,7 @@ const ClientsList = () => {
           <DialogContent className="max-w-xl bg-[#0f0518] border-white/10 text-white max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-white flex items-center gap-2">
-                <UserPlus size={18} className="text-[#E15CB8]" />
+                <UserPlus size={18} className="text-[#94867a]" />
                 Nueva clienta
               </DialogTitle>
               <p className="text-xs text-white/35 mt-0.5">Registro manual · La clienta recibe su contraseña por email</p>
@@ -309,7 +309,7 @@ const ClientsList = () => {
             <form onSubmit={manualForm.handleSubmit(onManualSubmit)} className="space-y-5 pt-1">
               {/* Personal info */}
               <div>
-                <p className="text-[11px] text-[#E15CB8]/70 font-semibold uppercase tracking-wider mb-3">Datos personales</p>
+                <p className="text-[11px] text-[#94867a]/70 font-semibold uppercase tracking-wider mb-3">Datos personales</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1 col-span-2">
                     <Label className="text-white/60 text-xs">Nombre completo *</Label>
@@ -359,7 +359,7 @@ const ClientsList = () => {
 
               {/* Plan (optional) */}
               <div>
-                <p className="text-[11px] text-[#CA71E1]/70 font-semibold uppercase tracking-wider mb-3">Membresía (opcional)</p>
+                <p className="text-[11px] text-[#b5bf9c]/70 font-semibold uppercase tracking-wider mb-3">Membresía (opcional)</p>
                 <div className="space-y-3">
                   <div className="space-y-1">
                     <Label className="text-white/60 text-xs">Plan</Label>
@@ -386,9 +386,9 @@ const ClientsList = () => {
 
                   {/* Show price of selected plan */}
                   {selectedPlan && (
-                    <div className="flex items-center justify-between rounded-xl border border-[#CA71E1]/20 bg-[#CA71E1]/5 px-4 py-2.5">
+                    <div className="flex items-center justify-between rounded-xl border border-[#b5bf9c]/20 bg-[#b5bf9c]/5 px-4 py-2.5">
                       <span className="text-sm text-white/70">{selectedPlan.name}</span>
-                      <span className="text-lg font-bold text-[#CA71E1]">${selectedPlan.price.toLocaleString("es-MX")}</span>
+                      <span className="text-lg font-bold text-[#b5bf9c]">${selectedPlan.price.toLocaleString("es-MX")}</span>
                     </div>
                   )}
 
@@ -405,7 +405,7 @@ const ClientsList = () => {
                             className={cn(
                               "flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-all",
                               paymentMethod === value
-                                ? "border-[#E15CB8]/50 bg-[#E15CB8]/10 text-[#E15CB8]"
+                                ? "border-[#94867a]/50 bg-[#94867a]/10 text-[#94867a]"
                                 : "border-white/[0.07] bg-white/[0.02] text-white/40 hover:border-white/20 hover:text-white/60"
                             )}
                           >
@@ -449,7 +449,7 @@ const ClientsList = () => {
                 <Button
                   type="submit"
                   disabled={manualMutation.isPending}
-                  className="bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white border-0 min-w-[140px]"
+                  className="bg-gradient-to-r from-[#94867a] to-[#b5bf9c] text-white border-0 min-w-[140px]"
                 >
                   {manualMutation.isPending ? "Registrando…" : selectedPlanId && selectedPlanId !== "none" ? "Registrar + activar plan" : "Registrar clienta"}
                 </Button>

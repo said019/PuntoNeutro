@@ -39,9 +39,9 @@ interface ClientOption {
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; className: string }> = {
-  confirmed:  { label: "Confirmada",   className: "text-[#E7EB6E] border-[#E7EB6E]/30 bg-[#E7EB6E]/5" },
+  confirmed:  { label: "Confirmada",   className: "text-[#ebede5] border-[#ebede5]/30 bg-[#ebede5]/5" },
   checked_in: { label: "Asistió ✓",   className: "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/5" },
-  waitlist:   { label: "Lista espera", className: "text-[#CA71E1] border-[#CA71E1]/30 bg-[#CA71E1]/5" },
+  waitlist:   { label: "Lista espera", className: "text-[#b5bf9c] border-[#b5bf9c]/30 bg-[#b5bf9c]/5" },
   no_show:    { label: "No asistió",   className: "text-[#f87171] border-[#f87171]/30 bg-[#f87171]/5" },
   cancelled:  { label: "Cancelada",    className: "text-white/30 border-white/10 bg-white/3" },
 };
@@ -128,7 +128,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
               <div className="flex items-center gap-2 mb-1">
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: classInfo.color || "#E15CB8" }}
+                  style={{ backgroundColor: classInfo.color || "#94867a" }}
                 />
                 <h2 className="text-xl font-bold text-white">{classInfo.classTypeName}</h2>
               </div>
@@ -141,7 +141,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
             </div>
             <button
               onClick={() => refetch()}
-              className="text-xs text-[#CA71E1]/60 hover:text-[#CA71E1] transition-colors flex items-center gap-1"
+              className="text-xs text-[#b5bf9c]/60 hover:text-[#b5bf9c] transition-colors flex items-center gap-1"
             >
               <Clock size={11} /> Actualizar
             </button>
@@ -151,7 +151,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
             <Button
               size="sm"
               onClick={() => setAssignOpen(true)}
-              className="bg-gradient-to-r from-[#CA71E1] to-[#E15CB8] text-white"
+              className="bg-gradient-to-r from-[#b5bf9c] to-[#94867a] text-white"
             >
               <Plus size={14} className="mr-1" /> Asignar miembro
             </Button>
@@ -160,9 +160,9 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
             {[
-              { label: "Confirmadas", value: confirmed, color: "#E7EB6E" },
+              { label: "Confirmadas", value: confirmed, color: "#ebede5" },
               { label: "Asistieron",  value: checkedIn, color: "#4ade80" },
-              { label: "Lista esp.",  value: waitlist,  color: "#CA71E1" },
+              { label: "Lista esp.",  value: waitlist,  color: "#b5bf9c" },
               { label: "No asistió",  value: noShow,    color: "#f87171" },
             ].map((s) => (
               <div key={s.label} className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-center">
@@ -206,7 +206,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                     "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
                     entry.status === "checked_in"
                       ? "bg-[#4ade80]/20 text-[#4ade80] border border-[#4ade80]/30"
-                      : "bg-gradient-to-br from-[#E15CB8]/20 to-[#CA71E1]/10 border border-[#E15CB8]/20 text-[#E15CB8]"
+                      : "bg-gradient-to-br from-[#94867a]/20 to-[#b5bf9c]/10 border border-[#94867a]/20 text-[#94867a]"
                   )}>
                     {entry.status === "checked_in"
                       ? <UserCheck size={16} />
@@ -221,7 +221,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                       {entry.phone && <span className="text-xs text-white/25">{entry.phone}</span>}
                     </div>
                     {entry.planName && (
-                      <p className="text-[10px] text-[#CA71E1]/60 mt-0.5">
+                      <p className="text-[10px] text-[#b5bf9c]/60 mt-0.5">
                         {entry.planName}
                         {entry.classesRemaining !== null
                           ? ` · ${entry.classesRemaining} clases restantes`
@@ -356,7 +356,7 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
         </button>
         <button
           onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-          className="ml-2 text-xs text-[#E15CB8]/60 hover:text-[#E15CB8] transition-colors"
+          className="ml-2 text-xs text-[#94867a]/60 hover:text-[#94867a] transition-colors"
         >
           Hoy
         </button>
@@ -384,12 +384,12 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
               <div className="flex items-center gap-2 mb-2">
                 <p className={cn(
                   "text-xs font-semibold uppercase tracking-wider",
-                  isToday ? "text-[#E15CB8]" : "text-white/30"
+                  isToday ? "text-[#94867a]" : "text-white/30"
                 )}>
                   {format(day, "EEEE d", { locale: es })}
                 </p>
                 {isToday && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E15CB8]/15 text-[#E15CB8] border border-[#E15CB8]/25 font-semibold">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#94867a]/15 text-[#94867a] border border-[#94867a]/25 font-semibold">
                     Hoy
                   </span>
                 )}
@@ -412,11 +412,11 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
                       <button
                         key={cls.id}
                         onClick={() => onSelectClass(cls.id)}
-                        className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-[#E15CB8]/30 hover:bg-[#E15CB8]/5 transition-all group text-left"
+                        className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-[#94867a]/30 hover:bg-[#94867a]/5 transition-all group text-left"
                       >
                         <span
                           className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: cls.class_type_color ?? cls.color ?? "#E15CB8" }}
+                          style={{ backgroundColor: cls.class_type_color ?? cls.color ?? "#94867a" }}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-white/85 truncate">
@@ -433,11 +433,11 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
                           </div>
                           <div className="w-12 h-1.5 rounded-full bg-white/10 overflow-hidden">
                             <div
-                              className={cn("h-full rounded-full transition-all", full ? "bg-[#f87171]" : "bg-[#E15CB8]")}
+                              className={cn("h-full rounded-full transition-all", full ? "bg-[#f87171]" : "bg-[#94867a]")}
                               style={{ width: `${pct}%` }}
                             />
                           </div>
-                          <ChevronRight size={14} className="text-white/20 group-hover:text-[#E15CB8]/60 transition-colors" />
+                          <ChevronRight size={14} className="text-white/20 group-hover:text-[#94867a]/60 transition-colors" />
                         </div>
                       </button>
                     );

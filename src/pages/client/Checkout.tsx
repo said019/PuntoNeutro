@@ -47,9 +47,9 @@ const PlanCard = ({
     category === "pilates" ? "Pilates" :
     category === "mixto" ? "Mixto" : "General";
   const accent =
-    category === "jumping" ? "#E15CB8" :
-    category === "pilates" ? "#E7EB6E" :
-    category === "mixto" ? "#CA71E1" : "#CA71E1";
+    category === "jumping" ? "#94867a" :
+    category === "pilates" ? "#ebede5" :
+    category === "mixto" ? "#b5bf9c" : "#b5bf9c";
   const iconSrc =
     category === "jumping" ? imgTrampoline :
     category === "pilates" ? imgPilates :
@@ -62,13 +62,13 @@ const PlanCard = ({
       className={cn(
         "relative w-full text-left rounded-2xl border p-4 transition-all duration-200 overflow-hidden",
         selected
-          ? "border-[#E15CB8]/60 bg-gradient-to-br from-[#E15CB8]/10 to-[#CA71E1]/5 shadow-[0_0_20px_rgba(225,92,184,0.15)]"
+          ? "border-[#94867a]/60 bg-gradient-to-br from-[#94867a]/10 to-[#b5bf9c]/5 shadow-[0_0_20px_rgba(225,92,184,0.15)]"
           : "border-white/[0.08] bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
       )}
     >
       <div className="pointer-events-none absolute -top-12 -right-10 h-28 w-28 rounded-full opacity-30 blur-2xl" style={{ backgroundColor: accent }} />
       {selected && (
-        <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center">
+        <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-gradient-to-br from-[#94867a] to-[#b5bf9c] flex items-center justify-center">
           <Check size={11} className="text-white" />
         </span>
       )}
@@ -92,12 +92,12 @@ const PlanCard = ({
       </div>
       <div className="flex flex-wrap gap-2 mt-2">
         {durationDays > 0 && (
-          <span className="text-[10px] text-[#CA71E1]/70 bg-[#CA71E1]/8 border border-[#CA71E1]/15 rounded-full px-2 py-0.5">
+          <span className="text-[10px] text-[#b5bf9c]/70 bg-[#b5bf9c]/8 border border-[#b5bf9c]/15 rounded-full px-2 py-0.5">
             {durationDays} días
           </span>
         )}
         {Number(classLimit) > 0 && (
-          <span className="text-[10px] text-[#E7EB6E]/70 bg-[#E7EB6E]/8 border border-[#E7EB6E]/15 rounded-full px-2 py-0.5">
+          <span className="text-[10px] text-[#ebede5]/70 bg-[#ebede5]/8 border border-[#ebede5]/15 rounded-full px-2 py-0.5">
             {classLimit} clases
           </span>
         )}
@@ -138,12 +138,12 @@ const StepBar = ({ current }: { current: Step }) => {
         return (
           <div key={s.id} className="flex items-center gap-1">
             {i > 0 && (
-              <div className={cn("h-px w-6 rounded", done ? "bg-[#E15CB8]/60" : "bg-white/10")} />
+              <div className={cn("h-px w-6 rounded", done ? "bg-[#94867a]/60" : "bg-white/10")} />
             )}
             <div className={cn(
               "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all",
               active
-                ? "border-[#E15CB8]/40 bg-[#E15CB8]/10 text-[#E15CB8]"
+                ? "border-[#94867a]/40 bg-[#94867a]/10 text-[#94867a]"
                 : done
                   ? "border-[#4ade80]/30 bg-[#4ade80]/5 text-[#4ade80]"
                   : "border-white/10 text-white/25"
@@ -262,7 +262,7 @@ const Checkout = () => {
                 <div className="space-y-5">
                   {sortedCategories.map((cat) => (
                     <div key={cat}>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#CA71E1]/60">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#b5bf9c]/60">
                         {categoryLabel(cat)}
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -285,7 +285,7 @@ const Checkout = () => {
                   {/* Discount code */}
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Tag size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#E7EB6E]/50" />
+                      <Tag size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#ebede5]/50" />
                       <Input
                         className="pl-8 bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/25 uppercase"
                         placeholder="Código de descuento"
@@ -296,7 +296,7 @@ const Checkout = () => {
                     <button
                       onClick={() => validateCodeMutation.mutate()}
                       disabled={!discountCode || validateCodeMutation.isPending}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#E7EB6E]/30 text-[#E7EB6E] bg-[#E7EB6E]/5 hover:bg-[#E7EB6E]/10 transition-all disabled:opacity-40"
+                      className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#ebede5]/30 text-[#ebede5] bg-[#ebede5]/5 hover:bg-[#ebede5]/10 transition-all disabled:opacity-40"
                     >
                       Aplicar
                     </button>
@@ -316,7 +316,7 @@ const Checkout = () => {
 
                   <button
                     onClick={() => setStep("method")}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 transition-opacity"
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity"
                   >
                     Seleccionar método de pago <ChevronRight size={15} />
                   </button>
@@ -333,7 +333,7 @@ const Checkout = () => {
               </button>
 
               {/* Selected plan summary */}
-              <div className="rounded-2xl border border-[#E15CB8]/20 bg-[#E15CB8]/5 px-4 py-3 flex justify-between items-center">
+              <div className="rounded-2xl border border-[#94867a]/20 bg-[#94867a]/5 px-4 py-3 flex justify-between items-center">
                 <span className="text-sm text-white/70">{selectedPlan?.name}</span>
                 <span className="text-lg font-bold text-white">${finalAmount.toLocaleString("es-MX")} MXN</span>
               </div>
@@ -348,24 +348,24 @@ const Checkout = () => {
                   className={cn(
                     "flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all",
                     paymentMethod === "transfer"
-                      ? "border-[#CA71E1]/50 bg-[#CA71E1]/10 shadow-[0_0_16px_rgba(202,113,225,0.15)]"
+                      ? "border-[#b5bf9c]/50 bg-[#b5bf9c]/10 shadow-[0_0_16px_rgba(202,113,225,0.15)]"
                       : "border-white/[0.08] bg-white/[0.02] hover:border-white/20"
                   )}
                 >
                   <div className={cn(
                     "w-12 h-12 rounded-xl flex items-center justify-center",
-                    paymentMethod === "transfer" ? "bg-[#CA71E1]/20 text-[#CA71E1]" : "bg-white/5 text-white/40"
+                    paymentMethod === "transfer" ? "bg-[#b5bf9c]/20 text-[#b5bf9c]" : "bg-white/5 text-white/40"
                   )}>
                     <Building2 size={22} />
                   </div>
                   <div className="text-center">
-                    <p className={cn("text-sm font-semibold", paymentMethod === "transfer" ? "text-[#CA71E1]" : "text-white/60")}>
+                    <p className={cn("text-sm font-semibold", paymentMethod === "transfer" ? "text-[#b5bf9c]" : "text-white/60")}>
                       Transferencia
                     </p>
                     <p className="text-[10px] text-white/30 mt-0.5">SPEI / banco</p>
                   </div>
                   {paymentMethod === "transfer" && (
-                    <span className="w-5 h-5 rounded-full bg-gradient-to-br from-[#CA71E1] to-[#E15CB8] flex items-center justify-center">
+                    <span className="w-5 h-5 rounded-full bg-gradient-to-br from-[#b5bf9c] to-[#94867a] flex items-center justify-center">
                       <Check size={10} className="text-white" />
                     </span>
                   )}
@@ -378,24 +378,24 @@ const Checkout = () => {
                   className={cn(
                     "flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all",
                     paymentMethod === "cash"
-                      ? "border-[#E7EB6E]/50 bg-[#E7EB6E]/10 shadow-[0_0_16px_rgba(231,235,110,0.12)]"
+                      ? "border-[#ebede5]/50 bg-[#ebede5]/10 shadow-[0_0_16px_rgba(231,235,110,0.12)]"
                       : "border-white/[0.08] bg-white/[0.02] hover:border-white/20"
                   )}
                 >
                   <div className={cn(
                     "w-12 h-12 rounded-xl flex items-center justify-center",
-                    paymentMethod === "cash" ? "bg-[#E7EB6E]/20 text-[#E7EB6E]" : "bg-white/5 text-white/40"
+                    paymentMethod === "cash" ? "bg-[#ebede5]/20 text-[#ebede5]" : "bg-white/5 text-white/40"
                   )}>
                     <Banknote size={22} />
                   </div>
                   <div className="text-center">
-                    <p className={cn("text-sm font-semibold", paymentMethod === "cash" ? "text-[#E7EB6E]" : "text-white/60")}>
+                    <p className={cn("text-sm font-semibold", paymentMethod === "cash" ? "text-[#ebede5]" : "text-white/60")}>
                       Efectivo
                     </p>
                     <p className="text-[10px] text-white/30 mt-0.5">Pagar en estudio</p>
                   </div>
                   {paymentMethod === "cash" && (
-                    <span className="w-5 h-5 rounded-full bg-[#E7EB6E] flex items-center justify-center">
+                    <span className="w-5 h-5 rounded-full bg-[#ebede5] flex items-center justify-center">
                       <Check size={10} className="text-[#080808]" />
                     </span>
                   )}
@@ -405,7 +405,7 @@ const Checkout = () => {
               <button
                 onClick={() => createOrderMutation.mutate()}
                 disabled={createOrderMutation.isPending}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {createOrderMutation.isPending
                   ? <Loader2 className="animate-spin" size={16} />
@@ -418,8 +418,8 @@ const Checkout = () => {
           {/* ── Step 3a: Bank details (transfer) ── */}
           {step === "bank" && bankDetails && (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-[#CA71E1]/20 bg-[#CA71E1]/5 p-5 space-y-4">
-                <p className="text-sm font-semibold text-[#CA71E1]">Datos de transferencia SPEI</p>
+              <div className="rounded-2xl border border-[#b5bf9c]/20 bg-[#b5bf9c]/5 p-5 space-y-4">
+                <p className="text-sm font-semibold text-[#b5bf9c]">Datos de transferencia SPEI</p>
                 <p className="text-xs text-white/40">Realiza la transferencia con los siguientes datos. Luego sube tu comprobante.</p>
                 {[
                   { label: "CLABE", value: bankDetails.clabe },
@@ -434,7 +434,7 @@ const Checkout = () => {
                       <span className="font-mono text-sm font-semibold text-white/80">{value}</span>
                       <button
                         onClick={() => { navigator.clipboard.writeText(String(value)); toast({ title: "Copiado" }); }}
-                        className="text-[#CA71E1]/50 hover:text-[#CA71E1] transition-colors"
+                        className="text-[#b5bf9c]/50 hover:text-[#b5bf9c] transition-colors"
                       >
                         <Copy size={13} />
                       </button>
@@ -444,7 +444,7 @@ const Checkout = () => {
               </div>
               <button
                 onClick={() => setStep("upload")}
-                className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 transition-opacity"
+                className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity"
               >
                 Ya realicé la transferencia →
               </button>
@@ -454,11 +454,11 @@ const Checkout = () => {
           {/* ── Step 3b: Cash in studio ── */}
           {step === "cash" && (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-[#E7EB6E]/20 bg-[#E7EB6E]/5 p-6 text-center space-y-3">
-                <div className="w-14 h-14 rounded-2xl bg-[#E7EB6E]/15 flex items-center justify-center mx-auto">
-                  <Banknote size={26} className="text-[#E7EB6E]" />
+              <div className="rounded-2xl border border-[#ebede5]/20 bg-[#ebede5]/5 p-6 text-center space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-[#ebede5]/15 flex items-center justify-center mx-auto">
+                  <Banknote size={26} className="text-[#ebede5]" />
                 </div>
-                <p className="font-semibold text-[#E7EB6E]">Pago en el estudio</p>
+                <p className="font-semibold text-[#ebede5]">Pago en el estudio</p>
                 <p className="text-sm text-white/50">
                   Acércate a la recepción con el número de orden para completar tu pago en efectivo.
                 </p>
@@ -474,7 +474,7 @@ const Checkout = () => {
               </div>
               <button
                 onClick={() => window.location.replace("/app/orders")}
-                className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 transition-opacity"
+                className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity"
               >
                 Ver mis órdenes
               </button>
@@ -493,7 +493,7 @@ const Checkout = () => {
                   "border-2 border-dashed rounded-2xl p-8 cursor-pointer text-center transition-all",
                   file
                     ? "border-[#4ade80]/40 bg-[#4ade80]/5"
-                    : "border-white/[0.10] hover:border-[#E15CB8]/30 hover:bg-[#E15CB8]/3"
+                    : "border-white/[0.10] hover:border-[#94867a]/30 hover:bg-[#94867a]/3"
                 )}
               >
                 <input
@@ -520,7 +520,7 @@ const Checkout = () => {
               <button
                 onClick={() => uploadProofMutation.mutate()}
                 disabled={!file || uploadProofMutation.isPending}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {uploadProofMutation.isPending ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
                 {uploadProofMutation.isPending ? "Enviando…" : "Enviar comprobante"}

@@ -6,16 +6,15 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import opheliaLogo from "@/assets/ophelia-logo-full.png";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
-  BookOpen, DollarSign, ShoppingBag,
-  ShoppingCart, Tag, Gift, Video, BarChart2,
-  Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, Ticket, X,
+  BookOpen, DollarSign,
+  Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, X,
 } from "lucide-react";
 
 const NAV_GROUPS = [
   {
     label: "Principal",
     collapsible: false,
-    accentColor: "#E15CB8",
+    accentColor: "#94867a",
     items: [
       { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { path: "/admin/clients", label: "Clientes", icon: Users },
@@ -26,25 +25,18 @@ const NAV_GROUPS = [
   {
     label: "Gestión",
     collapsible: true,
-    accentColor: "#CA71E1",
+    accentColor: "#b5bf9c",
     items: [
       { path: "/admin/plans", label: "Planes", icon: Package },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
       { path: "/admin/classes", label: "Clases", icon: CalendarDays },
-      { path: "/admin/orders", label: "Órdenes", icon: ShoppingBag },
-      { path: "/admin/pos", label: "POS", icon: ShoppingCart },
-      { path: "/admin/discount-codes", label: "Descuentos", icon: Tag },
-      { path: "/admin/loyalty", label: "Lealtad", icon: Gift },
-      { path: "/admin/videos", label: "Videos", icon: Video },
-      { path: "/admin/events", label: "Eventos", icon: Ticket },
     ],
   },
   {
     label: "Sistema",
     collapsible: false,
-    accentColor: "#E15CB8",
+    accentColor: "#94867a",
     items: [
-      { path: "/admin/reports", label: "Reportes", icon: BarChart2 },
       { path: "/admin/settings", label: "Configuración", icon: Settings },
     ],
   },
@@ -126,7 +118,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           )}
         >
           {!isCompact && (
-            <img src={opheliaLogo} alt="Ophelia" className="h-14 w-auto object-contain" />
+            <img src={opheliaLogo} alt="Punto Neutro" className="h-14 w-auto object-contain" />
           )}
 
           <button
@@ -141,7 +133,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             onClick={() => setCollapsed((v) => !v)}
             className={cn(
               "hidden lg:flex items-center justify-center w-7 h-7 rounded-lg transition-all",
-              "text-[#CA71E1]/60 hover:text-[#CA71E1] hover:bg-[#CA71E1]/10",
+              "text-[#b5bf9c]/60 hover:text-[#b5bf9c] hover:bg-[#b5bf9c]/10",
             )}
             aria-label="Contraer menú"
           >
@@ -235,7 +227,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             title={isCompact ? "Ver sitio" : undefined}
             className={cn(
               "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 no-underline transition-all",
-              "text-white/35 hover:text-[#E7EB6E] hover:bg-[#E7EB6E]/5 border border-transparent",
+              "text-white/35 hover:text-[#ebede5] hover:bg-[#ebede5]/5 border border-transparent",
               isCompact && "justify-center px-0",
             )}
           >
@@ -276,13 +268,13 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             )}
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-[#E7EB6E]/70 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#E7EB6E] shadow-[0_0_6px_#E7EB6E] animate-pulse" />
+            <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-[#ebede5]/70 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#ebede5] shadow-[0_0_6px_#ebede5] animate-pulse" />
               En línea
             </span>
             <div className="w-px h-4 bg-white/10 hidden sm:block" />
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center text-[11px] font-bold text-white shadow-[0_0_10px_rgba(225,92,184,0.4)]">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#94867a] to-[#b5bf9c] flex items-center justify-center text-[11px] font-bold text-white shadow-[0_0_10px_rgba(225,92,184,0.4)]">
                 {user?.displayName?.[0]?.toUpperCase() ?? user?.display_name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "A"}
               </div>
               {!isCompact && (
@@ -308,7 +300,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       className={cn(
                         "flex h-12 min-h-[44px] flex-col items-center justify-center rounded-xl text-[11px] font-semibold transition-colors",
                         active
-                          ? "bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white shadow-[0_0_14px_rgba(225,92,184,0.28)]"
+                          ? "bg-gradient-to-r from-[#94867a] to-[#b5bf9c] text-white shadow-[0_0_14px_rgba(225,92,184,0.28)]"
                           : "text-white/55 hover:bg-white/5 hover:text-white",
                       )}
                       aria-current={active ? "page" : undefined}

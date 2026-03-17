@@ -157,7 +157,7 @@ const ReportsPage = () => {
                       <YAxis />
                       <Tooltip />
                       <Bar dataKey="bookings" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="attended" fill="#CA71E1" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="attended" fill="#b5bf9c" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>

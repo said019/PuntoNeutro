@@ -77,7 +77,7 @@ const ProfileEdit = () => {
     <ClientAuthGuard requiredRoles={["client"]}>
       <ClientLayout>
         <div className="max-w-md space-y-5">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/app/profile")} className="text-muted-foreground hover:text-[#CA71E1]">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/app/profile")} className="text-muted-foreground hover:text-[#b5bf9c]">
             <ArrowLeft size={16} className="mr-2" />Perfil
           </Button>
           <h1 className="text-xl font-bold">Editar perfil</h1>
@@ -95,7 +95,7 @@ const ProfileEdit = () => {
                   type={type ?? "text"}
                   placeholder={placeholder}
                   {...register(name)}
-                  className="bg-secondary border-border focus:border-[#CA71E1] transition-colors"
+                  className="bg-secondary border-border focus:border-[#b5bf9c] transition-colors"
                 />
                 {errors[name] && <p className="text-xs text-destructive">{errors[name]?.message}</p>}
               </div>
@@ -106,7 +106,7 @@ const ProfileEdit = () => {
               <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Sexo</Label>
               <select
                 {...register("gender")}
-                className="w-full rounded-md bg-secondary border border-border px-3 py-2.5 text-sm text-foreground focus:border-[#CA71E1] focus:outline-none transition-colors"
+                className="w-full rounded-md bg-secondary border border-border px-3 py-2.5 text-sm text-foreground focus:border-[#b5bf9c] focus:outline-none transition-colors"
               >
                 <option value="">Selecciona…</option>
                 <option value="female">Femenino</option>
@@ -120,12 +120,12 @@ const ProfileEdit = () => {
               <Textarea
                 placeholder="Alergias, condiciones médicas relevantes..."
                 {...register("healthNotes")}
-                className="bg-secondary border-border focus:border-[#CA71E1] transition-colors"
+                className="bg-secondary border-border focus:border-[#b5bf9c] transition-colors"
               />
             </div>
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:from-[#E15CB8]/90 hover:to-[#CA71E1]/90 text-white font-medium"
+              className="w-full bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:from-[#94867a]/90 hover:to-[#b5bf9c]/90 text-white font-medium"
               disabled={mutation.isPending}
             >
               {mutation.isPending ? <Loader2 className="animate-spin mr-2" size={16} /> : null}

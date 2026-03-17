@@ -53,13 +53,13 @@ const StepBar = ({ step }: { step: number }) => (
         <div key={i} className="flex items-center gap-0">
           <div className={cn(
             "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all",
-            done && "bg-[#E15CB8]/20 text-[#E15CB8] border border-[#E15CB8]/30",
-            active && "bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white shadow-[0_0_16px_rgba(225,92,184,0.4)]",
+            done && "bg-[#94867a]/20 text-[#94867a] border border-[#94867a]/30",
+            active && "bg-gradient-to-r from-[#94867a] to-[#b5bf9c] text-white shadow-[0_0_16px_rgba(225,92,184,0.4)]",
             !done && !active && "bg-white/5 text-white/25 border border-white/10"
           )}>
             <span className={cn(
               "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
-              done && "bg-[#E15CB8] text-white",
+              done && "bg-[#94867a] text-white",
               active && "bg-white/20 text-white",
               !done && !active && "bg-white/10 text-white/30"
             )}>
@@ -70,7 +70,7 @@ const StepBar = ({ step }: { step: number }) => (
           {i < 2 && (
             <div className={cn(
               "w-8 h-px mx-1 transition-all",
-              done ? "bg-[#E15CB8]/50" : "bg-white/10"
+              done ? "bg-[#94867a]/50" : "bg-white/10"
             )} />
           )}
         </div>
@@ -133,9 +133,9 @@ const CashAssignment = () => {
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
             <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Buscar cliente</h3>
             <div className="relative">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#CA71E1]/60" />
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#b5bf9c]/60" />
               <Input
-                className="pl-9 bg-white/[0.04] border-white/10 focus:border-[#E15CB8]/50 focus:ring-[#E15CB8]/20 text-white placeholder:text-white/25 rounded-xl"
+                className="pl-9 bg-white/[0.04] border-white/10 focus:border-[#94867a]/50 focus:ring-[#94867a]/20 text-white placeholder:text-white/25 rounded-xl"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Nombre, email o teléfono…"
@@ -145,7 +145,7 @@ const CashAssignment = () => {
           </div>
 
           {usersLoading && (
-            <div className="flex items-center justify-center py-8 text-[#CA71E1]/60">
+            <div className="flex items-center justify-center py-8 text-[#b5bf9c]/60">
               <Loader2 className="animate-spin mr-2" size={16} /> Buscando…
             </div>
           )}
@@ -154,10 +154,10 @@ const CashAssignment = () => {
             {filteredUsers.map((u) => (
               <button
                 key={u.id}
-                className="w-full flex items-center gap-4 p-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] hover:bg-[#E15CB8]/5 hover:border-[#E15CB8]/25 transition-all group text-left"
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] hover:bg-[#94867a]/5 hover:border-[#94867a]/25 transition-all group text-left"
                 onClick={() => { setSelectedUser(u); setStep(2); }}
               >
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E15CB8]/30 to-[#CA71E1]/20 border border-[#E15CB8]/30 flex items-center justify-center text-sm font-bold text-[#E15CB8] shrink-0">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#94867a]/30 to-[#b5bf9c]/20 border border-[#94867a]/30 flex items-center justify-center text-sm font-bold text-[#94867a] shrink-0">
                   {u.displayName?.[0]?.toUpperCase() ?? "?"}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -167,7 +167,7 @@ const CashAssignment = () => {
                     {u.phone ? ` · ${u.phone}` : ""}
                   </p>
                 </div>
-                <ArrowRight size={14} className="text-white/20 group-hover:text-[#E15CB8]/60 transition-colors shrink-0" />
+                <ArrowRight size={14} className="text-white/20 group-hover:text-[#94867a]/60 transition-colors shrink-0" />
               </button>
             ))}
             {filteredUsers.length === 0 && !usersLoading && (
@@ -181,8 +181,8 @@ const CashAssignment = () => {
       {step === 2 && (
         <div className="space-y-5">
           {/* Cliente seleccionado */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-[#E15CB8]/8 border border-[#E15CB8]/20">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center text-xs font-bold text-white">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-[#94867a]/8 border border-[#94867a]/20">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#94867a] to-[#b5bf9c] flex items-center justify-center text-xs font-bold text-white">
               {selectedUser?.displayName?.[0]?.toUpperCase()}
             </div>
             <div>
@@ -198,9 +198,9 @@ const CashAssignment = () => {
           {Object.entries(planGroups).map(([group, items]) => {
             if (!items.length) return null;
             const groupColors: Record<string, string> = {
-              jumping: "text-[#E15CB8]",
-              pilates: "text-[#CA71E1]",
-              mixto: "text-[#E7EB6E]",
+              jumping: "text-[#94867a]",
+              pilates: "text-[#b5bf9c]",
+              mixto: "text-[#ebede5]",
               otro: "text-white/50",
             };
             const groupLabels: Record<string, string> = {
@@ -221,8 +221,8 @@ const CashAssignment = () => {
                       className={cn(
                         "w-full flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group",
                         selectedPlan?.id === p.id
-                          ? "border-[#E15CB8]/50 bg-gradient-to-r from-[#E15CB8]/10 to-[#CA71E1]/5 shadow-[0_0_16px_rgba(225,92,184,0.12)]"
-                          : "border-white/[0.07] bg-white/[0.02] hover:border-[#E15CB8]/25 hover:bg-[#E15CB8]/5"
+                          ? "border-[#94867a]/50 bg-gradient-to-r from-[#94867a]/10 to-[#b5bf9c]/5 shadow-[0_0_16px_rgba(225,92,184,0.12)]"
+                          : "border-white/[0.07] bg-white/[0.02] hover:border-[#94867a]/25 hover:bg-[#94867a]/5"
                       )}
                       onClick={() => setSelectedPlan(p)}
                     >
@@ -230,8 +230,8 @@ const CashAssignment = () => {
                         <div className={cn(
                           "w-2 h-2 rounded-full shrink-0 transition-all",
                           selectedPlan?.id === p.id
-                            ? "bg-[#E15CB8] shadow-[0_0_8px_#E15CB8]"
-                            : "bg-white/15 group-hover:bg-[#E15CB8]/50"
+                            ? "bg-[#94867a] shadow-[0_0_8px_#94867a]"
+                            : "bg-white/15 group-hover:bg-[#94867a]/50"
                         )} />
                         <div>
                           <p className="text-sm font-semibold text-white/85">{p.name}</p>
@@ -243,7 +243,7 @@ const CashAssignment = () => {
                       </div>
                       <span className={cn(
                         "text-sm font-bold transition-colors",
-                        selectedPlan?.id === p.id ? "text-[#E15CB8]" : "text-white/60 group-hover:text-white/90"
+                        selectedPlan?.id === p.id ? "text-[#94867a]" : "text-white/60 group-hover:text-white/90"
                       )}>
                         ${Number(p.price).toLocaleString()} MXN
                       </span>
@@ -259,7 +259,7 @@ const CashAssignment = () => {
               <ChevronLeft size={14} className="mr-1" /> Volver
             </Button>
             <Button
-              className="flex-1 bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 text-white font-semibold shadow-[0_0_20px_rgba(225,92,184,0.3)]"
+              className="flex-1 bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 text-white font-semibold shadow-[0_0_20px_rgba(225,92,184,0.3)]"
               disabled={!selectedPlan}
               onClick={() => setStep(3)}
             >
@@ -275,14 +275,14 @@ const CashAssignment = () => {
           {/* Resumen */}
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
             <div className="px-5 py-3 border-b border-white/[0.07] flex items-center gap-2">
-              <Sparkles size={14} className="text-[#E7EB6E]" />
+              <Sparkles size={14} className="text-[#ebede5]" />
               <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Resumen de la membresía</span>
             </div>
             <div className="p-5 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-white/50">Cliente</span>
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] flex items-center justify-center text-[9px] font-bold text-white">
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#94867a] to-[#b5bf9c] flex items-center justify-center text-[9px] font-bold text-white">
                     {selectedUser?.displayName?.[0]?.toUpperCase()}
                   </div>
                   <span className="text-sm font-semibold text-white/90">{selectedUser?.displayName}</span>
@@ -296,7 +296,7 @@ const CashAssignment = () => {
               <div className="h-px bg-white/[0.05]" />
               <div className="flex justify-between items-center">
                 <span className="text-sm text-white/50">Total</span>
-                <span className="text-lg font-bold text-[#E15CB8]">${Number(selectedPlan?.price).toLocaleString()} MXN</span>
+                <span className="text-lg font-bold text-[#94867a]">${Number(selectedPlan?.price).toLocaleString()} MXN</span>
               </div>
             </div>
           </div>
@@ -311,7 +311,7 @@ const CashAssignment = () => {
                   className={cn(
                     "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
                     paymentMethod === value
-                      ? "border-[#E15CB8]/50 bg-[#E15CB8]/10 text-[#E15CB8]"
+                      ? "border-[#94867a]/50 bg-[#94867a]/10 text-[#94867a]"
                       : "border-white/[0.07] bg-white/[0.02] text-white/40 hover:border-white/15 hover:text-white/70"
                   )}
                   onClick={() => setPaymentMethod(value)}
@@ -328,7 +328,7 @@ const CashAssignment = () => {
               <ChevronLeft size={14} className="mr-1" /> Volver
             </Button>
             <Button
-              className="flex-1 bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] hover:opacity-90 text-white font-bold shadow-[0_0_24px_rgba(225,92,184,0.35)] h-11"
+              className="flex-1 bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 text-white font-bold shadow-[0_0_24px_rgba(225,92,184,0.35)] h-11"
               onClick={() => assignMutation.mutate()}
               disabled={assignMutation.isPending}
             >
@@ -353,9 +353,9 @@ const PaymentsHistory = () => {
   const payments = Array.isArray(data?.data) ? data.data : [];
 
   const methodStyles: Record<string, string> = {
-    cash: "text-[#E7EB6E] border-[#E7EB6E]/30 bg-[#E7EB6E]/5",
-    card: "text-[#CA71E1] border-[#CA71E1]/30 bg-[#CA71E1]/5",
-    transfer: "text-[#E15CB8] border-[#E15CB8]/30 bg-[#E15CB8]/5",
+    cash: "text-[#ebede5] border-[#ebede5]/30 bg-[#ebede5]/5",
+    card: "text-[#b5bf9c] border-[#b5bf9c]/30 bg-[#b5bf9c]/5",
+    transfer: "text-[#94867a] border-[#94867a]/30 bg-[#94867a]/5",
   };
   const methodLabels: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
 
@@ -372,8 +372,8 @@ const PaymentsHistory = () => {
     <div className="space-y-2">
       {payments.map((p: any) => (
         <div key={p.id} className="flex items-center gap-4 p-4 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#E15CB8]/20 to-[#CA71E1]/10 border border-[#E15CB8]/20 flex items-center justify-center shrink-0">
-            <CreditCard size={13} className="text-[#E15CB8]/70" />
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#94867a]/20 to-[#b5bf9c]/10 border border-[#94867a]/20 flex items-center justify-center shrink-0">
+            <CreditCard size={13} className="text-[#94867a]/70" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white/85 truncate">{p.userName ?? p.userId ?? "—"}</p>
@@ -414,7 +414,7 @@ const PaymentsPage = () => {
                 className={cn(
                   "px-5 py-2 rounded-lg text-sm font-semibold transition-all",
                   activeTab === val
-                    ? "bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white shadow-[0_0_14px_rgba(225,92,184,0.3)]"
+                    ? "bg-gradient-to-r from-[#94867a] to-[#b5bf9c] text-white shadow-[0_0_14px_rgba(225,92,184,0.3)]"
                     : "text-white/40 hover:text-white/70"
                 )}
               >

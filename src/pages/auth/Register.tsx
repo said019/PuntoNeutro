@@ -87,7 +87,7 @@ const Register = () => {
       <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden">
         <img
           src={ophelia28}
-          alt="Ophelia Studio"
+          alt="Punto Neutro"
           className="absolute inset-0 w-full h-full object-cover scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/30 to-transparent" />
@@ -95,7 +95,7 @@ const Register = () => {
 
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <Link to="/" className="block">
-            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
+            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
 
           <div>
@@ -142,7 +142,7 @@ const Register = () => {
 
           {/* Mobile logo */}
           <Link to="/" className="lg:hidden block mb-8">
-            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
+            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
 
           {/* heading */}
@@ -329,7 +329,7 @@ const Register = () => {
           </Link>
 
           <p className="text-center text-xs text-muted-foreground/50 mt-6">
-            © {new Date().getFullYear()} Ophelia Studio · San Juan del Río, Qro.
+            © {new Date().getFullYear()} Punto Neutro · San Juan del Río, Qro.
           </p>
         </div>
       </div>

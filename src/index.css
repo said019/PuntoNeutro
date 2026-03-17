@@ -36,62 +36,54 @@
 }
 
 /* ──────────────────────────────────────────────────────────────
-   PALETA OFICIAL OPHELIA STUDIO — sobre fondo negro
-   Background : #080808  (negro puro)
-   Primario   : #E15CB8  (rosa magenta vibrante)
-   Acento 1   : #CA71E1  (lila/violeta)
-   Acento 2   : #E7EB6E  (amarillo neón)
-   Foreground : #F9F7E8  (crema cálido)
-   Sec 1      : #ECD6FB  (lila pastel)
-   Sec 2      : #FEA5DC  (rosa claro)
+   PALETA OFICIAL PUNTO NEUTRO — sobre fondo claro
+   Background : #ebede5  (crema / light base)
+   Primario   : #94867a  (taupe warm gray)
+   Acento 1   : #b5bf9c  (sage green)
    ────────────────────────────────────────────────────────────── */
 
 @layer base {
   :root {
-    /* Fondo negro puro — estética original */
-    --background: 0 0% 3.1%;             /* #080808 */
-    --foreground: 53 74% 94%;            /* #F9F7E8 crema */
+    /* Fondo claro Punto Neutro */
+    --background: 75 23% 91%;            /* #ebede5 */
+    --foreground: 0 0% 10%;              /* Dark auth/text color */
 
-    --card: 0 0% 5.9%;
-    --card-foreground: 53 74% 94%;
+    --card: 75 23% 91%;
+    --card-foreground: 0 0% 10%;
 
-    --popover: 0 0% 5.9%;
-    --popover-foreground: 53 74% 94%;
+    --popover: 75 23% 91%;
+    --popover-foreground: 0 0% 10%;
 
-    /* Primario: rosa magenta Ophelia #E15CB8 */
-    --primary: 316 70% 61%;
+    /* Primario: taupe chale #94867a */
+    --primary: 28 12% 53%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secundario: gris muy oscuro */
-    --secondary: 0 0% 8.6%;
-    --secondary-foreground: 53 74% 94%;
+    /* Secundario: sage green #b5bf9c */
+    --secondary: 77 21% 68%;
+    --secondary-foreground: 0 0% 10%;
 
-    --muted: 0 0% 16.5%;
-    --muted-foreground: 0 0% 55%;
+    --muted: 75 10% 80%;
+    --muted-foreground: 28 12% 40%;
 
-    /* Acento: lila Ophelia #CA71E1 */
-    --accent: 291 65% 66%;
-    --accent-foreground: 0 0% 100%;
+    /* Acento: sage green */
+    --accent: 77 21% 68%;
+    --accent-foreground: 0 0% 10%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 16.5%;
-    --input: 0 0% 16.5%;
-    --ring: 316 70% 61%;
+    --border: 75 15% 80%;
+    --input: 75 15% 80%;
+    --ring: 28 12% 53%;
 
     --radius: 0.75rem;
 
-    /* Tokens Ophelia (disponibles como var() en cualquier componente) */
-    --ophelia-purple:    265 100% 14%;   /* #1F0047 */
-    --ophelia-magenta:   316 70% 61%;    /* #E15CB8 */
-    --ophelia-violet:    291 65% 66%;    /* #CA71E1 */
-    --ophelia-lime:      62 75% 68%;     /* #E7EB6E */
-    --ophelia-cream:     53 74% 94%;     /* #F9F7E8 */
-    --ophelia-lilac:     285 86% 91%;    /* #ECD6FB */
-    --ophelia-pinklight: 327 96% 82%;    /* #FEA5DC */
+    /* Tokens Punto Neutro (disponibles como var() en cualquier componente) */
+    --punto-cream:       75 23% 91%;     /* #ebede5 */
+    --punto-green:       77 21% 68%;     /* #b5bf9c */
+    --punto-taupe:       28 12% 53%;     /* #94867a */
 
-    --pink-glow: 316 70% 61%;
+    --pink-glow: 28 12% 53%;
   }
 }
 

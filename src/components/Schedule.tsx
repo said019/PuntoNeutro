@@ -44,14 +44,14 @@ interface ScheduleClass {
 // ─── Fallback colors ──────────────────────────────────────────────────────────
 
 const fallbackColors: Record<string, string> = {
-  "Jumping Fitness": "#E15CB8",
-  "Jumping Dance":   "#CA71E1",
-  "Jump & Tone":     "#E7EB6E",
-  "Strong Jump":     "#E15CB8",
-  "Mindful Jump":    "#CA71E1",
-  "Hot Pilates":     "#E7EB6E",
-  "Flow Pilates":    "#E15CB8",
-  "Pilates Mat":     "#CA71E1",
+  "Jumping Fitness": "#94867a",
+  "Jumping Dance":   "#b5bf9c",
+  "Jump & Tone":     "#ebede5",
+  "Strong Jump":     "#94867a",
+  "Mindful Jump":    "#b5bf9c",
+  "Hot Pilates":     "#ebede5",
+  "Flow Pilates":    "#94867a",
+  "Pilates Mat":     "#b5bf9c",
 };
 const DEFAULT_COLOR = "#A48550";
 
@@ -225,7 +225,7 @@ export default function Schedule() {
 
           {/* Studio label */}
           <p className="text-[11px] font-normal tracking-[0.25em] uppercase text-white/40 mb-8">
-            ✦ Ophelia · Jumping &amp; Pilates
+            ✦ Punto Neutro · Jumping &amp; Pilates
           </p>
 
           {/* Month nav */}
@@ -539,13 +539,13 @@ export default function Schedule() {
         {/* ── CTA ─────────────────────────────────────────────────────────── */}
         <div className="mb-16 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/[0.07] via-primary/[0.03] to-transparent p-10 text-center">
           <p className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-2">
-            ¿Primera vez en Ophelia?
+            ¿Primera vez en Punto Neutro?
           </p>
           <h3 className="font-bebas text-[clamp(1.8rem,3vw,2.5rem)] leading-none text-white mb-3">
             Prueba una clase sin compromiso
           </h3>
           <p className="text-sm text-white/40 mb-7 max-w-sm mx-auto">
-            Reserva tu sesión muestra y descubre por qué cientos de mujeres eligen Ophelia.
+            Reserva tu sesión muestra y descubre por qué cientos de mujeres eligen Punto Neutro.
           </p>
           <Link
             to="/auth/register?returnUrl=/app/book"

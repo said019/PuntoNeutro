@@ -45,7 +45,7 @@ const Dashboard = () => {
     queryFn: async () => (await api.get("/admin/orders?status=pending_verification")).data,
   });
 
-  const metric = (label: string, value: number | undefined, icon: React.ReactNode, prefix = "", accent = "#CA71E1") => (
+  const metric = (label: string, value: number | undefined, icon: React.ReactNode, prefix = "", accent = "#b5bf9c") => (
     <Card className="border-t-2" style={{ borderTopColor: accent }}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
@@ -71,9 +71,9 @@ const Dashboard = () => {
 
           {/* Metric cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {metric("Clases de hoy", stats?.classesToday, <CalendarDays size={18} />, "", "#CA71E1")}
-            {metric("Membresías activas", stats?.activeMembers, <Users size={18} />, "", "#E15CB8")}
-            {metric("Ingresos del mes", stats?.monthlyRevenue, <DollarSign size={18} />, "$", "#E7EB6E")}
+            {metric("Clases de hoy", stats?.classesToday, <CalendarDays size={18} />, "", "#b5bf9c")}
+            {metric("Membresías activas", stats?.activeMembers, <Users size={18} />, "", "#94867a")}
+            {metric("Ingresos del mes", stats?.monthlyRevenue, <DollarSign size={18} />, "$", "#ebede5")}
             {metric("Alertas pendientes", stats?.pendingAlerts, <AlertCircle size={18} />, "", "#F97316")}
           </div>
 

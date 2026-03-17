@@ -13,35 +13,18 @@ import opheliaLogo from "@/assets/ophelia-logo-full.png";
 const NAV_GROUPS = [
   {
     label: "Principal",
-    labelColor: "#E15CB8",
+    labelColor: "#94867a",
     items: [
-      { to: "/app", label: "Inicio", icon: LayoutDashboard, activeColor: "#E7EB6E" },
-      { to: "/app/classes", label: "Reservar clase", icon: Calendar, activeColor: "#E15CB8" },
-      { to: "/app/bookings", label: "Mis reservas", icon: ClipboardList, activeColor: "#CA71E1" },
-      { to: "/app/events", label: "Eventos", icon: Ticket, activeColor: "#E7EB6E" },
-    ],
-  },
-  {
-    label: "Cuenta",
-    labelColor: "#CA71E1",
-    items: [
-      { to: "/app/checkout", label: "Membresía", icon: CreditCard, activeColor: "#E15CB8" },
-      { to: "/app/wallet", label: "Club & Wallet", icon: Wallet, activeColor: "#E7EB6E" },
-      { to: "/app/orders", label: "Mis órdenes", icon: Package, activeColor: "#CA71E1" },
-    ],
-  },
-  {
-    label: "Contenido",
-    labelColor: "#E7EB6E",
-    items: [
-      { to: "/app/videos", label: "Videos", icon: Play, activeColor: "#E7EB6E" },
+      { to: "/app", label: "Inicio", icon: LayoutDashboard, activeColor: "#ebede5" },
+      { to: "/app/classes", label: "Reservar clase", icon: Calendar, activeColor: "#94867a" },
+      { to: "/app/bookings", label: "Mis reservas", icon: ClipboardList, activeColor: "#b5bf9c" },
     ],
   },
 ];
 
 /* ── Single nav item ───────────────────────────────────────────────── */
 const NavItem = ({
-  to, label, icon: Icon, onClick, collapsed, activeColor = "#E15CB8",
+  to, label, icon: Icon, onClick, collapsed, activeColor = "#94867a",
 }: {
   to: string; label: string; icon: any; onClick?: () => void; collapsed?: boolean; activeColor?: string;
 }) => {
@@ -75,7 +58,7 @@ const NavItem = ({
 
       {/* Icon */}
       <span
-        className={cn("flex-shrink-0 transition-all", !active && "group-hover:text-[#CA71E1]")}
+        className={cn("flex-shrink-0 transition-all", !active && "group-hover:text-[#b5bf9c]")}
         style={active ? { color: activeColor } : {}}
       >
         <Icon size={17} />
@@ -111,11 +94,10 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
 
   /* ── mobile bottom nav items ── */
   const BOTTOM_NAV = [
-    { to: "/app", icon: LayoutDashboard, label: "Inicio", color: "#E7EB6E" },
-    { to: "/app/classes", icon: Calendar, label: "Clases", color: "#E15CB8" },
-    { to: "/app/bookings", icon: ClipboardList, label: "Reservas", color: "#CA71E1" },
-    { to: "/app/events", icon: Ticket, label: "Eventos", color: "#E7EB6E" },
-    { to: "/app/profile", icon: User, label: "Perfil", color: "#E15CB8" },
+    { to: "/app", icon: LayoutDashboard, label: "Inicio", color: "#ebede5" },
+    { to: "/app/classes", icon: Calendar, label: "Clases", color: "#94867a" },
+    { to: "/app/bookings", icon: ClipboardList, label: "Reservas", color: "#b5bf9c" },
+    { to: "/app/profile", icon: User, label: "Perfil", color: "#94867a" },
   ];
 
   return (
@@ -137,13 +119,13 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
       )}>
 
         {/* Ambient top glow */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[200px] bg-gradient-to-b from-[#E15CB8]/[0.07] to-transparent" />
-        <div className="pointer-events-none absolute left-[-40px] top-[-40px] h-[180px] w-[180px] rounded-full bg-[#CA71E1]/[0.06] blur-[60px]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[200px] bg-gradient-to-b from-[#94867a]/[0.07] to-transparent" />
+        <div className="pointer-events-none absolute left-[-40px] top-[-40px] h-[180px] w-[180px] rounded-full bg-[#b5bf9c]/[0.06] blur-[60px]" />
 
         {/* ── Logo / Brand ── */}
         <div className="relative flex h-20 items-center justify-between px-5 border-b border-white/[0.06]">
           <Link to="/" className="flex items-center no-underline">
-            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
+            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
           <button
             onClick={() => setOpen(false)}
@@ -159,16 +141,16 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
           onClick={() => setOpen(false)}
           className={cn(
             "relative mx-3 mt-4 mb-2 flex items-center gap-3 rounded-2xl p-3.5 no-underline transition-all duration-200",
-            "bg-gradient-to-br from-[#ECD6FB]/[0.08] to-[#FEA5DC]/[0.06]",
-            "border border-[#ECD6FB]/[0.12] hover:border-[#E15CB8]/30 hover:from-[#ECD6FB]/[0.12] hover:to-[#FEA5DC]/[0.10]",
-            pathname.startsWith("/app/profile") && "border-[#E15CB8]/30"
+            "bg-gradient-to-br from-[#b5bf9c]/[0.08] to-[#ebede5]/[0.06]",
+            "border border-[#b5bf9c]/[0.12] hover:border-[#94867a]/30 hover:from-[#b5bf9c]/[0.12] hover:to-[#ebede5]/[0.10]",
+            pathname.startsWith("/app/profile") && "border-[#94867a]/30"
           )}
         >
           {/* Avatar */}
           <div className="relative flex-shrink-0">
             <div className={cn(
               "flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white",
-              "bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] shadow-md shadow-[#E15CB8]/30"
+              "bg-gradient-to-br from-[#94867a] to-[#b5bf9c] shadow-md shadow-[#94867a]/30"
             )}>
               {(user?.photoUrl ?? user?.photo_url)
                 ? <img src={(user?.photoUrl ?? user?.photo_url)!} className="h-10 w-10 rounded-full object-cover" alt="" />
@@ -195,7 +177,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
           [&::-webkit-scrollbar]:w-[3px]
           [&::-webkit-scrollbar-track]:bg-transparent
           [&::-webkit-scrollbar-thumb]:bg-white/10
-          [&::-webkit-scrollbar-thumb:hover]:bg-[#E15CB8]/40">
+          [&::-webkit-scrollbar-thumb:hover]:bg-[#94867a]/40">
           {NAV_GROUPS.map((group) => (
             <div key={group.label}>
               <p
@@ -259,7 +241,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
           </button>
 
           <Link to="/">
-            <img src={opheliaLogo} alt="Ophelia Studio" className="h-12 w-auto" />
+            <img src={opheliaLogo} alt="Punto Neutro" className="h-12 w-auto" />
           </Link>
 
           <Link to="/app/notifications" className="rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">

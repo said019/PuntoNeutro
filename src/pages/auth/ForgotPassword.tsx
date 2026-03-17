@@ -41,7 +41,7 @@ const ForgotPassword = () => {
         {/* Logo */}
         <div className="flex justify-center mb-2">
           <Link to="/">
-            <img src={opheliaLogo} alt="Ophelia Studio" className="h-16 w-auto" />
+            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
         </div>
         {sent ? (

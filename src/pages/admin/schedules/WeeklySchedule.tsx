@@ -91,7 +91,7 @@ const WeeklySchedule = () => {
   const scheduleCard = (s: Schedule) => (
     <div key={s.id} className="mb-2 p-2.5 bg-white/[0.03] rounded-xl border border-white/[0.05] text-xs">
       <div className="font-semibold text-white/80 text-[11px] truncate">{s.classTypeName ?? s.classTypeId}</div>
-      <div className="text-[#E7EB6E]/70 text-[10px] mt-0.5">{s.startTime}–{s.endTime}</div>
+      <div className="text-[#ebede5]/70 text-[10px] mt-0.5">{s.startTime}–{s.endTime}</div>
       <div className="text-white/35 text-[10px] truncate">{s.instructorName ?? s.instructorId}</div>
       <div className="flex items-center justify-between mt-1.5">
         <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${s.isActive ? "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/5" : "text-white/25 border-white/10"}`}>
@@ -123,7 +123,7 @@ const WeeklySchedule = () => {
             </div>
             <button
               onClick={() => openCreate(isMobile ? mobileDay : new Date().getDay())}
-              className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#94867a] to-[#b5bf9c] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
             >
               <Plus size={14} /> Nuevo horario
             </button>
@@ -143,7 +143,7 @@ const WeeklySchedule = () => {
                         className={cn(
                           "flex min-h-[52px] min-w-[84px] flex-col items-center justify-center rounded-xl border px-2 text-xs transition-colors",
                           active
-                            ? "border-[#E15CB8]/60 bg-gradient-to-r from-[#E15CB8]/20 to-[#CA71E1]/20 text-white"
+                            ? "border-[#94867a]/60 bg-gradient-to-r from-[#94867a]/20 to-[#b5bf9c]/20 text-white"
                             : "border-white/10 bg-black/30 text-white/70",
                         )}
                       >
@@ -180,7 +180,7 @@ const WeeklySchedule = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-3">
               {DAYS.map((day, i) => (
                 <div key={i} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3">
-                  <p className="text-[10px] font-bold text-center mb-3 text-[#CA71E1]/60 uppercase tracking-widest">
+                  <p className="text-[10px] font-bold text-center mb-3 text-[#b5bf9c]/60 uppercase tracking-widest">
                     {day.slice(0, 3)}
                   </p>
                   {grouped[i].length === 0 ? (
@@ -284,7 +284,7 @@ const WeeklySchedule = () => {
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-[#E15CB8] to-[#CA71E1] text-white border-0"
+                  className="bg-gradient-to-r from-[#94867a] to-[#b5bf9c] text-white border-0"
                 >
                   {editing ? "Actualizar" : "Crear"}
                 </Button>

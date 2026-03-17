@@ -1,5 +1,5 @@
 /**
- * Styled time picker for the Ophelia dark palette.
+ * Styled time picker for the Punto Neutro dark palette.
  * Renders a clean HH:MM selector with +/- controls.
  * Accepts and emits "HH:MM" strings (same as <input type="time">).
  */
@@ -59,7 +59,7 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center justify-center text-white/25 hover:text-[#E15CB8] transition-colors disabled:opacity-30"
+      className="flex items-center justify-center text-white/25 hover:text-[#94867a] transition-colors disabled:opacity-30"
     >
       {up ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
     </button>
@@ -70,12 +70,12 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
       <div
         className={cn(
           "inline-flex w-full items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2",
-          "focus-within:border-[#E15CB8]/40 focus-within:bg-[#E15CB8]/[0.03]",
+          "focus-within:border-[#94867a]/40 focus-within:bg-[#94867a]/[0.03]",
           disabled && "opacity-50 pointer-events-none",
           className,
         )}
       >
-        <Clock size={13} className="text-[#E15CB8]/50 shrink-0" />
+        <Clock size={13} className="text-[#94867a]/50 shrink-0" />
         <input
           type="time"
           step={300}
@@ -93,12 +93,12 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
     <div
       className={cn(
         "inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 select-none",
-        "focus-within:border-[#E15CB8]/40 focus-within:bg-[#E15CB8]/[0.03]",
+        "focus-within:border-[#94867a]/40 focus-within:bg-[#94867a]/[0.03]",
         disabled && "opacity-50 pointer-events-none",
         className
       )}
     >
-      <Clock size={13} className="text-[#E15CB8]/50 shrink-0" />
+      <Clock size={13} className="text-[#94867a]/50 shrink-0" />
 
       {/* Hours */}
       <div className="flex flex-col items-center gap-0.5">
@@ -109,7 +109,7 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
         <Spin up={false} onClick={() => changeHours(-1)} />
       </div>
 
-      <span className="text-lg font-bold text-[#E15CB8]/60 leading-none -mt-0.5">:</span>
+      <span className="text-lg font-bold text-[#94867a]/60 leading-none -mt-0.5">:</span>
 
       {/* Minutes */}
       <div className="flex flex-col items-center gap-0.5">

@@ -22,9 +22,9 @@ const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 type ClassCat = "jumping" | "pilates" | "mixto" | "all";
 
 const CAT_COLORS: Record<ClassCat, { bg: string; text: string; border: string; dot: string }> = {
-  jumping: { bg: "bg-[#E15CB8]/15", text: "text-[#E15CB8]",  border: "border-[#E15CB8]/40", dot: "bg-[#E15CB8]"  },
-  pilates: { bg: "bg-[#CA71E1]/15", text: "text-[#CA71E1]",  border: "border-[#CA71E1]/40", dot: "bg-[#CA71E1]"  },
-  mixto:   { bg: "bg-[#E7EB6E]/15", text: "text-[#E7EB6E]",  border: "border-[#E7EB6E]/40", dot: "bg-[#E7EB6E]"  },
+  jumping: { bg: "bg-[#94867a]/15", text: "text-[#94867a]",  border: "border-[#94867a]/40", dot: "bg-[#94867a]"  },
+  pilates: { bg: "bg-[#b5bf9c]/15", text: "text-[#b5bf9c]",  border: "border-[#b5bf9c]/40", dot: "bg-[#b5bf9c]"  },
+  mixto:   { bg: "bg-[#ebede5]/15", text: "text-[#ebede5]",  border: "border-[#ebede5]/40", dot: "bg-[#ebede5]"  },
   all:     { bg: "bg-white/5",      text: "text-white/60",   border: "border-white/15",     dot: "bg-white/40"   },
 };
 

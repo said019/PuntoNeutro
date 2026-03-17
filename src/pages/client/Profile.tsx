@@ -17,7 +17,7 @@ const ProfileLink = ({
       "flex items-center justify-between rounded-2xl border p-4 transition-all duration-200",
       danger
         ? "border-red-500/20 hover:bg-red-500/10 hover:border-red-500/40"
-        : "border-white/[0.08] hover:border-[#E15CB8]/30 hover:bg-white/[0.03]"
+        : "border-white/[0.08] hover:border-[#94867a]/30 hover:bg-white/[0.03]"
     )}
   >
     <div className="flex items-center gap-3.5">
@@ -26,7 +26,7 @@ const ProfileLink = ({
         style={
           danger
             ? { background: "rgba(239,68,68,0.1)", color: "#f87171" }
-            : { background: `${accent ?? "#E15CB8"}15`, color: accent ?? "#E15CB8" }
+            : { background: `${accent ?? "#94867a"}15`, color: accent ?? "#94867a" }
         }
       >
         <Icon size={17} />
@@ -70,13 +70,13 @@ const Profile = () => {
           {/* ── Header card ── */}
           <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#1a0d1a] via-[#130d18] to-[#0d0d14] p-6">
             {/* Ambient glow */}
-            <div className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full bg-[#E15CB8]/15 blur-[40px]" />
-            <div className="pointer-events-none absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-[#CA71E1]/10 blur-[30px]" />
+            <div className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full bg-[#94867a]/15 blur-[40px]" />
+            <div className="pointer-events-none absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-[#b5bf9c]/10 blur-[30px]" />
 
             <div className="relative flex items-center gap-4">
               {/* Avatar */}
               <div className="relative flex-shrink-0">
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#E15CB8] to-[#CA71E1] text-2xl font-bold text-white shadow-xl shadow-[#E15CB8]/25">
+                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[#94867a] to-[#b5bf9c] text-2xl font-bold text-white shadow-xl shadow-[#94867a]/25">
                   {(user?.photoUrl ?? user?.photo_url)
                     ? <img src={(user?.photoUrl ?? user?.photo_url)!} className="h-20 w-20 rounded-2xl object-cover" alt={name} />
                     : initials}
@@ -92,9 +92,9 @@ const Profile = () => {
                   <p className="text-sm text-muted-foreground mt-0.5">{user.phone}</p>
                 )}
                 {/* Role badge */}
-                <div className="inline-flex items-center gap-1.5 mt-2.5 px-2.5 py-1 rounded-full bg-[#E15CB8]/15 border border-[#E15CB8]/20">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#E15CB8]" />
-                  <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-[#E15CB8]">
+                <div className="inline-flex items-center gap-1.5 mt-2.5 px-2.5 py-1 rounded-full bg-[#94867a]/15 border border-[#94867a]/20">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#94867a]" />
+                  <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-[#94867a]">
                     {user?.role === "client"
                       ? (user?.gender === "male" ? "Alumno" : user?.gender === "other" ? "Alumno/a" : "Alumna")
                       : user?.role ?? "Cliente"}
@@ -114,21 +114,21 @@ const Profile = () => {
               icon={User}
               label="Editar perfil"
               description="Nombre, teléfono, foto y más"
-              accent="#CA71E1"
+              accent="#b5bf9c"
             />
             <ProfileLink
               to="/app/profile/membership"
               icon={CreditCard}
               label="Mi membresía"
               description="Clases disponibles y vigencia"
-              accent="#E15CB8"
+              accent="#94867a"
             />
             <ProfileLink
               to="/app/profile/preferences"
               icon={Bell}
               label="Preferencias"
               description="Notificaciones y comunicaciones"
-              accent="#E7EB6E"
+              accent="#ebede5"
             />
           </div>
 

@@ -47,15 +47,11 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        /* ── Ophelia Studio brand palette ── */
-        ophelia: {
-          purple:      "#1F0047",
-          magenta:     "#E15CB8",
-          violet:      "#CA71E1",
-          lime:        "#E7EB6E",
-          cream:       "#F9F7E8",
-          lilac:       "#ECD6FB",
-          pinklight:   "#FEA5DC",
+        /* ── Punto Neutro brand palette ── */
+        punto: {
+          cream:       "#ebede5",
+          green:       "#b5bf9c",
+          taupe:       "#94867a",
         },
       },
       borderRadius: {

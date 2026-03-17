@@ -114,9 +114,9 @@ const MembershipTable = ({ status, title }: { status?: string; title: string }) 
               ))
               : memberships.map((m) => {
                 const catColors: Record<string, string> = {
-                  jumping: "bg-[#E15CB8]/15 text-[#E15CB8] border-[#E15CB8]/30",
-                  pilates: "bg-[#CA71E1]/15 text-[#CA71E1] border-[#CA71E1]/30",
-                  mixto: "bg-[#E7EB6E]/15 text-[#E7EB6E] border-[#E7EB6E]/30",
+                  jumping: "bg-[#94867a]/15 text-[#94867a] border-[#94867a]/30",
+                  pilates: "bg-[#b5bf9c]/15 text-[#b5bf9c] border-[#b5bf9c]/30",
+                  mixto: "bg-[#ebede5]/15 text-[#ebede5] border-[#ebede5]/30",
                 };
                 const cat = m.classCategory ?? "";
                 return (

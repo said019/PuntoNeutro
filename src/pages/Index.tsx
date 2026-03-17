@@ -57,33 +57,29 @@ type TrialPlanRow = {
 
 /* ───── Fallbacks ───── */
 const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
-  { id: "c1", name: "Jumping Fitness", subtitle: "Full Body Cardio", description: "Cardio en trampolín lleno de energía, música y diversión. Un entrenamiento completo que te hará volar.", category: "jumping", intensity: "media", color: "#E15CB8", emoji: "zap", level: "Todos los niveles", duration_min: 50, capacity: 10, is_active: true, sort_order: 1 },
-  { id: "c2", name: "Strong Jump", subtitle: "Fuerza & Glúteo", description: "Clase enfocada en piernas y glúteos. Fuerza y resistencia sobre el trampolín con resultados visibles.", category: "jumping", intensity: "pesada", color: "#E15CB8", emoji: "dumbbell", level: "Intermedio", duration_min: 55, capacity: 10, is_active: true, sort_order: 2 },
-  { id: "c3", name: "Jump & Tone", subtitle: "Tren Superior", description: "Brazos, abdomen y tren superior mientras mantienes el ritmo del jumping. Tonificación inteligente.", category: "jumping", intensity: "media", color: "#E15CB8", emoji: "activity", level: "Todos los niveles", duration_min: 55, capacity: 10, is_active: true, sort_order: 3 },
-  { id: "c4", name: "Jump Dance", subtitle: "Baila & Salta", description: "Cardio al ritmo de la música. Saltar, bailar y disfrutar. La clase más divertida del estudio.", category: "jumping", intensity: "media", color: "#E15CB8", emoji: "music", level: "Todos los niveles", duration_min: 50, capacity: 10, is_active: true, sort_order: 4 },
-  { id: "c5", name: "Pilates Mat", subtitle: "Core & Postura", description: "Conecta con tu cuerpo, fortalece tu core y mejora tu postura. Pilates en colchoneta desde la base.", category: "pilates", intensity: "ligera", color: "#CA71E1", emoji: "waves", level: "Principiante", duration_min: 50, capacity: 10, is_active: true, sort_order: 5 },
-  { id: "c6", name: "Flow Pilates · Sculpt", subtitle: "Fluir & Esculpir", description: "Secuencias fluidas que conectan movimiento y respiración. Esculpe tu cuerpo con control y elegancia.", category: "pilates", intensity: "media", color: "#CA71E1", emoji: "sparkles", level: "Todos los niveles", duration_min: 55, capacity: 10, is_active: true, sort_order: 6 },
-  { id: "c7", name: "Hot Pilates · Barralates", subtitle: "Alta Intensidad", description: "Pilates de alta intensidad con accesorios y movimientos de barre. Quema, fortalece, transforma.", category: "pilates", intensity: "pesada", color: "#CA71E1", emoji: "flame", level: "Avanzado", duration_min: 55, capacity: 10, is_active: true, sort_order: 7 },
-  { id: "c8", name: "Yoga", subtitle: "Cuerpo, Mente & Espíritu", description: "Unión del cuerpo, mente y espíritu a través de asanas, pranayama y meditación. Tu momento de paz.", category: "mixto", intensity: "ligera", color: "#E7EB6E", emoji: "flower2", level: "Todos los niveles", duration_min: 60, capacity: 10, is_active: true, sort_order: 8 },
+  { id: "c1", name: "Pilates Matt Clásico", subtitle: "Método Clásico", description: "Fortalece la musculatura que le da sostén a tu cuerpo respetando las bases del método clásico. Es una clase que te exige presencia, control, fluidez y una respiración consiente.", category: "pilates", intensity: "media", color: "#b5bf9c", emoji: "waves", level: "Todos los niveles", duration_min: 50, capacity: 10, is_active: true, sort_order: 1 },
+  { id: "c2", name: "Pilates Terapéutico", subtitle: "Fines terapéuticos", description: "Una clase con efectos terapéuticos en el cuerpo como la disminución de dolor, mejora en movilidad y fortalecimiento general. Ideal para condiciones médicas o salir del sedentarismo.", category: "pilates", intensity: "ligera", color: "#ebede5", emoji: "heart", level: "Todos los niveles", duration_min: 55, capacity: 10, is_active: true, sort_order: 2 },
+  { id: "c3", name: "Flex & Flow", subtitle: "Libre y ágil", description: "Una clase que te invita a conectar mente y cuerpo por medio de movimientos naturales, fluidos y consientes ayudando a sentirte más libre, ágil, flexible y sin limitación.", category: "mixto", intensity: "media", color: "#b5bf9c", emoji: "activity", level: "Todos los niveles", duration_min: 55, capacity: 10, is_active: true, sort_order: 3 },
+  { id: "c4", name: "Body Strong", subtitle: "Retadora", description: "Una clase de intensidad moderada, dinámica y retadora, que busca lograr un funcionamiento integral y funcional del cuerpo sin dejar ejecución y cuidado de los movimientos.", category: "jumping", intensity: "pesada", color: "#94867a", emoji: "flame", level: "Avanzado", duration_min: 50, capacity: 10, is_active: true, sort_order: 4 },
 ];
 
 const FALLBACK_PACKAGES: PackageRow[] = [
-  { id: "p1",  name: "4 Clases Jumping",      num_classes: "4",         price: 300,  category: "jumping", validity_days: 30, is_active: true, sort_order: 1 },
-  { id: "p2",  name: "8 Clases Jumping",      num_classes: "8",         price: 560,  category: "jumping", validity_days: 30, is_active: true, sort_order: 2 },
-  { id: "p3",  name: "12 Clases Jumping",     num_classes: "12",        price: 780,  category: "jumping", validity_days: 30, is_active: true, sort_order: 3 },
-  { id: "p4",  name: "16 Clases Jumping",     num_classes: "16",        price: 960,  category: "jumping", validity_days: 30, is_active: true, sort_order: 4 },
-  { id: "p5",  name: "20 Clases Jumping",     num_classes: "20",        price: 1100, category: "jumping", validity_days: 30, is_active: true, sort_order: 5 },
-  { id: "p6",  name: "Ilimitado Jumping",     num_classes: "ILIMITADO", price: 1000, category: "jumping", validity_days: 30, is_active: true, sort_order: 6 },
-  { id: "p7",  name: "4 Clases Pilates",      num_classes: "4",         price: 300,  category: "pilates", validity_days: 30, is_active: true, sort_order: 1 },
-  { id: "p8",  name: "8 Clases Pilates",      num_classes: "8",         price: 600,  category: "pilates", validity_days: 30, is_active: true, sort_order: 2 },
-  { id: "p9",  name: "12 Clases Pilates",     num_classes: "12",        price: 840,  category: "pilates", validity_days: 30, is_active: true, sort_order: 3 },
-  { id: "p10", name: "16 Clases Pilates",     num_classes: "16",        price: 1120, category: "pilates", validity_days: 30, is_active: true, sort_order: 4 },
-  { id: "p11", name: "Ilimitado Pilates",     num_classes: "ILIMITADO", price: 1000, category: "pilates", validity_days: 30, is_active: true, sort_order: 5 },
-  { id: "p12", name: "8 Clases Mixto",        num_classes: "8",         price: 600,  category: "mixtos",  validity_days: 30, is_active: true, sort_order: 1 },
-  { id: "p13", name: "12 Clases Mixto",       num_classes: "12",        price: 860,  category: "mixtos",  validity_days: 30, is_active: true, sort_order: 2 },
-  { id: "p14", name: "16 Clases Mixto",       num_classes: "16",        price: 1120, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 3 },
-  { id: "p15", name: "20 Clases Mixto",       num_classes: "20",        price: 1300, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 4 },
-  { id: "p16", name: "Ilimitado Mixto",       num_classes: "ILIMITADO", price: 1000, category: "mixtos",  validity_days: 30, is_active: true, sort_order: 5 },
+  { id: "p1", name: "4 Clases Jumping", num_classes: "4", price: 300, category: "jumping", validity_days: 30, is_active: true, sort_order: 1 },
+  { id: "p2", name: "8 Clases Jumping", num_classes: "8", price: 560, category: "jumping", validity_days: 30, is_active: true, sort_order: 2 },
+  { id: "p3", name: "12 Clases Jumping", num_classes: "12", price: 780, category: "jumping", validity_days: 30, is_active: true, sort_order: 3 },
+  { id: "p4", name: "16 Clases Jumping", num_classes: "16", price: 960, category: "jumping", validity_days: 30, is_active: true, sort_order: 4 },
+  { id: "p5", name: "20 Clases Jumping", num_classes: "20", price: 1100, category: "jumping", validity_days: 30, is_active: true, sort_order: 5 },
+  { id: "p6", name: "Ilimitado Jumping", num_classes: "ILIMITADO", price: 1000, category: "jumping", validity_days: 30, is_active: true, sort_order: 6 },
+  { id: "p7", name: "4 Clases Pilates", num_classes: "4", price: 300, category: "pilates", validity_days: 30, is_active: true, sort_order: 1 },
+  { id: "p8", name: "8 Clases Pilates", num_classes: "8", price: 600, category: "pilates", validity_days: 30, is_active: true, sort_order: 2 },
+  { id: "p9", name: "12 Clases Pilates", num_classes: "12", price: 840, category: "pilates", validity_days: 30, is_active: true, sort_order: 3 },
+  { id: "p10", name: "16 Clases Pilates", num_classes: "16", price: 1120, category: "pilates", validity_days: 30, is_active: true, sort_order: 4 },
+  { id: "p11", name: "Ilimitado Pilates", num_classes: "ILIMITADO", price: 1000, category: "pilates", validity_days: 30, is_active: true, sort_order: 5 },
+  { id: "p12", name: "8 Clases Mixto", num_classes: "8", price: 600, category: "mixtos", validity_days: 30, is_active: true, sort_order: 1 },
+  { id: "p13", name: "12 Clases Mixto", num_classes: "12", price: 860, category: "mixtos", validity_days: 30, is_active: true, sort_order: 2 },
+  { id: "p14", name: "16 Clases Mixto", num_classes: "16", price: 1120, category: "mixtos", validity_days: 30, is_active: true, sort_order: 3 },
+  { id: "p15", name: "20 Clases Mixto", num_classes: "20", price: 1300, category: "mixtos", validity_days: 30, is_active: true, sort_order: 4 },
+  { id: "p16", name: "Ilimitado Mixto", num_classes: "ILIMITADO", price: 1000, category: "mixtos", validity_days: 30, is_active: true, sort_order: 5 },
 ];
 
 const FALLBACK_TRIAL_PLANS: TrialPlanRow[] = [
@@ -163,10 +159,10 @@ const Index = () => {
   const videoCards = videoCardsData?.data?.length
     ? videoCardsData.data
     : [
-        { id: 1, title: "Jumping Fitness", description: "Cardio de alta intensidad en trampolín con música que te hará volar.", emoji: "dumbbell", video_url: null, thumbnail_url: null },
-        { id: 2, title: "Jumping Dance",   description: "Coreografías sobre el trampolín que combinan ritmo y diversión.",     emoji: "music", video_url: null, thumbnail_url: null },
-        { id: 3, title: "Pilates Flow",    description: "Secuencias fluidas para fortalecer tu core y mejorar postura.",        emoji: "waves", video_url: null, thumbnail_url: null },
-      ];
+      { id: 1, title: "Jumping Fitness", description: "Cardio de alta intensidad en trampolín con música que te hará volar.", emoji: "dumbbell", video_url: null, thumbnail_url: null },
+      { id: 2, title: "Jumping Dance", description: "Coreografías sobre el trampolín que combinan ritmo y diversión.", emoji: "music", video_url: null, thumbnail_url: null },
+      { id: 3, title: "Pilates Flow", description: "Secuencias fluidas para fortalecer tu core y mejorar postura.", emoji: "waves", video_url: null, thumbnail_url: null },
+    ];
 
   const { data: plansData } = useQuery<{ data: any[] }>({
     queryKey: ["plans-public"],
@@ -212,21 +208,21 @@ const Index = () => {
     api.get<{ data: ClassTypeRow[] }>("/admin/class-types").then(({ data }) => {
       const rows = Array.isArray(data?.data) ? data.data.filter((c) => c.is_active) : [];
       if (rows.length > 0) setClassTypes(rows);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   useEffect(() => {
     api.get<{ data: PackageRow[] }>("/packages").then(({ data }) => {
       const rows = Array.isArray(data?.data) ? data.data : [];
       if (rows.length > 0) setPackages(rows);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   useEffect(() => {
     api.get("/public/instructors").then(({ data }) => {
       const rows = Array.isArray(data?.data) ? data.data : [];
       if (rows.length > 0) setInstructors(rows);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   // Gallery auto-rotate
@@ -262,14 +258,13 @@ const Index = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* ── NAV — Logo más grande ── */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-4 sm:px-6 lg:px-[60px] py-3 sm:py-4 transition-all duration-400 ${
-          navScrolled
-            ? "bg-background/92 backdrop-blur-[20px]"
-            : "bg-gradient-to-b from-background/95 to-transparent"
-        }`}
+        className={`fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-4 sm:px-6 lg:px-[60px] py-3 sm:py-4 transition-all duration-400 ${navScrolled
+          ? "bg-background/92 backdrop-blur-[20px]"
+          : "bg-gradient-to-b from-background/95 to-transparent"
+          }`}
       >
         <a href="#" className="flex items-center">
-          <img src={opheliaLogo} alt="Ophelia Studio" className="h-20 sm:h-24 lg:h-32 w-auto object-contain" />
+          <img src={opheliaLogo} alt="Punto Neutro" className="h-20 sm:h-24 lg:h-32 w-auto object-contain" />
         </a>
         <ul className="hidden lg:flex gap-8 list-none">
           {[
@@ -292,14 +287,14 @@ const Index = () => {
         </ul>
         {isAuthenticated && user ? (
           <button
-            onClick={() => navigate(["admin","super_admin","instructor","reception"].includes(user.role) ? "/admin/dashboard" : "/app")}
+            onClick={() => navigate(["admin", "super_admin", "instructor", "reception"].includes(user.role) ? "/admin/dashboard" : "/app")}
             className="flex items-center gap-2 bg-primary/15 border border-primary/40 text-primary px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-[0.75rem] sm:text-[0.82rem] font-medium tracking-wide hover:bg-primary/25 transition-all max-w-[190px]"
           >
             <span className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-[0.75rem] font-bold uppercase">
               {user.displayName?.[0] ?? user.email?.[0] ?? "U"}
             </span>
             <span className="truncate">
-              {["admin","super_admin"].includes(user.role) ? "Admin" : user.displayName?.split(" ")[0] ?? "Mi cuenta"}
+              {["admin", "super_admin"].includes(user.role) ? "Admin" : user.displayName?.split(" ")[0] ?? "Mi cuenta"}
             </span>
           </button>
         ) : (
@@ -323,20 +318,20 @@ const Index = () => {
       {/* ── HERO — Full-width photo, "Where Focus Goes, Energy Flows" ── */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0">
-          <img src={ophelia31} alt="Alumnas en Ophelia Studio" className="w-full h-full object-cover" />
+          <img src={ophelia31} alt="Alumnas en Punto Neutro" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
         </div>
         <div className="relative z-10 text-center px-6 lg:px-[60px] pt-[140px] pb-20 max-w-[900px] mx-auto">
-          <p className="font-alilato italic text-[clamp(1.1rem,2.2vw,1.6rem)] text-[#F9F7E8]/80 mb-6 animate-fade-up delay-200 tracking-wide">
+          <p className="font-alilato italic text-[clamp(1.1rem,2.2vw,1.6rem)] text-[#ebede5]/80 mb-6 animate-fade-up delay-200 tracking-wide">
             &ldquo;Where Focus Goes, Energy Flows&rdquo;
           </p>
-          <h1 className="font-bebas text-[clamp(3.5rem,8vw,7rem)] leading-[0.9] tracking-tight text-[#F9F7E8] animate-fade-up delay-400 mb-8">
+          <h1 className="font-bebas text-[clamp(3.5rem,8vw,7rem)] leading-[0.9] tracking-tight text-[#ebede5] animate-fade-up delay-400 mb-8">
             LIBERA TU ENERGÍA<br />
             <span className="text-primary">Y DESCUBRE</span><br />
             <span style={{ WebkitTextStroke: "2px rgba(249,247,232,0.5)", color: "transparent" }}>LO FUERTE QUE ERES</span>
           </h1>
-          <p className="text-[clamp(0.95rem,1.3vw,1.15rem)] text-[#F9F7E8]/75 leading-[1.8] max-w-[600px] mx-auto mb-10 animate-fade-up delay-600">
+          <p className="text-[clamp(0.95rem,1.3vw,1.15rem)] text-[#ebede5]/75 leading-[1.8] max-w-[600px] mx-auto mb-10 animate-fade-up delay-600">
             Un espacio donde cada entrenamiento se celebra, cada logro importa
             y cada persona encuentra su propio ritmo.<br />
             <span className="text-primary font-medium">Aquí no solo entrenas… aquí vuelves a ti.</span>
@@ -351,16 +346,16 @@ const Index = () => {
             </button>
             <button
               onClick={() => scrollTo("clases")}
-              className="text-[#F9F7E8] text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity bg-transparent border-none cursor-pointer"
+              className="text-[#ebede5] text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity bg-transparent border-none cursor-pointer"
             >
-              <span className="w-[42px] h-[42px] border border-[#F9F7E8]/30 rounded-full flex items-center justify-center text-[0.8rem]">▶</span>
+              <span className="w-[42px] h-[42px] border border-[#ebede5]/30 rounded-full flex items-center justify-center text-[0.8rem]">▶</span>
               Ver clases
             </button>
           </div>
         </div>
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-pulse-dot z-10">
-          <div className="w-[1px] h-10 bg-gradient-to-b from-transparent to-[#F9F7E8]/40" />
-          <span className="text-[0.6rem] tracking-[0.2em] uppercase text-[#F9F7E8]/40">Scroll</span>
+          <div className="w-[1px] h-10 bg-gradient-to-b from-transparent to-[#ebede5]/40" />
+          <span className="text-[0.6rem] tracking-[0.2em] uppercase text-[#ebede5]/40">Scroll</span>
         </div>
       </section>
 
@@ -368,9 +363,9 @@ const Index = () => {
       <div className="bg-secondary border-t border-b border-border">
         <div className="grid grid-cols-3 text-center">
           {([
-            { name: "JUMP", color: "#E15CB8", Icon: Zap, desc: "Cardio en trampolín" },
-            { name: "PILATES", color: "#CA71E1", Icon: Activity, desc: "Fuerza y control" },
-            { name: "YOGA", color: "#E7EB6E", Icon: Flower2, desc: "Cuerpo, mente y espíritu" },
+            { name: "JUMP", color: "#94867a", Icon: Zap, desc: "Cardio en trampolín" },
+            { name: "PILATES", color: "#b5bf9c", Icon: Activity, desc: "Fuerza y control" },
+            { name: "YOGA", color: "#ebede5", Icon: Flower2, desc: "Cuerpo, mente y espíritu" },
           ] as const).map((d, i) => (
             <div key={i} className="py-8 sm:py-10 px-3 sm:px-5 border-r border-border last:border-r-0 hover:bg-[hsl(var(--primary)/0.03)] transition-colors group cursor-default">
               <div className="flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
@@ -400,7 +395,7 @@ const Index = () => {
             MÁS QUE UN ESTUDIO,<br /><span className="text-primary">UN ESPACIO PARA TI</span>
           </h2>
           <p className="text-[1.05rem] text-muted-foreground leading-[1.9] mb-6">
-            Ophelia nació de la idea de crear un lugar donde cada mujer pueda
+            Punto Neutro nació de la idea de crear un lugar donde cada mujer pueda
             reconectar con su fuerza, celebrar su cuerpo y encontrar una comunidad
             que la impulse. No importa tu nivel, tu edad ni tu experiencia —
             aquí cada salto cuenta, cada respiración importa.
@@ -430,7 +425,7 @@ const Index = () => {
           {/* Main carousel */}
           <div className="relative rounded-3xl overflow-hidden bg-black h-[400px] sm:h-[500px] lg:h-[600px] mb-5 group">
             {GALLERY_IMAGES.map((img, i) => (
-              <img key={i} src={img} alt={"Ophelia Studio momento " + (i + 1)}
+              <img key={i} src={img} alt={"Punto Neutro momento " + (i + 1)}
                 className={"absolute inset-0 w-full h-full object-contain transition-opacity duration-1000 " + (i === galleryIdx ? "opacity-100" : "opacity-0")} />
             ))}
             <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
@@ -475,15 +470,15 @@ const Index = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-4 mb-10 text-[0.72rem] tracking-wider uppercase">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#E15CB8]" /> Jumping</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#CA71E1]" /> Pilates</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#E7EB6E]" /> Mixto / Yoga</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#94867a]" /> Jumping</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#b5bf9c]" /> Pilates</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#ebede5]" /> Mixto / Yoga</span>
           </div>
         </div>
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {classTypes.slice(0, 8).map((c) => {
-            const catBorder: Record<string, string> = { jumping: "#E15CB8", pilates: "#CA71E1", mixto: "#E7EB6E" };
-            const accent = catBorder[c.category] ?? "#E15CB8";
+            const catBorder: Record<string, string> = { jumping: "#94867a", pilates: "#b5bf9c", mixto: "#ebede5" };
+            const accent = catBorder[c.category] ?? "#94867a";
             const isFlipped = flippedCard === c.id;
             const Icon = getCardIcon(c.emoji, c.name);
             return (
@@ -530,79 +525,6 @@ const Index = () => {
       {/* ── HORARIO ── */}
       <Schedule />
 
-      {/* ── VIDEOS ── */}
-      <section id="videos" className="py-16 lg:py-24 px-6 lg:px-[60px]">
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
-          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
-            <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Conoce la experiencia
-          </div>
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-10">
-            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">MIRA CÓMO<br />SE VIVE</h2>
-            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Descubre la energía de cada clase. Fragmentos de lo que te espera en Ophelia.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {videoCards.map((v) => {
-              const videoUrl = normalizeVideoUrl(v.video_url);
-              const isPlaying = playingVideoId === v.id;
-              const hasThumbnail = Boolean(v.thumbnail_url);
-              const handlePlay = () => {
-                if (!videoUrl) return;
-                setPlayingVideoId(v.id);
-                setTimeout(() => { const el = videoRefs.current[v.id]; if (el) el.play().catch(() => {}); }, 100);
-              };
-              return (
-                <div key={v.id} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 transition-all">
-                  <div className="relative aspect-video bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center overflow-hidden">
-                    {videoUrl && isPlaying ? (
-                      <video ref={(el) => { videoRefs.current[v.id] = el; }} src={videoUrl}
-                        className="absolute inset-0 w-full h-full object-contain bg-black"
-                        controls autoPlay playsInline title={v.title} onEnded={() => setPlayingVideoId(null)} />
-                    ) : videoUrl ? (
-                      <button onClick={handlePlay} className="absolute inset-0 w-full h-full cursor-pointer focus:outline-none" aria-label={"Reproducir " + v.title}>
-                        {hasThumbnail ? (
-                          <img src={v.thumbnail_url!} alt={v.title} className="absolute inset-0 w-full h-full object-cover" />
-                        ) : (
-                          <video src={videoUrl} className="absolute inset-0 w-full h-full object-contain bg-black pointer-events-none" preload="metadata" muted playsInline />
-                        )}
-                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/20 transition-colors">
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary/80 backdrop-blur-sm border-2 border-white/30 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_40px_hsl(var(--primary)/0.4)]">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="text-white ml-1"><polygon points="5 3 19 12 5 21 5 3" /></svg>
-                          </div>
-                        </div>
-                      </button>
-                    ) : (
-                      <>
-                        {hasThumbnail ? (
-                          <img src={v.thumbnail_url!} alt={v.title} className="absolute inset-0 w-full h-full object-cover" />
-                        ) : (
-                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--primary)/0.15)_0%,transparent_65%)]" />
-                        )}
-                        <div className="relative flex flex-col items-center gap-3">
-                          <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_40px_hsl(var(--primary)/0.3)]">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-primary ml-1"><polygon points="5 3 19 12 5 21 5 3" /></svg>
-                          </div>
-                          <span className="text-[0.65rem] tracking-[0.15em] uppercase text-primary/60 font-medium">Video próximamente</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <div className="p-5">
-                    <div className="flex items-center gap-2 mb-2">
-                      {(() => { const Ic = getCardIcon(v.emoji, v.title); return <Ic size={20} className="text-primary flex-shrink-0" />; })()}
-                      <h3 className="font-syne font-bold text-[1rem] text-foreground">{v.title}</h3>
-                    </div>
-                    <p className="text-[0.82rem] text-muted-foreground leading-[1.6]">{v.description}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
       {/* ── PAQUETES ── */}
       <section id="membresias" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
@@ -630,7 +552,7 @@ const Index = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {trialPlans.map((plan) => {
                 const isJumping = plan.classCategory === "jumping";
-                const accent = isJumping ? "#E15CB8" : "#CA71E1";
+                const accent = isJumping ? "#94867a" : "#b5bf9c";
                 const icon = isJumping ? imgTrampoline : imgPilates;
                 return (
                   <div key={plan.id} className="rounded-2xl border border-border bg-secondary p-5 flex flex-col gap-3">
@@ -689,11 +611,11 @@ const Index = () => {
                       isUnlimited
                         ? "bg-primary border-2 border-primary shadow-[0_20px_60px_hsl(var(--primary)/0.35)]"
                         : isPopular
-                        ? "bg-background border-2 border-primary/60 shadow-[0_10px_40px_hsl(var(--primary)/0.15)]"
-                        : "bg-background border border-border hover:border-primary/50"
+                          ? "bg-background border-2 border-primary/60 shadow-[0_10px_40px_hsl(var(--primary)/0.15)]"
+                          : "bg-background border border-border hover:border-primary/50"
                     )}>
                     {isPopular && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#CA71E1] text-white text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium whitespace-nowrap">Más popular</div>
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#b5bf9c] text-white text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium whitespace-nowrap">Más popular</div>
                     )}
                     {isUnlimited && (
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-foreground text-primary text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium whitespace-nowrap">Mejor valor</div>
@@ -751,33 +673,37 @@ const Index = () => {
           <div className={"grid grid-cols-1 " + ((instructors.length > 0 ? instructors.length : 2) === 1 ? "max-w-md mx-auto" : "sm:grid-cols-2") + " " + ((instructors.length > 0 ? instructors.length : 2) >= 3 ? "lg:grid-cols-3" : "") + " gap-6"}>
             {(instructors.length > 0
               ? instructors.map((inst) => ({
-                  key: inst.id,
-                  label: inst.displayName,
-                  coachTitle: null as string | null,
-                  sub: Array.isArray(inst.specialties)
-                    ? (inst.specialties as unknown as string[]).join(" & ")
-                    : typeof inst.specialties === "string" && inst.specialties ? inst.specialties : "Instructora",
-                  bio: inst.bio || null,
-                  funFact: null as string | null,
-                  photoUrl: inst.photoUrl || null,
-                  photoFocusX: clampFocus(inst.photoFocusX),
-                  photoFocusY: clampFocus(inst.photoFocusY),
-                }))
+                key: inst.id,
+                label: inst.displayName,
+                coachTitle: null as string | null,
+                sub: Array.isArray(inst.specialties)
+                  ? (inst.specialties as unknown as string[]).join(" & ")
+                  : typeof inst.specialties === "string" && inst.specialties ? inst.specialties : "Instructora",
+                bio: inst.bio || null,
+                funFact: null as string | null,
+                photoUrl: inst.photoUrl || null,
+                photoFocusX: clampFocus(inst.photoFocusX),
+                photoFocusY: clampFocus(inst.photoFocusY),
+              }))
               : [
-                  { key: "emi", label: "Emi", coachTitle: "COACH EMI",
-                    sub: "Hot Pilates · Flow Pilates · Pilates Mat · Jumping Fitness · Jumping Dance",
-                    bio: "Especialista en Pilates y entrenamiento funcional. Enfocada en técnica, control corporal y bienestar integral.",
-                    funFact: "Siempre dice que ya es la última repetición… pero no es verdad",
-                    photoUrl: null, photoFocusX: 50, photoFocusY: 50 },
-                  { key: "mon", label: "Montse", coachTitle: "COACH MON",
-                    sub: "Jumping Fitness · Jumping Dance · Jump & Tone · Strong Jump · Mindful Jump",
-                    bio: "Certificada en Jumping Fitness y Pilates. Apasionada por motivar a cada alumna a dar su mejor versión.",
-                    funFact: "Siempre dice que estará tranquila la clase, pero al final sales temblando",
-                    photoUrl: null, photoFocusX: 50, photoFocusY: 50 },
-                ]
+                {
+                  key: "emi", label: "Emi", coachTitle: "COACH EMI",
+                  sub: "Hot Pilates · Flow Pilates · Pilates Mat · Jumping Fitness · Jumping Dance",
+                  bio: "Especialista en Pilates y entrenamiento funcional. Enfocada en técnica, control corporal y bienestar integral.",
+                  funFact: "Siempre dice que ya es la última repetición… pero no es verdad",
+                  photoUrl: null, photoFocusX: 50, photoFocusY: 50
+                },
+                {
+                  key: "mon", label: "Montse", coachTitle: "COACH MON",
+                  sub: "Jumping Fitness · Jumping Dance · Jump & Tone · Strong Jump · Mindful Jump",
+                  bio: "Certificada en Jumping Fitness y Pilates. Apasionada por motivar a cada alumna a dar su mejor versión.",
+                  funFact: "Siempre dice que estará tranquila la clase, pero al final sales temblando",
+                  photoUrl: null, photoFocusX: 50, photoFocusY: 50
+                },
+              ]
             ).map((inst) => (
               <div key={inst.key} className="group rounded-3xl overflow-hidden bg-secondary border border-border hover:border-primary/50 hover:-translate-y-2 transition-all">
-                <div className="h-[380px] lg:h-[460px] bg-gradient-to-br from-[#1F0047] via-[#2d0a40] to-[#1a0035] flex items-center justify-center relative overflow-hidden">
+                <div className="h-[380px] lg:h-[460px] bg-gradient-to-br from-[#94867a] via-[#2d0a40] to-[#1a0035] flex items-center justify-center relative overflow-hidden">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_60%,hsl(var(--primary)/0.18)_0%,transparent_65%)]" />
                   {inst.photoUrl ? (
                     <img src={inst.photoUrl} alt={inst.label}
@@ -785,18 +711,18 @@ const Index = () => {
                       style={{ objectPosition: clampFocus(inst.photoFocusX) + "% " + clampFocus(inst.photoFocusY) + "%" }} />
                   ) : (
                     <div className="relative flex flex-col items-center gap-4">
-                      <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-[#E15CB8]/25 to-[#CA71E1]/15 border-2 border-[#E15CB8]/30 shadow-[0_0_60px_hsl(var(--primary)/0.2)]">
-                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-[#E15CB8]/50">
+                      <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-[#94867a]/25 to-[#b5bf9c]/15 border-2 border-[#94867a]/30 shadow-[0_0_60px_hsl(var(--primary)/0.2)]">
+                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-[#94867a]/50">
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
                         </svg>
                       </div>
-                      <span className="text-[0.65rem] tracking-[0.2em] uppercase text-[#E15CB8]/50 font-medium">Foto próximamente</span>
+                      <span className="text-[0.65rem] tracking-[0.2em] uppercase text-[#94867a]/50 font-medium">Foto próximamente</span>
                     </div>
                   )}
                 </div>
                 <div className="p-7">
                   {inst.coachTitle && (
-                    <div className="font-bebas text-[1.6rem] tracking-wide leading-none mb-1" style={{ color: "#E7EB6E" }}>
+                    <div className="font-bebas text-[1.6rem] tracking-wide leading-none mb-1" style={{ color: "#ebede5" }}>
                       {inst.coachTitle}
                     </div>
                   )}
@@ -824,7 +750,7 @@ const Index = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             <div className="relative">
               <div className="rounded-3xl overflow-hidden aspect-[4/5] relative">
-                <img src={ophelia50} alt="Ophelia Studio" className="w-full h-full object-cover" />
+                <img src={ophelia50} alt="Punto Neutro" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
               </div>
               <div className="absolute -bottom-4 -right-4 lg:-right-8 bg-primary/90 backdrop-blur-sm rounded-2xl px-6 py-4 shadow-[0_20px_60px_hsl(var(--primary)/0.3)]">
@@ -842,15 +768,15 @@ const Index = () => {
                 ¿POR QUÉ<br /><span className="text-primary">&ldquo;OPHELIA&rdquo;?</span>
               </h2>
               <div className="space-y-5 text-[0.95rem] text-muted-foreground leading-[1.85]">
-                <p>El nombre <span className="text-foreground font-medium">Ophelia</span> viene de mi abuela
+                <p>El nombre <span className="text-foreground font-medium">Punto Neutro</span> viene de mi abuela
                   <span className="text-primary font-medium"> Ofelia</span> — una mujer fuerte, amorosa y llena de vida.</p>
                 <p>Ella era mi lugar seguro. Su risa llenaba la casa, su abrazo curaba todo
                   y su fortaleza me enseñó que ser mujer es un superpoder.</p>
                 <p>Este estudio lleva su nombre porque quiero que cada persona que entre
                   sienta lo que yo sentía con ella: <span className="text-foreground font-medium">que pertenece,
-                  que es suficiente y que es capaz de todo.</span></p>
+                    que es suficiente y que es capaz de todo.</span></p>
                 <p className="font-alilato italic text-foreground text-[1.1rem]">
-                  Ophelia es más que un estudio — es un abrazo en forma de movimiento.</p>
+                  Punto Neutro es más que un estudio — es un abrazo en forma de movimiento.</p>
               </div>
               <div className="mt-8 flex items-center gap-3">
                 <div className="w-12 h-[1px] bg-primary" />
@@ -890,55 +816,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ── TESTIMONIOS ── */}
-      <section className="py-16 lg:py-24 px-6 lg:px-[60px] bg-secondary">
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
-          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
-            <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Lo que dicen nuestras alumnas
-          </div>
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-12">
-            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">EXPERIENCIAS<br />REALES</h2>
-            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Cada historia nos inspira a seguir creando un espacio único.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { name: "Ana García", time: "Alumna desde 2024", text: "Ophelia me cambió la vida. Llegué sin saber nada de jumping y ahora no puedo vivir sin mis clases. El ambiente es increíble y las coaches te motivan como nadie.", stars: 5 },
-              { name: "Laura Martínez", time: "Alumna desde 2025", text: "El pilates con Emi es otra cosa. Salgo de cada clase sintiéndome más fuerte y más conectada con mi cuerpo. Es mi momento favorito de la semana.", stars: 5 },
-              { name: "Sofía Hernández", time: "Alumna desde 2024", text: "Lo que más me gusta de Ophelia es la comunidad. Aquí no te juzgan, te impulsan. Las clases de Mon son pura energía y cada una es diferente.", stars: 5 },
-              { name: "Daniela Ríos", time: "Alumna desde 2025", text: "Probé la clase muestra de jumping y quedé enganchada. La música, la energía, el trampolín… es una experiencia completa. ¡Ya voy por mi tercer paquete!", stars: 5 },
-              { name: "Mariana López", time: "Alumna desde 2024", text: "Nunca pensé que entrenar pudiera ser tan divertido. En Ophelia cada clase se siente como una fiesta. Mis amigas ya se unieron también.", stars: 5 },
-              { name: "Valeria Torres", time: "Alumna desde 2025", text: "El estudio es hermoso, las instalaciones están increíbles y las coaches realmente se preocupan por ti. Ophelia no es un gym, es un espacio para ti.", stars: 5 },
-            ].map((t, i) => (
-              <div key={i} className="rounded-2xl border border-border bg-background p-6 hover:border-primary/30 transition-all flex flex-col gap-4">
-                <div className="flex gap-0.5">
-                  {Array.from({ length: t.stars }).map((_, s) => (
-                    <svg key={s} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-[#E7EB6E]">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-[0.88rem] text-muted-foreground leading-[1.7] flex-1 italic">
-                  &ldquo;{t.text}&rdquo;
-                </p>
-                <div className="flex items-center gap-3 pt-3 border-t border-border">
-                  <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-[0.8rem] font-bold text-primary">
-                    {t.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
-                  </div>
-                  <div>
-                    <div className="text-[0.85rem] font-medium text-foreground">{t.name}</div>
-                    <div className="text-[0.7rem] text-muted-foreground">{t.time}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── CTA — "¿Lista para vivir la experiencia Ophelia?" ── */}
+      {/* ── CTA — "¿Lista para vivir la experiencia Punto Neutro?" ── */}
       <section id="contacto" className="py-16 lg:py-24 px-6 lg:px-[60px] relative overflow-hidden bg-secondary">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.12)_0%,transparent_60%)] pointer-events-none" />
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700 relative z-10">
@@ -946,7 +824,7 @@ const Index = () => {
             <div className="text-primary text-[0.8rem] tracking-[0.15em] uppercase mb-6">Tu momento es ahora</div>
             <h2 className="font-bebas text-[clamp(3.5rem,7vw,7rem)] leading-[0.9] text-foreground mb-8">
               ¿LISTA PARA VIVIR<br /><span className="text-primary">LA EXPERIENCIA</span><br />
-              <span style={{ WebkitTextStroke: "2px hsl(53 74% 94% / 0.4)", color: "transparent" }}>OPHELIA?</span>
+              <span style={{ WebkitTextStroke: "2px hsl(53 74% 94% / 0.4)", color: "transparent" }}>PUNTO NEUTRO?</span>
             </h2>
             <p className="text-[1.1rem] text-muted-foreground max-w-[500px] mx-auto mb-10 leading-[1.7]">
               Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Prueba Jumping o Pilates por $65 en tu clase muestra.
@@ -957,7 +835,7 @@ const Index = () => {
                 Reservar clase muestra
                 <span className="w-[22px] h-[22px] bg-primary-foreground/20 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
               </button>
-              <a href="https://wa.me/524421234567?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Ophelia%20Studio"
+              <a href="https://wa.me/524421234567?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Punto Neutro%20Studio"
                 target="_blank" rel="noopener noreferrer"
                 className="border border-border text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-3 px-8 py-[18px] rounded-full opacity-70 hover:opacity-100 hover:border-primary transition-all no-underline">
                 WhatsApp
@@ -966,44 +844,44 @@ const Index = () => {
           </div>
           {/* Info + Map */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-            <div className="rounded-3xl p-10 flex flex-col justify-between gap-8 bg-gradient-to-br from-[#1F0047] via-[#2a0050] to-[#1a003a] border border-[#CA71E1]/20 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,#E15CB8_0%,transparent_65%)] opacity-[0.08] pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-[200px] h-[200px] rounded-full bg-[radial-gradient(circle,#CA71E1_0%,transparent_65%)] opacity-[0.08] pointer-events-none" />
+            <div className="rounded-3xl p-10 flex flex-col justify-between gap-8 bg-gradient-to-br from-[#94867a] via-[#2a0050] to-[#1a003a] border border-[#b5bf9c]/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,#94867a_0%,transparent_65%)] opacity-[0.08] pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-[200px] h-[200px] rounded-full bg-[radial-gradient(circle,#b5bf9c_0%,transparent_65%)] opacity-[0.08] pointer-events-none" />
               <div className="relative z-10">
-                <div className="text-[0.7rem] tracking-[0.18em] uppercase text-[#E15CB8] font-semibold mb-3">Encuéntranos</div>
-                <h3 className="font-bebas text-[clamp(2.5rem,3.5vw,3.5rem)] leading-[0.95] text-[#F9F7E8] mb-8">VISÍTANOS<br />EN ESTUDIO</h3>
+                <div className="text-[0.7rem] tracking-[0.18em] uppercase text-[#94867a] font-semibold mb-3">Encuéntranos</div>
+                <h3 className="font-bebas text-[clamp(2.5rem,3.5vw,3.5rem)] leading-[0.95] text-[#ebede5] mb-8">VISÍTANOS<br />EN ESTUDIO</h3>
                 <div className="flex flex-col gap-6">
                   {[
-                    { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>, label: "Ubicación", value: "San Juan del Río, Querétaro", accent: "#E15CB8" },
-                    { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 11 19.79 19.79 0 0 1 1.77 2.38 2 2 0 0 1 3.74.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6.08 6.08l1.28-1.28a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>, label: "Teléfono", value: "+52 442 123 4567", accent: "#CA71E1" },
-                    { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>, label: "Email", value: "info@opheliajumping.mx", accent: "#E15CB8" },
-                    { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>, label: "Horarios", value: "Lun–Vie 6am–9pm  ·  Sáb 7am–2pm", accent: "#E7EB6E" },
+                    { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" /><circle cx="12" cy="9" r="2.5" /></svg>, label: "Ubicación", value: "San Juan del Río, Querétaro", accent: "#94867a" },
+                    { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 11 19.79 19.79 0 0 1 1.77 2.38 2 2 0 0 1 3.74.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 7.91a16 16 0 0 0 6.08 6.08l1.28-1.28a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>, label: "Teléfono", value: "+52 442 123 4567", accent: "#b5bf9c" },
+                    { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>, label: "Email", value: "contacto@puntoneutro.mx", accent: "#94867a" },
+                    { icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>, label: "Horarios", value: "Lun–Vie 6am–9pm  ·  Sáb 7am–2pm", accent: "#ebede5" },
                   ].map((item) => (
                     <div key={item.label} className="flex items-start gap-4">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: item.accent + "20", color: item.accent, border: "1px solid " + item.accent + "30" }}>{item.icon}</div>
                       <div>
                         <div className="text-[0.65rem] tracking-widest uppercase mb-0.5" style={{ color: item.accent }}>{item.label}</div>
-                        <div className="text-[1rem] text-[#F9F7E8] font-medium leading-snug">{item.value}</div>
+                        <div className="text-[1rem] text-[#ebede5] font-medium leading-snug">{item.value}</div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="relative z-10 flex gap-3 pt-6 border-t border-[#CA71E1]/15">
+              <div className="relative z-10 flex gap-3 pt-6 border-t border-[#b5bf9c]/15">
                 {[
                   { label: "Instagram", href: "https://www.instagram.com/ophelia_studiomx/", short: "ig" },
                   { label: "Facebook", href: "https://www.facebook.com/profile.php?id=61574872102085", short: "fb" },
                 ].map((s) => (
                   <a key={s.short} href={s.href} target="_blank" rel="noopener noreferrer"
-                    className="w-10 h-10 rounded-full border border-[#E15CB8]/30 flex items-center justify-center text-[0.8rem] text-[#E15CB8]/70 hover:bg-[#E15CB8]/15 hover:text-[#E15CB8] transition-all no-underline">{s.short}</a>
+                    className="w-10 h-10 rounded-full border border-[#94867a]/30 flex items-center justify-center text-[0.8rem] text-[#94867a]/70 hover:bg-[#94867a]/15 hover:text-[#94867a] transition-all no-underline">{s.short}</a>
                 ))}
               </div>
             </div>
             <div className="rounded-3xl overflow-hidden border border-border min-h-[480px] lg:min-h-0">
               <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3739.577714731379!2d-99.99482528857814!3d20.40029408101758!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d30d002e88643b%3A0xb7eed5074cefa672!2sOphelia%20Jumping%20Studio!5e0!3m2!1ses-419!2smx!4v1772066339529!5m2!1ses-419!2smx"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3739.577714731379!2d-99.99482528857814!3d20.40029408101758!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d30d002e88643b%3A0xb7eed5074cefa672!2sPunto Neutro%20Jumping%20Studio!5e0!3m2!1ses-419!2smx!4v1772066339529!5m2!1ses-419!2smx"
                 width="100%" height="100%" style={{ border: 0, display: "block", minHeight: "480px" }}
-                allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="Ophelia Jumping Studio ubicación" />
+                allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="Punto Neutro ubicación" />
             </div>
           </div>
         </div>
@@ -1013,7 +891,7 @@ const Index = () => {
       <footer className="bg-background px-6 lg:px-[60px] pt-[60px] border-t border-border">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 pb-10">
           <div>
-            <div className="mb-3"><img src={opheliaLogo} alt="Ophelia Studio" className="h-20 w-auto object-contain" /></div>
+            <div className="mb-3"><img src={opheliaLogo} alt="Punto Neutro" className="h-20 w-auto object-contain" /></div>
             <p className="text-[0.82rem] text-muted-foreground leading-[1.7] max-w-[200px]">
               Aquí no solo entrenas… aquí vuelves a ti. Salto a salto, respiración a respiración.
             </p>
@@ -1025,7 +903,7 @@ const Index = () => {
           <div>
             <div className="text-[0.72rem] tracking-widest uppercase text-muted-foreground mb-5">Estudio</div>
             <ul className="flex flex-col gap-[10px] list-none">
-              {[["Clases","clases"],["Horario","horario"],["Paquetes","membresias"],["Instructoras","instructoras"],["Galería","galeria"],["Políticas","politicas"]].map(([label, id]) => (
+              {[["Clases", "clases"], ["Horario", "horario"], ["Paquetes", "membresias"], ["Instructoras", "instructoras"], ["Galería", "galeria"], ["Políticas", "politicas"]].map(([label, id]) => (
                 <li key={id}><button onClick={() => scrollTo(id)} className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none cursor-pointer p-0">{label}</button></li>
               ))}
             </ul>
@@ -1046,14 +924,14 @@ const Index = () => {
             <div className="text-[0.72rem] tracking-widest uppercase text-muted-foreground mb-5">Contacto</div>
             <ul className="flex flex-col gap-[10px] list-none">
               <li><span className="text-[0.85rem] text-muted-foreground">San Juan del Río, Qro.</span></li>
-              <li><a href="mailto:info@opheliajumping.mx" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">info@opheliajumping.mx</a></li>
+              <li><a href="mailto:contacto@puntoneutro.mx" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">contacto@puntoneutro.mx</a></li>
               <li><a href="https://wa.me/524421234567" target="_blank" rel="noopener noreferrer" className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors no-underline">WhatsApp</a></li>
               <li><button onClick={() => scrollTo("horario")} className="text-[0.85rem] text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none cursor-pointer p-0">Horarios</button></li>
             </ul>
           </div>
         </div>
         <div className="border-t border-border py-5 flex flex-col sm:flex-row justify-between items-center gap-2">
-          <p className="text-[0.75rem] text-muted-foreground/50">© 2026 Ophelia Studio. Todos los derechos reservados.</p>
+          <p className="text-[0.75rem] text-muted-foreground/50">© 2026 Punto Neutro. Todos los derechos reservados.</p>
           <p className="text-[0.75rem] text-muted-foreground/50">Hecho con pasión en San Juan del Río ♡</p>
         </div>
       </footer>
