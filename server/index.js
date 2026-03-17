@@ -619,14 +619,14 @@ async function ensureSchema() {
                 SET order_id = NULL
               WHERE order_id IN (SELECT id FROM orders WHERE plan_id = ANY($1::uuid[]))`,
             [legacyIds]
-          ).catch(() => {});
-          await cleanupClient.query(`DELETE FROM discount_codes WHERE plan_id = ANY($1::uuid[])`, [legacyIds]).catch(() => {});
-          await cleanupClient.query(`DELETE FROM memberships WHERE plan_id = ANY($1::uuid[])`, [legacyIds]).catch(() => {});
-          await cleanupClient.query(`DELETE FROM orders WHERE plan_id = ANY($1::uuid[])`, [legacyIds]).catch(() => {});
+          ).catch(() => { });
+          await cleanupClient.query(`DELETE FROM discount_codes WHERE plan_id = ANY($1::uuid[])`, [legacyIds]).catch(() => { });
+          await cleanupClient.query(`DELETE FROM memberships WHERE plan_id = ANY($1::uuid[])`, [legacyIds]).catch(() => { });
+          await cleanupClient.query(`DELETE FROM orders WHERE plan_id = ANY($1::uuid[])`, [legacyIds]).catch(() => { });
           await cleanupClient.query(`DELETE FROM plans WHERE id = ANY($1::uuid[])`, [legacyIds]);
           await cleanupClient.query("COMMIT");
         } catch (legacyErr) {
-          await cleanupClient.query("ROLLBACK").catch(() => {});
+          await cleanupClient.query("ROLLBACK").catch(() => { });
           console.warn("[schema] Legacy session cleanup skipped:", legacyErr?.message || legacyErr);
         } finally {
           cleanupClient.release();
@@ -764,8 +764,8 @@ async function ensureSchema() {
         updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_x SMALLINT DEFAULT 50`).catch(() => {});
-    await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_y SMALLINT DEFAULT 50`).catch(() => {});
+    await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_x SMALLINT DEFAULT 50`).catch(() => { });
+    await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_y SMALLINT DEFAULT 50`).catch(() => { });
     // ── Reviews table ──────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
@@ -780,17 +780,17 @@ async function ensureSchema() {
       CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id);
     `);
     // Ensure all review columns exist even if table was created by an older schema
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_id UUID`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS rating SMALLINT`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS overall_rating SMALLINT`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment TEXT`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS class_id UUID`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT false`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
-    await pool.query(`UPDATE reviews SET rating = COALESCE(rating, overall_rating, 5) WHERE rating IS NULL`).catch(() => {});
-    await pool.query(`UPDATE reviews SET overall_rating = COALESCE(overall_rating, rating, 5) WHERE overall_rating IS NULL`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET DEFAULT 5`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ALTER COLUMN overall_rating SET DEFAULT 5`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_id UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS rating SMALLINT`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS overall_rating SMALLINT`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS comment TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS class_id UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`).catch(() => { });
+    await pool.query(`UPDATE reviews SET rating = COALESCE(rating, overall_rating, 5) WHERE rating IS NULL`).catch(() => { });
+    await pool.query(`UPDATE reviews SET overall_rating = COALESCE(overall_rating, rating, 5) WHERE overall_rating IS NULL`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET DEFAULT 5`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ALTER COLUMN overall_rating SET DEFAULT 5`).catch(() => { });
     await pool.query(`
       DO $$
       BEGIN
@@ -803,7 +803,7 @@ async function ensureSchema() {
           ALTER TABLE reviews ADD CONSTRAINT reviews_rating_check CHECK (rating BETWEEN 1 AND 5);
         END IF;
       END $$;
-    `).catch(() => {});
+    `).catch(() => { });
     await pool.query(`
       DO $$
       BEGIN
@@ -820,9 +820,9 @@ async function ensureSchema() {
           ALTER TABLE reviews ADD CONSTRAINT reviews_overall_rating_check CHECK (overall_rating BETWEEN 1 AND 5);
         END IF;
       END $$;
-    `).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET NOT NULL`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ALTER COLUMN overall_rating SET NOT NULL`).catch(() => {});
+    `).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ALTER COLUMN rating SET NOT NULL`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ALTER COLUMN overall_rating SET NOT NULL`).catch(() => { });
     await pool.query(`
       CREATE OR REPLACE FUNCTION reviews_sync_overall_rating()
       RETURNS trigger
@@ -834,26 +834,26 @@ async function ensureSchema() {
         RETURN NEW;
       END;
       $$;
-    `).catch(() => {});
-    await pool.query(`DROP TRIGGER IF EXISTS trg_reviews_sync_overall_rating ON reviews`).catch(() => {});
+    `).catch(() => { });
+    await pool.query(`DROP TRIGGER IF EXISTS trg_reviews_sync_overall_rating ON reviews`).catch(() => { });
     await pool.query(`
       CREATE TRIGGER trg_reviews_sync_overall_rating
       BEFORE INSERT OR UPDATE ON reviews
       FOR EACH ROW
       EXECUTE FUNCTION reviews_sync_overall_rating();
-    `).catch(() => {});
+    `).catch(() => { });
     // Add booking_id, instructor_id, tag_ids columns to reviews if missing
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS booking_id UUID`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS instructor_id UUID`).catch(() => {});
-    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS tag_ids UUID[] DEFAULT '{}'`).catch(() => {});
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reviews_booking ON reviews(booking_id)`).catch(() => {});
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS booking_id UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS instructor_id UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS tag_ids UUID[] DEFAULT '{}'`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reviews_booking ON reviews(booking_id)`).catch(() => { });
     await pool.query(`
       DELETE FROM reviews a
       USING reviews b
       WHERE a.booking_id IS NOT NULL
         AND a.booking_id = b.booking_id
         AND a.created_at < b.created_at
-    `).catch(() => {});
+    `).catch(() => { });
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_booking_unique
       ON reviews(booking_id)
@@ -868,7 +868,7 @@ async function ensureSchema() {
         tag_id    UUID REFERENCES review_tags(id) ON DELETE CASCADE,
         PRIMARY KEY (review_id, tag_id)
       );
-    `).catch(() => {});
+    `).catch(() => { });
     // ── Loyalty transactions table ─────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS loyalty_transactions (
@@ -2881,7 +2881,7 @@ app.post("/api/reviews", authMiddleware, async (req, res) => {
         await pool.query(
           "INSERT INTO review_tag_links (review_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
           [review.id, tagId]
-        ).catch(() => {});
+        ).catch(() => { });
       }
     }
 
@@ -3316,7 +3316,7 @@ function parseGWServiceAccount() {
     if (raw) {
       // Step 1: URL-decode if needed (Railway sometimes encodes)
       if (raw.includes("%3D") || raw.includes("%2B") || raw.includes("%2F")) {
-        try { raw = decodeURIComponent(raw); } catch (_) {}
+        try { raw = decodeURIComponent(raw); } catch (_) { }
       }
       // Step 2: If it's a JSON-escaped string (starts with "), unwrap it
       if (raw.startsWith('"') || raw.startsWith("'")) {
@@ -3329,7 +3329,7 @@ function parseGWServiceAccount() {
         try {
           const decoded = Buffer.from(raw, "base64").toString("utf8");
           if (decoded.includes("-----BEGIN") || decoded.includes("PRIVATE KEY")) raw = decoded;
-        } catch (_) {}
+        } catch (_) { }
       }
       // Step 4: Replace escaped newlines (\\n → \n, plus double-escaped)
       raw = raw.replace(/\\\\n/g, "\n").replace(/\\n/g, "\n");
@@ -3500,8 +3500,8 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     : "all";
   const membershipCategoryLabel =
     membershipCategory === "jumping" ? "Jumping" :
-    membershipCategory === "pilates" ? "Pilates" :
-    membershipCategory === "mixto" ? "Mixto" : "General";
+      membershipCategory === "pilates" ? "Pilates" :
+        membershipCategory === "mixto" ? "Mixto" : "General";
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
   const classLimit = Number(membership?.class_limit ?? 0);
   const hasIconStampMode = hasMembership && !isUnlimited && classLimit > 0;
@@ -3765,7 +3765,7 @@ app.get("/api/wallet/google/save-url", authMiddleware, async (req, res) => {
     const saveUrl = buildGoogleWalletSaveUrl({ ...snapshot, activeEventPass: null, passKind: "membership" });
     return res.json({ data: { saveUrl } });
   } catch (err) {
-    console.error("Google Wallet save-url error:", err.response?.data || err.message, err.stack?.split("\n").slice(0,3).join("\n"));
+    console.error("Google Wallet save-url error:", err.response?.data || err.message, err.stack?.split("\n").slice(0, 3).join("\n"));
     return res.status(500).json({ message: "Error generando pase de Google Wallet", detail: err.message });
   }
 });
@@ -4073,7 +4073,7 @@ function resolveWalletStripStampState(classLimitRaw, classesRemainingRaw) {
   }
   const nearestTotal = WALLET_STRIP_TOTAL_BUCKETS.reduce((best, current) =>
     Math.abs(current - classLimit) < Math.abs(best - classLimit) ? current : best,
-  WALLET_STRIP_TOTAL_BUCKETS[0]);
+    WALLET_STRIP_TOTAL_BUCKETS[0]);
   const ratio = classLimit > 0 ? Math.min(1, Math.max(0, classesRemaining / classLimit)) : 0;
   const remainingBucket = Math.min(nearestTotal, Math.max(0, Math.round(ratio * nearestTotal)));
   return { total: nearestTotal, remaining: remainingBucket };
@@ -4584,8 +4584,8 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     : "all";
   const membershipCategoryLabel =
     membershipCategory === "jumping" ? "Jumping" :
-    membershipCategory === "pilates" ? "Pilates" :
-    membershipCategory === "mixto" ? "Mixto" : "General";
+      membershipCategory === "pilates" ? "Pilates" :
+        membershipCategory === "mixto" ? "Mixto" : "General";
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
   const isTrialSingleSession = hasMembership && String(membership.repeat_key || "").startsWith("trial_single_session");
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
@@ -6075,7 +6075,7 @@ app.post("/api/admin/plans", adminMiddleware, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
       [name.trim(), description || null, price, currency || "MXN",
       duration_days || 30, class_limit || null,
-      cat, JSON.stringify(features || []), is_active ?? true, sort_order ?? 0, nonTransferable, nonRepeatable, safeRepeatKey]
+        cat, JSON.stringify(features || []), is_active ?? true, sort_order ?? 0, nonTransferable, nonRepeatable, safeRepeatKey]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
@@ -6115,7 +6115,7 @@ app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
        WHERE id = $14 RETURNING *`,
       [name || null, description || null, price ?? null, currency || null,
       duration_days || null, class_limit ?? null,
-      cat, features ? JSON.stringify(features) : null,
+        cat, features ? JSON.stringify(features) : null,
       is_active ?? null, sort_order ?? null, nonTransferable, nonRepeatable, safeRepeatKey, req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
@@ -6978,7 +6978,7 @@ function queueWhatsAppSend(number, text) {
     });
   });
   // Keep queue alive even if one send fails
-  evolutionSendQueue = run.catch(() => {});
+  evolutionSendQueue = run.catch(() => { });
   return run;
 }
 
@@ -7265,7 +7265,7 @@ app.post("/api/videos/upload", adminMiddleware, uploadVideo.fields([{ name: "vid
       accessToken
     );
     // Clean up temp file
-    fs.unlink(videoFile.path, () => {});
+    fs.unlink(videoFile.path, () => { });
     await makeGoogleDriveFilePublic(videoResult.id, accessToken);
 
     // Upload thumbnail (optional) — small file, use buffer multipart
@@ -7279,7 +7279,7 @@ app.post("/api/videos/upload", adminMiddleware, uploadVideo.fields([{ name: "vid
         thumbnailFile.mimetype,
         accessToken
       );
-      fs.unlink(thumbnailFile.path, () => {});
+      fs.unlink(thumbnailFile.path, () => { });
       await makeGoogleDriveFilePublic(thumbResult.id, accessToken);
       thumbnailUrl = `https://drive.google.com/thumbnail?id=${thumbResult.id}&sz=w640`;
       thumbnailDriveId = thumbResult.id;
@@ -7296,8 +7296,8 @@ app.post("/api/videos/upload", adminMiddleware, uploadVideo.fields([{ name: "vid
     });
   } catch (err) {
     // Clean up temp files on error
-    if (req.files?.video?.[0]?.path) fs.unlink(req.files.video[0].path, () => {});
-    if (req.files?.thumbnail?.[0]?.path) fs.unlink(req.files.thumbnail[0].path, () => {});
+    if (req.files?.video?.[0]?.path) fs.unlink(req.files.video[0].path, () => { });
+    if (req.files?.thumbnail?.[0]?.path) fs.unlink(req.files.thumbnail[0].path, () => { });
     console.error("Video upload error:", err?.response?.data || err.message);
     return res.status(500).json({ message: "Error al subir video: " + (err?.response?.data?.error?.message || err.message) });
   }
@@ -7785,11 +7785,11 @@ app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, (req, res, nex
         accessToken
       );
       // Clean up temp file
-      fs.unlink(videoFile.path, () => {});
+      fs.unlink(videoFile.path, () => { });
       await makeGoogleDriveFilePublic(result.id, accessToken);
       videoUrl = `/api/drive/video/${result.id}`;
     } else {
-      if (videoFile.path) fs.unlink(videoFile.path, () => {});
+      if (videoFile.path) fs.unlink(videoFile.path, () => { });
       return res.status(503).json({
         message: "Google Drive no está configurado. Configura GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN para subir videos.",
       });
@@ -7804,7 +7804,7 @@ app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, (req, res, nex
     return res.json({ data: r.rows[0] });
   } catch (err) {
     // Clean up temp file on error
-    if (req.file?.path) fs.unlink(req.file.path, () => {});
+    if (req.file?.path) fs.unlink(req.file.path, () => { });
     console.error("Homepage card video upload error:", err?.response?.data || err.message);
     return res.status(500).json({ message: "Error al subir video: " + (err?.response?.data?.error?.message || err.message) });
   }
@@ -8181,10 +8181,10 @@ app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
             SET order_id = NULL
           WHERE order_id IN (SELECT id FROM orders WHERE plan_id = $1)`,
         [req.params.id]
-      ).catch(() => {});
-      await client.query("DELETE FROM discount_codes WHERE plan_id = $1", [req.params.id]).catch(() => {});
-      await client.query("DELETE FROM memberships WHERE plan_id = $1", [req.params.id]).catch(() => {});
-      await client.query("DELETE FROM orders WHERE plan_id = $1", [req.params.id]).catch(() => {});
+      ).catch(() => { });
+      await client.query("DELETE FROM discount_codes WHERE plan_id = $1", [req.params.id]).catch(() => { });
+      await client.query("DELETE FROM memberships WHERE plan_id = $1", [req.params.id]).catch(() => { });
+      await client.query("DELETE FROM orders WHERE plan_id = $1", [req.params.id]).catch(() => { });
     }
 
     const del = await client.query("DELETE FROM plans WHERE id = $1 RETURNING id", [req.params.id]);
@@ -8199,7 +8199,7 @@ app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
     }
     return res.json({ message: "Plan eliminado" });
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
+    await client.query("ROLLBACK").catch(() => { });
     if (!cascade && err?.code === "23503") {
       try {
         await pool.query("UPDATE plans SET is_active = false, updated_at = NOW() WHERE id = $1", [req.params.id]);
@@ -10435,12 +10435,20 @@ app.post("/api/admin/test-emails", adminMiddleware, async (req, res) => {
 
 // ─── Serve React SPA (static) ────────────────────────────────────────────────
 const distDir = path.join(__dirname, "../dist");
-app.use(express.static(distDir));
-app.get("*", (_req, res) => {
+app.use(express.static(distDir, {
+  setHeaders: (res, path) => {
+    if (path.endsWith(".css")) {
+      res.setHeader("Content-Type", "text/css");
+    } else if (path.endsWith(".js")) {
+      res.setHeader("Content-Type", "application/javascript");
+    }
+  }
+}));
+
+app.get("*", (_req, res, next) => {
+  if (_req.path.startsWith("/api")) return next();
   res.sendFile(path.join(distDir, "index.html"));
 });
-
-// ─── Email Cron Jobs ─────────────────────────────────────────────────────────
 
 /**
  * Runs every Sunday at 8:00 AM Mexico City time (UTC-6 = 14:00 UTC).
