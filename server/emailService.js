@@ -3,14 +3,13 @@
  * Handles all transactional emails with branded HTML templates.
  */
 
-import { Resend } from "resend";
-
 let resend = null;
 if (process.env.RESEND_API_KEY) {
   try {
+    const { Resend } = await import("resend");
     resend = new Resend(process.env.RESEND_API_KEY);
   } catch (err) {
-    console.warn("[Email] Not setting up Resend. Missing or invalid key.");
+    console.warn("[Email] Not setting up Resend. Package missing or invalid key.");
   }
 }
 
