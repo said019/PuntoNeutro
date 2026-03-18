@@ -1,10 +1,10 @@
 {
-  "name": "Ophelia Studio",
-  "short_name": "Ophelia",
+  "name": "Punto Neutro",
+  "short_name": "Punto Neutro",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#ebede5",
+  "theme_color": "#94867a",
   "icons": [
     {
       "src": "/icon-192.png",
