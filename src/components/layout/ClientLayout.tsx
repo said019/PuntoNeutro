@@ -15,7 +15,7 @@ const NAV_GROUPS = [
     label: "Principal",
     labelColor: "#94867a",
     items: [
-      { to: "/app", label: "Inicio", icon: LayoutDashboard, activeColor: "#ebede5" },
+      { to: "/app", label: "Inicio", icon: LayoutDashboard, activeColor: "#94867a" },
       { to: "/app/classes", label: "Reservar clase", icon: Calendar, activeColor: "#94867a" },
       { to: "/app/bookings", label: "Mis reservas", icon: ClipboardList, activeColor: "#b5bf9c" },
     ],
@@ -94,7 +94,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
 
   /* ── mobile bottom nav items ── */
   const BOTTOM_NAV = [
-    { to: "/app", icon: LayoutDashboard, label: "Inicio", color: "#ebede5" },
+    { to: "/app", icon: LayoutDashboard, label: "Inicio", color: "#94867a" },
     { to: "/app/classes", icon: Calendar, label: "Clases", color: "#94867a" },
     { to: "/app/bookings", icon: ClipboardList, label: "Reservas", color: "#b5bf9c" },
     { to: "/app/profile", icon: User, label: "Perfil", color: "#94867a" },

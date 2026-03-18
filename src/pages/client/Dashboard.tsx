@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { format } from "date-fns";
 import api from "@/lib/api";
@@ -11,7 +10,6 @@ import { safeParse } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MembershipCard } from "@/components/MembershipCard";
 import { Calendar, ClipboardList } from "lucide-react";
@@ -31,41 +29,19 @@ const Dashboard = () => {
     queryFn: async () => (await api.get("/bookings/my-bookings")).data,
   });
 
-  const { data: walletData, isError: walletError } = useQuery({
-    queryKey: ["wallet-pass"],
-    queryFn: async () => (await api.get("/wallet/pass")).data,
-    retry: false,
-  });
-
   const membership: ClientMembership | null = membershipData?.data ?? membershipData ?? null;
   const bookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
-  const wallet = walletData?.data ?? walletData ?? null;
-
-  // Support both camelCase (server response) and snake_case (legacy)
-  const planName = membership?.planName ?? membership?.plan_name ?? "Membresía";
-  const classLimit = membership?.classLimit ?? membership?.class_limit ?? null;
-  const classesRemaining = membership?.classesRemaining ?? membership?.classes_remaining ?? null;
-  const endDate = membership?.endDate ?? membership?.end_date ?? null;
 
   const upcomingBookings = bookings
     .filter((b) => b.status === "confirmed" || b.status === "waitlist")
     .slice(0, 2);
-
-  const daysRemaining = endDate
-    ? Math.max(differenceInCalendarDays(safeParse(endDate), new Date()), 0)
-    : null;
-
-  const classesProgress =
-    classLimit && classesRemaining !== null
-      ? (classesRemaining / classLimit) * 100
-      : null;
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
       <ClientLayout>
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">¡Hola, {user?.display_name?.split(" ")[0]}!</h1>
+            <h1 className="text-2xl font-bold">¡Hola, {(user?.displayName ?? user?.display_name ?? user?.email?.split("@")[0] ?? "")?.split(" ")[0]}!</h1>
             <p className="text-sm text-muted-foreground">Aquí está tu resumen de hoy</p>
           </div>
 
@@ -91,23 +67,6 @@ const Dashboard = () => {
                     <p className="text-sm text-muted-foreground">No tienes membresía activa</p>
                     <Button asChild size="sm"><Link to="/app/checkout">Adquirir membresía</Link></Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Puntos */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Puntos de lealtad</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(wallet || walletError) ? (
-                  <div className="space-y-2">
-                    <p className="text-3xl font-bold">{wallet?.points ?? 0}</p>
-                    <p className="text-xs text-muted-foreground">puntos acumulados</p>
-                  </div>
-                ) : (
-                  <Skeleton className="h-16 w-full" />
                 )}
               </CardContent>
             </Card>
