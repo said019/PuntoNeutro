@@ -12,7 +12,7 @@ import ophelia31 from "@/assets/ophelia-31.jpg";
 import ophelia32 from "@/assets/ophelia-32.jpg";
 import ophelia38 from "@/assets/ophelia-38.jpg";
 import ophelia50 from "@/assets/ophelia-50.jpg";
-import opheliaLogo from "@/assets/ophelia-logo-full.png";
+import opheliaLogo from "@/assets/punto-neutro-logo.png";
 import imgTrampoline from "@/assets/trampoline_2982156.png";
 import imgPilates from "@/assets/pilates_2320695.png";
 
