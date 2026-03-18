@@ -91,7 +91,7 @@ const WeeklySchedule = () => {
   const scheduleCard = (s: Schedule) => (
     <div key={s.id} className="mb-2 p-2.5 bg-[#94867a]/[0.05] rounded-xl border border-[#94867a]/12 text-xs">
       <div className="font-semibold text-[#2d2d2d]/80 text-[11px] truncate">{s.classTypeName ?? s.classTypeId}</div>
-      <div className="text-[#ebede5]/70 text-[10px] mt-0.5">{s.startTime}–{s.endTime}</div>
+      <div className="text-[#2d2d2d]/50 text-[10px] mt-0.5">{s.startTime}–{s.endTime}</div>
       <div className="text-[#2d2d2d]/35 text-[10px] truncate">{s.instructorName ?? s.instructorId}</div>
       <div className="flex items-center justify-between mt-1.5">
         <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${s.isActive ? "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/5" : "text-[#2d2d2d]/25 border-[#94867a]/15"}`}>

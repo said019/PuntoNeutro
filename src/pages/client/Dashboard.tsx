@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MembershipCard } from "@/components/MembershipCard";
-import { Calendar, ClipboardList, Play, Star } from "lucide-react";
+import { Calendar, ClipboardList } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
 import type { BookingClient } from "@/types/booking";
 
@@ -37,15 +37,9 @@ const Dashboard = () => {
     retry: false,
   });
 
-  const { data: videosData } = useQuery({
-    queryKey: ["recent-videos"],
-    queryFn: async () => (await api.get("/videos?limit=4")).data,
-  });
-
   const membership: ClientMembership | null = membershipData?.data ?? membershipData ?? null;
   const bookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
   const wallet = walletData?.data ?? walletData ?? null;
-  const videos = Array.isArray(videosData?.data) ? videosData.data : Array.isArray(videosData) ? videosData : [];
 
   // Support both camelCase (server response) and snake_case (legacy)
   const planName = membership?.planName ?? membership?.plan_name ?? "Membresía";
@@ -79,7 +73,6 @@ const Dashboard = () => {
           <div className="flex flex-wrap gap-3">
             <Button asChild size="sm"><Link to="/app/classes"><Calendar size={16} className="mr-2" />Reservar clase</Link></Button>
             <Button asChild variant="outline" size="sm"><Link to="/app/bookings"><ClipboardList size={16} className="mr-2" />Mis reservas</Link></Button>
-            <Button asChild variant="outline" size="sm"><Link to="/app/videos"><Play size={16} className="mr-2" />Explorar videos</Link></Button>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -112,7 +105,6 @@ const Dashboard = () => {
                   <div className="space-y-2">
                     <p className="text-3xl font-bold">{wallet?.points ?? 0}</p>
                     <p className="text-xs text-muted-foreground">puntos acumulados</p>
-                    <Button asChild variant="outline" size="sm"><Link to="/app/wallet">Ver wallet</Link></Button>
                   </div>
                 ) : (
                   <Skeleton className="h-16 w-full" />
@@ -154,34 +146,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Videos recientes */}
-          {videos.length > 0 && (
-            <div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
-                <h2 className="font-semibold">Videos recientes</h2>
-                <Link to="/app/videos" className="text-sm text-primary hover:underline">Ver todos</Link>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:grid-cols-4">
-                {videos.map((v: any) => (
-                  <Link key={v.id} to={`/app/videos/${v.id}`}>
-                    <div className="rounded-xl overflow-hidden border group cursor-pointer">
-                      <div className="aspect-video bg-muted relative overflow-hidden">
-                        {v.thumbnail_url && (
-                          <img src={v.thumbnail_url} className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
-                        )}
-                        <div className="absolute bottom-1 right-1 bg-[#94867a]/25 text-[#2d2d2d] text-xs rounded px-1">
-                          {Math.floor((v.duration_seconds ?? 0) / 60)} min
-                        </div>
-                      </div>
-                      <div className="p-2">
-                        <p className="text-xs font-medium line-clamp-1">{v.title}</p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Videos — section available when /app/videos page is built */}
         </div>
       </ClientLayout>
     </ClientAuthGuard>

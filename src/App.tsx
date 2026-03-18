@@ -36,6 +36,8 @@ import BookingsList from "./pages/admin/bookings/BookingsList";
 import Waitlist from "./pages/admin/bookings/Waitlist";
 import PaymentsPage from "./pages/admin/payments/PaymentsPage";
 import SettingsPage from "./pages/admin/settings/SettingsPage";
+import ReportsPage from "./pages/admin/reports/ReportsPage";
+import WeeklySchedule from "./pages/admin/schedules/WeeklySchedule";
 
 // Legal pages
 import Privacidad from "./pages/legal/Privacidad";
@@ -96,11 +98,13 @@ const App = () => (
           <Route path="/admin/classes" element={<ClassesCalendar />} />
           <Route path="/admin/classes/types" element={<ClassTypesList />} />
           <Route path="/admin/classes/generate" element={<GenerateClasses />} />
-          <Route path="/admin/schedules" element={<Navigate to="/admin/classes" replace />} />
+          <Route path="/admin/schedules" element={<WeeklySchedule />} />
           <Route path="/admin/bookings" element={<BookingsList />} />
           <Route path="/admin/bookings/waitlist" element={<Waitlist />} />
           <Route path="/admin/staff" element={<Navigate to="/admin/classes" replace />} />
           <Route path="/admin/payments" element={<PaymentsPage />} />
+          <Route path="/admin/orders" element={<Navigate to="/admin/payments" replace />} />
+          <Route path="/admin/reports" element={<ReportsPage />} />
           <Route path="/admin/settings" element={<SettingsPage />} />
 
           {/* 404 */}
