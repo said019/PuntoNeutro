@@ -1,5 +1,5 @@
 /**
- * Ophelia Studio — Email Service (Resend)
+ * Punto Neutro — Email Service (Resend)
  * Handles all transactional emails with branded HTML templates.
  */
 
@@ -13,25 +13,25 @@ if (process.env.RESEND_API_KEY) {
   }
 }
 
-// IMPORTANT: Use onboarding@resend.dev until ophelia-studio.com.mx is verified in Resend dashboard
-// Once verified, change this back to: process.env.EMAIL_FROM || "Ophelia Studio <notificaciones@ophelia-studio.com.mx>"
-const FROM_EMAIL = "Ophelia Studio <onboarding@resend.dev>";
-const SITE_URL = process.env.SITE_URL || "https://ophelia-studio.com.mx";
-const LOGO_URL = `${SITE_URL}/ophelia-logo-full.png`;
+// IMPORTANT: Use onboarding@resend.dev until puntoneutro.com.mx is verified in Resend dashboard
+// Once verified, change this back to: process.env.EMAIL_FROM || "Punto Neutro <notificaciones@puntoneutro.com.mx>"
+const FROM_EMAIL = "Punto Neutro <onboarding@resend.dev>";
+const SITE_URL = process.env.SITE_URL || "https://puntoneutro.com.mx";
+const LOGO_URL = `${SITE_URL}/pn-logo-full.png`;
 
 // ─── Brand palette ────────────────────────────────────────────────────────────
 const B = {
-  bg: "#0D0018",   // deep purple-black
-  card: "#160024",   // card background
-  border: "#3D0069",   // border
-  purple: "#1F0047",
-  magenta: "#E15CB8",
-  violet: "#CA71E1",
-  lime: "#E7EB6E",
-  cream: "#F9F7E8",
-  lilac: "#ECD6FB",
-  text: "#F9F7E8",   // cream / almost-white
-  muted: "#C4A8E0",   // soft lilac muted
+  bg: "#2c2c2c",       // dark neutral
+  card: "#3a3a3a",     // card background
+  border: "#5a5a5a",   // border
+  purple: "#94867a",   // warm brown accent
+  magenta: "#b5bf9c",  // punto verde
+  violet: "#94867a",   // punto marrón
+  lime: "#b5bf9c",     // punto verde
+  cream: "#ebede5",    // punto crema
+  lilac: "#d4d8c8",    // light sage
+  text: "#ebede5",     // cream / almost-white
+  muted: "#a8a89e",    // soft muted
 };
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Ophelia Studio</title>
+  <title>Punto Neutro</title>
   <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
 </head>
 <body style="margin:0;padding:0;background-color:${B.bg};">
@@ -78,7 +78,7 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
 
         <!-- Logo -->
         <tr><td align="center" style="padding:32px 40px 8px;">
-          <img src="${LOGO_URL}" alt="Ophelia Studio" width="160" height="auto"
+          <img src="${LOGO_URL}" alt="Punto Neutro" width="160" height="auto"
                style="display:block;max-width:160px;" />
         </td></tr>
 
@@ -99,8 +99,8 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
         <tr><td align="center" style="padding:20px 40px 32px;">
           <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;
                     color:${B.muted};margin:0;line-height:1.6;">
-            © ${new Date().getFullYear()} Ophelia Studio · Jumping & Pilates<br>
-            <a href="${SITE_URL}" style="color:${B.magenta};text-decoration:none;">ophelia-studio.com.mx</a>
+            © ${new Date().getFullYear()} Punto Neutro · Pilates & Bienestar<br>
+            <a href="${SITE_URL}" style="color:${B.magenta};text-decoration:none;">puntoneutro.com.mx</a>
           </p>
         </td></tr>
 
@@ -210,7 +210,7 @@ async function sendMembershipActivated(opts) {
   const classesText = classLimit ? `${classLimit} clases` : "Clases ilimitadas ♾";
   const content = `
     ${h1(`¡Tu membresía está activa, ${name.split(" ")[0]}! 🎉`)}
-    ${p("Tu acceso a Ophelia Studio ha sido activado. ¡Es momento de saltar!")}
+    ${p("Tu acceso a Punto Neutro ha sido activado. ¡Es momento de moverte con propósito!")}
     ${infoTable([
     infoRow("Plan", planName),
     infoRow("Clases incluidas", classesText),
@@ -225,7 +225,7 @@ async function sendMembershipActivated(opts) {
     ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Reservar clases",
   });
-  await sendEmail({ to, subject: `✨ Tu membresía en Ophelia Studio está activa`, html });
+  await sendEmail({ to, subject: `✨ Tu membresía en Punto Neutro está activa`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -235,7 +235,7 @@ async function sendMembershipActivated(opts) {
  * @param {object} opts
  * @param {string} opts.to
  * @param {string} opts.name
- * @param {string} opts.className       — tipo de clase (Jumping Fitness, etc.)
+ * @param {string} opts.className       — tipo de clase (Pilates Matt Clásico, etc.)
  * @param {string} opts.date            — fecha de la clase (DATE)
  * @param {string} opts.startTime       — hora inicio (TIME "HH:MM")
  * @param {string} opts.instructor      — nombre instructor
@@ -354,12 +354,12 @@ async function sendWeeklyReminder(opts) {
     : "";
 
   const content = `
-    ${h1(`¡Hola ${name.split(" ")[0]}! ¿Ya programaste tu semana? 🏃‍♀️`)}
-    ${p("Es un nuevo comienzo. Esta semana tienes nuevos horarios disponibles en Ophelia Studio.")}
+    ${h1(`¡Hola ${name.split(" ")[0]}! ¿Ya programaste tu semana? 🧘‍♀️`)}
+    ${p("Es un nuevo comienzo. Esta semana tienes nuevos horarios disponibles en Punto Neutro.")}
     ${p(classesText)}
     ${expiryNote}
     ${h2("¿Por qué no faltar?")}
-    ${p("Saltar en trampolín <strong>quema hasta 800 kcal</strong> por sesión, mejora tu coordinación y eleva tu energía. ¡Vale mucho la pena!")}
+    ${p("Pilates <strong>fortalece tu core</strong>, mejora tu postura y eleva tu bienestar. ¡Vale mucho la pena!")}
     ${p("Entra ahora y reserva tus clases antes de que se llenen los spots:")}
   `;
   const html = baseLayout({
@@ -368,7 +368,7 @@ async function sendWeeklyReminder(opts) {
     ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Programar mi semana",
   });
-  await sendEmail({ to, subject: `🗓️ ¡Programa tu semana en Ophelia Studio!`, html });
+  await sendEmail({ to, subject: `🗓️ ¡Programa tu semana en Punto Neutro!`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -400,7 +400,7 @@ async function sendRenewalReminder(opts) {
   const content = `
     ${h1(`${name.split(" ")[0]}, es momento de renovar 🔄`)}
     ${urgencyBlock}
-    ${p("En Ophelia Studio nos aseguramos de que nunca pierdas el hilo de tu entrenamiento.")}
+    ${p("En Punto Neutro nos aseguramos de que nunca pierdas el hilo de tu entrenamiento.")}
     ${infoTable([
     infoRow("Plan actual", planName),
     ...(classesLeft !== null ? [infoRow("Clases restantes", `${classesLeft}`)] : []),
@@ -409,7 +409,7 @@ async function sendRenewalReminder(opts) {
     ${benefit}
   `;
   const html = baseLayout({
-    preheader: isLastClass ? `¡Solo te queda 1 clase! Renueva tu paquete ahora.` : `Tu membresía vence pronto. Renueva para seguir saltando.`,
+    preheader: isLastClass ? `¡Solo te queda 1 clase! Renueva tu paquete ahora.` : `Tu membresía vence pronto. Renueva para seguir entrenando.`,
     content,
     ctaUrl: `${SITE_URL}/app/checkout`,
     ctaText: "Renovar mi membresía",
@@ -418,7 +418,7 @@ async function sendRenewalReminder(opts) {
     to,
     subject: isLastClass
       ? `⚡ ¡Solo te queda 1 clase! Renueva tu membresía`
-      : `⏰ Tu membresía vence pronto — Ophelia Studio`,
+      : `⏰ Tu membresía vence pronto — Punto Neutro`,
     html,
   });
 }
@@ -442,18 +442,18 @@ async function sendPasswordResetEmail(opts) {
   );
   const content = `
     ${h1(`Recupera tu contraseña, ${firstName} 🔐`)}
-    ${p("Hemos recibido una solicitud para cambiar la contraseña de tu cuenta en Ophelia Studio.")}
+    ${p("Hemos recibido una solicitud para cambiar la contraseña de tu cuenta en Punto Neutro.")}
     ${p("Si fuiste tú, haz clic en el siguiente enlace para crear una contraseña nueva. Este enlace expirará en 2 horas.")}
     ${p("Si no solicitaste este cambio, puedes ignorar este correo; tu cuenta seguirá segura.")}
     ${small(`Si el botón no abre, copia y pega este enlace en tu navegador:<br><a href="${resolvedResetUrl}" style="color:${B.magenta};word-break:break-all;">${resolvedResetUrl}</a>`)}
   `;
   const html = baseLayout({
-    preheader: "Recupera el acceso a tu cuenta de Ophelia Studio",
+    preheader: "Recupera el acceso a tu cuenta de Punto Neutro",
     content,
     ctaUrl: resolvedResetUrl,
     ctaText: "Reestablecer mi contraseña",
   });
-  await sendEmail({ to, subject: "🔐 Restablecer contraseña — Ophelia Studio", html });
+  await sendEmail({ to, subject: "🔐 Restablecer contraseña — Punto Neutro", html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -481,12 +481,12 @@ async function sendOrderRejected(opts) {
     ${p("Si crees que hubo un error, por favor contáctanos directamente por WhatsApp o responde este correo. ¡Estamos para ayudarte! 💜")}
   `;
   const html = baseLayout({
-    preheader: "Tu comprobante de pago fue revisado — Ophelia Studio",
+    preheader: "Tu comprobante de pago fue revisado — Punto Neutro",
     content,
     ctaUrl: `https://wa.me/521${process.env.STUDIO_PHONE || ""}`,
     ctaText: "Contactar por WhatsApp",
   });
-  await sendEmail({ to, subject: "Comprobante de pago no aprobado — Ophelia Studio", html });
+  await sendEmail({ to, subject: "Comprobante de pago no aprobado — Punto Neutro", html });
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────

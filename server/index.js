@@ -26,13 +26,13 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 8080;
-const JWT_SECRET = process.env.JWT_SECRET || "ophelia_secret_2026";
-const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://ophelia-studio.com.mx").replace(/\/+$/, "");
+const JWT_SECRET = process.env.JWT_SECRET || "puntoneutro_secret_2026";
+const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://puntoneutro.com.mx").replace(/\/+$/, "");
 
 // ─── Evolution API (WhatsApp) config ────────────────────────────────────────
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "https://evolution-api-production-c1cb.up.railway.app";
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || "xoL0b1t0s-2026";
-const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || "ophelia-jump-studio";
+const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME || "punto-neutro-studio";
 const evolutionApi = axios.create({
   baseURL: EVOLUTION_API_URL,
   headers: { apikey: EVOLUTION_API_KEY },
@@ -40,7 +40,7 @@ const evolutionApi = axios.create({
 });
 
 const DEFAULT_GENERAL_SETTINGS = {
-  studio_name: "Ophelia Studio",
+  studio_name: "Punto Neutro",
   address: "",
   phone: "",
   instagram: "",
@@ -57,9 +57,10 @@ const DEFAULT_GENERAL_SETTINGS = {
 
 const DEFAULT_BANK_INFO = Object.freeze({
   bank: "BBVA",
-  account_holder: "Montserrath Cornejo Ramírez",
-  account_number: "157 824 4526",
-  clabe: "012 180 01578244526 8",
+  account_holder: "Angelina Salas Huante",
+  account_number: "151 128 2689",
+  clabe: "012 680 01511282689 2",
+  card_number: "4152 3139 4571 6699",
 });
 
 function digitsOnly(value) {
@@ -98,8 +99,7 @@ function normalizeBankInfo(rawValue) {
     clabeDigits === "012180001234567890" ||
     clabeDigits === "012180012345678901" ||
     clabeDigits === "710180000068980" ||
-    holderLower.includes("balance studio") ||
-    holderLower.includes("ophelia jump studio sa de cv");
+    holderLower.includes("balance studio");
 
   const base = shouldUseDefault ? DEFAULT_BANK_INFO : candidate;
   const formattedAccount = formatAccountNumber(base.account_number || DEFAULT_BANK_INFO.account_number);
@@ -131,8 +131,8 @@ async function getConfiguredBankInfo(dbClient = pool) {
 }
 
 const DEFAULT_POLICIES_SETTINGS = {
-  cancellation_policy: "Puedes cancelar tu reserva sin penalización hasta 8 horas antes de la clase. Cancelaciones fuera de tiempo o inasistencias pueden consumir tu clase.",
-  terms_of_service: "Al reservar o comprar en Ophelia Studio aceptas el reglamento interno, políticas de seguridad y uso personal e intransferible de tus clases y membresías.",
+  cancellation_policy: "Para cancelar tu reserva se tiene como mínimo 2 horas de tolerancia. De no hacerlo se perderá la clase y no habrá reposición.",
+  terms_of_service: "Al reservar o comprar en Punto Neutro aceptas el reglamento interno, políticas de puntualidad, atención plena y uso personal e intransferible de tus clases y membresías.",
   privacy_policy: "Tus datos se usan únicamente para gestionar reservas, pagos y comunicación operativa del estudio. No compartimos tu información personal con terceros sin autorización.",
 };
 
@@ -168,8 +168,8 @@ const DEFAULT_NOTIFICATION_TEMPLATES = {
     body: "Hola {name}, tu plan {plan} está por vencer el {expiresAt}.",
   },
   welcome: {
-    subject: "Bienvenida a Ophelia",
-    body: "Hola {name}, bienvenida a Ophelia Studio. ¡Nos encanta tenerte aquí!",
+    subject: "Bienvenida a Punto Neutro",
+    body: "Hola {name}, bienvenida a Punto Neutro. ¡Nos encanta tenerte aquí!",
   },
   password_reset: {
     subject: "Recuperación de contraseña",
@@ -230,7 +230,7 @@ const VIDEO_MAX_MB = 500;
 const uploadVideo = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, os.tmpdir()),
-    filename: (req, file, cb) => cb(null, `ophelia_vid_${Date.now()}_${file.originalname}`),
+    filename: (req, file, cb) => cb(null, `pn_vid_${Date.now()}_${file.originalname}`),
   }),
   limits: { fileSize: VIDEO_MAX_MB * 1024 * 1024 },
 });
@@ -259,7 +259,7 @@ async function uploadBufferToDrive(buffer, fileName, mimeType, accessToken) {
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || "";
   const metadata = { name: fileName, ...(folderId ? { parents: [folderId] } : {}) };
   // Build multipart body manually
-  const boundary = "ophelia_boundary_" + Date.now();
+  const boundary = "pn_boundary_" + Date.now();
   const metaPart = Buffer.from(
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`
   );
@@ -429,7 +429,7 @@ async function ensureSchema() {
         name         VARCHAR(100) NOT NULL,
         subtitle     VARCHAR(150),
         description  TEXT,
-        category     VARCHAR(20)  NOT NULL DEFAULT 'jumping' CHECK (category IN ('jumping','pilates')),
+        category     VARCHAR(20)  NOT NULL DEFAULT 'pilates' CHECK (category IN ('pilates','bienestar','funcional','mixto','all')),
         intensity    VARCHAR(20)  DEFAULT 'media' CHECK (intensity IN ('ligera','media','pesada','todas')),
         level        VARCHAR(50)  DEFAULT 'Todos los niveles',
         duration_min INTEGER      DEFAULT 50,
@@ -443,7 +443,7 @@ async function ensureSchema() {
       );
     `);
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS subtitle VARCHAR(150)`).catch(() => { });
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'jumping'`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'pilates'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS intensity VARCHAR(20) DEFAULT 'media'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS level VARCHAR(50) DEFAULT 'Todos los niveles'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS duration_min INTEGER DEFAULT 50`).catch(() => { });
@@ -487,14 +487,14 @@ async function ensureSchema() {
         UNIQUE (time_slot, day_of_week)
       );
     `);
-    // ── packages (paquetes de precios jumping/pilates/mixtos) ────────────────
+    // ── packages (paquetes de precios) ────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS packages (
         id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         name          VARCHAR(100) NOT NULL,
         num_classes   VARCHAR(20)  NOT NULL,
         price         DECIMAL(10,2) NOT NULL,
-        category      VARCHAR(20)  NOT NULL DEFAULT 'jumping' CHECK (category IN ('jumping','pilates','mixtos')),
+        category      VARCHAR(20)  NOT NULL DEFAULT 'all' CHECK (category IN ('pilates','bienestar','funcional','mixto','all')),
         validity_days INTEGER      DEFAULT 30,
         is_active     BOOLEAN      DEFAULT true,
         sort_order    INTEGER      DEFAULT 0,
@@ -508,64 +508,46 @@ async function ensureSchema() {
     if (parseInt(pkgCount.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO packages (name, num_classes, price, category, validity_days, is_active, sort_order) VALUES
-          ('4 Clases Jumping',  '4',         300,  'jumping', 30, true, 1),
-          ('8 Clases Jumping',  '8',         560,  'jumping', 30, true, 2),
-          ('12 Clases Jumping', '12',        780,  'jumping', 30, true, 3),
-          ('16 Clases Jumping', '16',        960,  'jumping', 30, true, 4),
-          ('20 Clases Jumping', '20',        1100, 'jumping', 30, true, 5),
-          ('Ilimitado Jumping', 'ILIMITADO', 1000, 'jumping', 30, true, 6),
-          ('4 Clases Pilates',  '4',         300,  'pilates', 30, true, 1),
-          ('8 Clases Pilates',  '8',         600,  'pilates', 30, true, 2),
-          ('12 Clases Pilates', '12',        840,  'pilates', 30, true, 3),
-          ('16 Clases Pilates', '16',        1120, 'pilates', 30, true, 4),
-          ('Ilimitado Pilates', 'ILIMITADO', 1000, 'pilates', 30, true, 5),
-          ('8 Clases Mixto',    '8',         600,  'mixtos',  30, true, 1),
-          ('12 Clases Mixto',   '12',        860,  'mixtos',  30, true, 2),
-          ('16 Clases Mixto',   '16',        1120, 'mixtos',  30, true, 3),
-          ('20 Clases Mixto',   '20',        1300, 'mixtos',  30, true, 4),
-          ('Ilimitado Mixto',   'ILIMITADO', 1000, 'mixtos',  30, true, 5)
+          ('Clase Suelta',  '1',  120,  'pilates', 7,  true, 0),
+          ('4 Clases',      '4',  400,  'pilates', 30, true, 1),
+          ('8 Clases',      '8',  680,  'pilates', 30, true, 2),
+          ('12 Clases',     '12', 900,  'pilates', 30, true, 3),
+          ('16 Clases',     '16', 1100, 'pilates', 30, true, 4),
+          ('Clase Muestra', '1',  110,  'pilates', 7,  true, 5)
         ON CONFLICT DO NOTHING;
       `);
-      console.log("✅ Seeded 16 Ophelia packages");
+      console.log("✅ Seeded Punto Neutro packages");
     }
-    // ── Seed class_types – ensure 8 real Ophelia types exist ──────────────
-    const hasOpheliaTypes = await pool.query("SELECT 1 FROM class_types WHERE name = 'Jumping Fitness' LIMIT 1");
-    if (hasOpheliaTypes.rows.length === 0) {
-      // Remove any old / placeholder class types
-      const opheliaNames = ['Jumping Fitness', 'Jumping Dance', 'Jump & Tone', 'Strong Jump', 'Mindful Jump', 'Hot Pilates', 'Flow Pilates', 'Pilates Mat'];
-      await pool.query("DELETE FROM class_types WHERE name != ALL($1::text[])", [opheliaNames]);
+    // ── Seed class_types – ensure Punto Neutro types exist ──────────────
+    const hasPNTypes = await pool.query("SELECT 1 FROM class_types WHERE name = 'Pilates Matt Clásico' LIMIT 1");
+    if (hasPNTypes.rows.length === 0) {
       await pool.query(`
         INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order, is_active) VALUES
-          ('Jumping Fitness',  'Full Body',                  'Clase de jumping fitness de cuerpo completo con música motivadora.',                   'jumping',  'Alta',  'all',          50, 10, '#E15CB8', '🏋️', 1, true),
-          ('Jumping Dance',    'Coreografías',               'Coreografías dinámicas sobre el trampolín con ritmos contagiosos.',                    'jumping',  'Media', 'all',          50, 10, '#CA71E1', '💃',  2, true),
-          ('Jump & Tone',      'Tonificación y resistencia', 'Combina jumping con ejercicios de tonificación y resistencia muscular.',              'jumping',  'Alta',  'intermediate', 55, 10, '#E7EB6E', '💪',  3, true),
-          ('Strong Jump',      'Fuerza y glúteo',            'Enfocada en fuerza de tren inferior y glúteo con intervalos de alta intensidad.',      'jumping',  'Alta',  'intermediate', 55, 10, '#8B5CF6', '🔥',  4, true),
-          ('Mindful Jump',     'Pilates en trampolín',       'Pilates sobre trampolín para mejorar equilibrio, flexibilidad y conciencia corporal.', 'jumping',  'Baja',  'all',          60, 10, '#c026d3', '🧘',  5, true),
-          ('Hot Pilates',      'Pesada',                     'Clase de pilates de alta intensidad enfocada en fuerza y control.',                    'pilates',  'Alta',  'intermediate', 55, 10, '#E15CB8', '🔥',  6, true),
-          ('Flow Pilates',     'Media',                      'Pilates fluido de intensidad media para fortalecer y elongar.',                       'pilates',  'Media', 'all',          55, 10, '#CA71E1', '🌊',  7, true),
-          ('Pilates Mat',      'Ligera',                     'Pilates en mat de baja intensidad enfocado en técnica y control corporal.',            'pilates',  'Baja',  'beginner',     50, 10, '#E7EB6E', '🌸',  8, true)
+          ('Pilates Matt Clásico', 'Método Clásico',        'Fortalece la musculatura que le da sostén a tu cuerpo respetando las bases del método clásico. Es una clase que te exige presencia, control, fluidez y una respiración consiente. ¡Utiliza el movimiento como forma de autoconocimiento!',        'pilates',   'media',   'all',          55, 10, '#b5bf9c', '🌊', 1, true),
+          ('Pilates Terapéutico',  'Fines terapéuticos',    'Una clase con efectos terapéuticos en el cuerpo como la disminución de dolor, mejora en movilidad y fortalecimiento general. Ideal para quienes buscan ejercitarse por alguna condición médica, lesión o bien están buscando regresar a ejercitarse. ¡Recupera la confianza en tu movimiento!', 'pilates',   'ligera',  'all',          55, 10, '#ebede5', '💚', 2, true),
+          ('Flex & Flow',          'Movimiento libre',      'Una clase que te invita a conectar mente y cuerpo por medio de movimientos naturales, fluidos y consientes ayudando a sentirte más libre, ágil, flexible y sin limitación. ¡Recupera el placer de un movimiento libre!',                           'pilates',   'media',   'all',          55, 10, '#b5bf9c', '�', 3, true),
+          ('Body Strong',          'Dinámica y retadora',   'Una clase de intensidad moderada, dinámica y retadora, que busca lograr un funcionamiento integral y funcional del cuerpo sin dejar ejecución y cuidado de los movimientos. ¡Conoce y desafía tus propios límites!',                              'pilates',   'pesada',  'intermediate', 50, 10, '#94867a', '🔥', 4, true)
         ON CONFLICT DO NOTHING;
       `);
-      console.log("✅ Seeded 8 Ophelia class types");
+      console.log("✅ Seeded 4 Punto Neutro class types");
     }
     // ── Seed schedule_slots si la tabla está vacía ─────────────────────────
     const ssCount = await pool.query("SELECT COUNT(*) FROM schedule_slots");
     if (parseInt(ssCount.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO schedule_slots (time_slot, day_of_week, class_type_name) VALUES
-          ('7:00 am', 1, 'Jumping Fitness'), ('7:00 am', 2, 'Jumping Dance'),
-          ('7:00 am', 3, 'Jump & Tone'),     ('7:00 am', 4, 'Strong Jump'),
-          ('7:00 am', 5, 'Mindful Jump'),    ('7:00 am', 6, 'Jumping Fitness'),
-          ('9:00 am', 1, 'Jumping Dance'),   ('9:00 am', 2, 'Jump & Tone'),
-          ('9:00 am', 3, 'Strong Jump'),     ('9:00 am', 4, 'Jumping Fitness'),
-          ('9:00 am', 5, 'Jumping Dance'),   ('9:00 am', 6, 'Hot Pilates'),
-          ('11:00 am',1, 'Flow Pilates'),    ('11:00 am',3, 'Pilates Mat'),
-          ('11:00 am',5, 'Hot Pilates'),     ('11:00 am',6, 'Flow Pilates'),
-          ('6:00 pm', 1, 'Jumping Fitness'), ('6:00 pm', 2, 'Strong Jump'),
-          ('6:00 pm', 3, 'Jumping Dance'),   ('6:00 pm', 4, 'Jump & Tone'),
-          ('6:00 pm', 5, 'Mindful Jump'),
-          ('7:30 pm', 1, 'Jump & Tone'),     ('7:30 pm', 2, 'Pilates Mat'),
-          ('7:30 pm', 3, 'Strong Jump'),     ('7:30 pm', 4, 'Flow Pilates')
+          ('7:15 am', 1, 'Body Strong'),          ('8:20 am', 1, 'Pilates Matt Clásico'),
+          ('6:15 pm', 1, 'Body Strong'),          ('7:20 pm', 1, 'Pilates Matt Clásico'),
+          ('7:15 am', 2, 'Body Strong'),          ('8:20 am', 2, 'Pilates Matt Clásico'),
+          ('9:25 am', 2, 'Pilates Terapéutico'),  ('6:15 pm', 2, 'Body Strong'),
+          ('7:20 pm', 2, 'Pilates Matt Clásico'),
+          ('7:15 am', 3, 'Body Strong'),          ('8:20 am', 3, 'Flex & Flow'),
+          ('6:15 pm', 3, 'Body Strong'),          ('7:20 pm', 3, 'Flex & Flow'),
+          ('7:15 am', 4, 'Body Strong'),          ('8:20 am', 4, 'Pilates Matt Clásico'),
+          ('9:25 am', 4, 'Pilates Terapéutico'),  ('6:15 pm', 4, 'Body Strong'),
+          ('7:20 pm', 4, 'Pilates Matt Clásico'),
+          ('7:15 am', 5, 'Body Strong'),          ('8:20 am', 5, 'Pilates Matt Clásico'),
+          ('8:00 am', 6, 'Pilates Matt Clásico'), ('9:05 am', 6, 'Flex & Flow')
         ON CONFLICT DO NOTHING;
       `);
     }
@@ -581,9 +563,9 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_non_transferable BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_non_repeatable BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS repeat_key VARCHAR(80)`).catch(() => { });
-    // ── Migrate class_types: remove 'mixto' category (now only jumping/pilates) ──
+    // ── Migrate class_types: normalize categories for Punto Neutro ──
     await pool.query(`
-      UPDATE class_types SET category = 'jumping' WHERE category NOT IN ('jumping','pilates');
+      UPDATE class_types SET category = 'pilates' WHERE category NOT IN ('pilates','bienestar','funcional');
     `).catch(() => { });
     // ── Migrate plans: 'mixto' class_category means both, keep as 'mixto' for logic ──
     // (mixto plans are still valid — the booking endpoint allows them on both categories)
@@ -639,37 +621,24 @@ async function ensureSchema() {
     if (parseInt(plCount.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO plans (name, price, currency, duration_days, class_limit, class_category, is_active, sort_order) VALUES
-          ('Jumping — 4 Clases',    380,  'MXN', 30, 4,    'jumping', true, 1),
-          ('Jumping — 8 Clases',    700,  'MXN', 30, 8,    'jumping', true, 2),
-          ('Jumping — 12 Clases',   980,  'MXN', 30, 12,   'jumping', true, 3),
-          ('Jumping — Ilimitado',   1350, 'MXN', 30, NULL, 'jumping', true, 4),
-          ('Pilates — 4 Clases',    380,  'MXN', 30, 4,    'pilates', true, 5),
-          ('Pilates — 8 Clases',    700,  'MXN', 30, 8,    'pilates', true, 6),
-          ('Pilates — 12 Clases',   980,  'MXN', 30, 12,   'pilates', true, 7),
-          ('Pilates — Ilimitado',   1350, 'MXN', 30, NULL, 'pilates', true, 8),
-          ('Mixto — 8 Clases',      800,  'MXN', 30, 8,    'mixto',   true, 9),
-          ('Mixto — 12 Clases',     1100, 'MXN', 30, 12,   'mixto',   true, 10),
-          ('Mixto — Ilimitado',     1500, 'MXN', 30, NULL, 'mixto',   true, 11)
+          ('Clase Suelta',  120,  'MXN', 7,  1,  'all', true, 0),
+          ('4 Clases',      400,  'MXN', 30, 4,  'all', true, 1),
+          ('8 Clases',      680,  'MXN', 30, 8,  'all', true, 2),
+          ('12 Clases',     900,  'MXN', 30, 12, 'all', true, 3),
+          ('16 Clases',     1100, 'MXN', 30, 16, 'all', true, 4),
+          ('Clase Muestra', 110,  'MXN', 7,  1,  'all', true, 5)
         ON CONFLICT DO NOTHING;
       `);
     }
-    // ── Backfill class_category on existing plans that have no category set ──
-    await pool.query(`UPDATE plans SET class_category = 'jumping' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%jumping%' OR name ILIKE '%jump%' OR name ILIKE '%strong%' OR name ILIKE '%dance%' OR name ILIKE '%tone%' OR name ILIKE '%mindful jump%')`).catch(() => { });
-    await pool.query(`UPDATE plans SET class_category = 'pilates' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%pilates%' OR name ILIKE '%mat%' OR name ILIKE '%flow%' OR name ILIKE '%hot%')`).catch(() => { });
-    await pool.query(`UPDATE plans SET class_category = 'mixto'   WHERE (class_category IS NULL OR class_category = 'all') AND name ILIKE '%mixto%'`).catch(() => { });
+    // ── Backfill class_category on existing plans ──
+    await pool.query(`UPDATE plans SET class_category = 'all' WHERE class_category IS NULL`).catch(() => { });
     // ── Ensure sample single-session plans exist (MXN 65, non-transferable, non-repeatable) ──
     const samplePlans = [
       {
-        name: "Sesión suelta (muestra) Jumping",
-        classCategory: "jumping",
-        repeatKey: "trial_single_session_jumping",
-        sortOrder: 0,
-      },
-      {
-        name: "Sesión suelta (muestra) Pilates",
-        classCategory: "pilates",
-        repeatKey: "trial_single_session_pilates",
-        sortOrder: 0,
+        name: "Clase Muestra",
+        classCategory: "all",
+        repeatKey: "trial_single_session",
+        sortOrder: 5,
       },
     ];
     for (const sp of samplePlans) {
@@ -951,9 +920,9 @@ async function ensureSchema() {
     await pool.query(`
       INSERT INTO homepage_video_cards (sort_order, title, description, emoji)
       SELECT * FROM (VALUES
-        (1, 'Jumping Fitness', 'Cardio de alta intensidad en trampolín con música que te hará volar.', 'dumbbell'),
-        (2, 'Jumping Dance',   'Coreografías sobre el trampolín que combinan ritmo y diversión.',     'music'),
-        (3, 'Pilates Flow',    'Secuencias fluidas para fortalecer tu core y mejorar postura.',        'waves')
+        (1, 'Pilates Matt Clásico', 'Fortalece tu core y mejora tu postura con movimientos controlados.', 'dumbbell'),
+        (2, 'Flex & Flow',   'Secuencias fluidas para ganar flexibilidad y conciencia corporal.',     'waves'),
+        (3, 'Body Strong',    'Entrenamiento funcional para fortalecer todo tu cuerpo.',        'activity')
       ) AS v(sort_order, title, description, emoji)
       WHERE NOT EXISTS (SELECT 1 FROM homepage_video_cards LIMIT 1);
     `).catch(() => { });
@@ -979,7 +948,7 @@ async function ensureSchema() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_discount_codes_channel ON discount_codes(channel)`).catch(() => { });
     await pool.query(`UPDATE discount_codes SET discount_type = 'percent' WHERE discount_type IN ('percentage', 'porcentaje', '%')`).catch(() => { });
     await pool.query(`UPDATE discount_codes SET channel = 'all' WHERE channel IS NULL OR channel = ''`).catch(() => { });
-    await pool.query(`UPDATE discount_codes SET class_category = NULL WHERE class_category NOT IN ('all','jumping','pilates','mixto')`).catch(() => { });
+    await pool.query(`UPDATE discount_codes SET class_category = NULL WHERE class_category NOT IN ('all','pilates','bienestar','funcional','mixto')`).catch(() => { });
     // ── bookings: add checked_in_at column ────────────────────────────────
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
     // ── Settings table ─────────────────────────────────────────────────────
@@ -1211,13 +1180,11 @@ async function ensureSchema() {
     if (parseInt(instCount.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO instructors (display_name, email, bio, specialties, is_active) VALUES
-          ('Valeria Mendoza',  'valeria@opheliajumping.mx',  'Instructora certificada de Jumping Fitness con 5 años de experiencia.', 'Jumping Fitness,Jumping Dance,Strong Jump', true),
-          ('Daniela Reyes',    'daniela@opheliajumping.mx',  'Especialista en Pilates y movimiento consciente.', 'Hot Pilates,Flow Pilates,Pilates Mat,Mindful Jump', true),
-          ('Sofía Torres',     'sofia@opheliajumping.mx',    'Instructora de Jump & Tone y entrenamientos funcionales.', 'Jump & Tone,Strong Jump,Jumping Fitness', true),
-          ('Camila Vargas',    'camila@opheliajumping.mx',   'Certificada en Pilates mat y reformer.', 'Pilates Mat,Flow Pilates,Hot Pilates', true)
+          ('Angelina Salas',   'angelina@puntoneutro.com.mx', 'Instructora certificada en Pilates Mat y movimiento terapéutico.', 'Pilates Matt Clásico,Pilates Terapéutico,Flex & Flow', true),
+          ('Instructora PN',   'instructora@puntoneutro.com.mx', 'Especialista en entrenamiento funcional y bienestar corporal.', 'Body Strong,Flex & Flow,Pilates Matt Clásico', true)
         ON CONFLICT DO NOTHING;
       `);
-      console.log("✅ Seeded 4 demo instructors");
+      console.log("✅ Seeded 2 Punto Neutro instructors");
     }
 
     const classCount = await pool.query("SELECT COUNT(*) FROM classes");
@@ -1310,14 +1277,14 @@ async function ensureSchema() {
 
 
   try {
-    const adminHash = await bcrypt.hash("Ophelia2026!", 12);
+    const adminHash = await bcrypt.hash("PuntoNeutro2026!", 12);
     await pool.query(
       `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
-       VALUES ('Admin Ophelia', 'admin@opheliajumping.mx', '0000000000', $1, 'admin', true, false)
+       VALUES ('Admin Punto Neutro', 'admin@puntoneutro.com', '0000000000', $1, 'admin', true, false)
        ON CONFLICT (email) DO UPDATE SET role = 'admin', password_hash = $1`,
       [adminHash]
     );
-    console.log("✅ Admin user ready: admin@opheliajumping.mx / Ophelia2026!");
+    console.log("✅ Admin user ready: admin@puntoneutro.com / PuntoNeutro2026!");
   } catch (err) {
     console.error("Admin seed warning:", err.message);
   }
@@ -1326,7 +1293,7 @@ async function ensureSchema() {
 // ─── Middleware ──────────────────────────────────────────────────────────────
 const CORS_ALLOWED_ORIGINS = String(
   process.env.CORS_ALLOWED_ORIGINS ||
-  "https://ophelia-studio.com.mx,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080",
+  "https://puntoneutro.com.mx,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080",
 )
   .split(",")
   .map((origin) => origin.trim())
@@ -1454,7 +1421,7 @@ function calculateDiscountAmount(type, value, subtotal) {
 
 function normalizeClassCategory(value, fallback = "all") {
   const raw = String(value ?? "").trim().toLowerCase();
-  if (["jumping", "pilates", "mixto", "all"].includes(raw)) return raw;
+  if (["pilates", "bienestar", "funcional", "mixto", "all"].includes(raw)) return raw;
   return fallback;
 }
 
@@ -1544,7 +1511,7 @@ async function findApplicableDiscountCode({
           class_category IS NULL
           OR class_category = 'all'
           OR class_category = $4
-          OR (class_category = 'mixto' AND $4 IN ('jumping','pilates'))
+          OR (class_category = 'mixto' AND $4 IN ('pilates','bienestar','funcional'))
         )
       ORDER BY
         CASE WHEN plan_id IS NULL THEN 1 ELSE 0 END ASC,
@@ -2478,9 +2445,8 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     });
     if (!membership) {
       await client.query("ROLLBACK");
-      const label = clsCategory === "jumping" ? "Jumping" : clsCategory === "pilates" ? "Pilates" : "esta";
       return res.status(403).json({
-        message: `No tienes membresía activa con créditos para clases de ${label}.`,
+        message: `No tienes membresía activa con créditos para esta clase.`,
       });
     }
 
@@ -2497,9 +2463,8 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
       await client.query("ROLLBACK");
-      const label = clsCategory === "jumping" ? "Jumping" : "Pilates";
       return res.status(403).json({
-        message: `Tu membresía no incluye clases de ${label}. Necesitas una membresía ${label} o Mixta.`,
+        message: `Tu membresía no incluye este tipo de clase. Necesitas una membresía compatible.`,
       });
     }
 
@@ -3280,10 +3245,10 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
 
 // ─── Google Wallet helpers ──────────────────────────────────────────────────
 
-const SITE_URL = process.env.SITE_URL || "https://ophelia-studio.com.mx";
+const SITE_URL = process.env.SITE_URL || "https://puntoneutro.com.mx";
 const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
-const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || "Ophelia Jump Studio";
-const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || "Ophelia Club";
+const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || "Punto Neutro";
+const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || "Punto Neutro Club";
 const GW_HEX_BG = process.env.GOOGLE_HEX_BACKGROUND_COLOR || "#1a0b26";
 const GW_HEX_BG_EVENT = process.env.GOOGLE_HEX_BACKGROUND_COLOR_EVENT || "#1F0047";
 
@@ -3384,7 +3349,7 @@ function parseGWServiceAccount() {
 const { email: _gwEmail, key: _gwKey } = parseGWServiceAccount();
 const GW_SA_EMAIL = _gwEmail;
 const GW_SA_PRIVATE_KEY = _gwKey;
-const GW_CLASS_ID = GW_ISSUER_ID ? `${GW_ISSUER_ID}.ophelia_loyalty_v1` : "";
+const GW_CLASS_ID = GW_ISSUER_ID ? `${GW_ISSUER_ID}.puntoneutro_loyalty_v1` : "";
 
 function isGoogleWalletConfigured() {
   return !!(GW_ISSUER_ID && GW_SA_EMAIL && GW_SA_PRIVATE_KEY);
@@ -3419,11 +3384,11 @@ async function ensureGoogleWalletClass() {
       programName: GW_PROGRAM_NAME,
       programLogo: {
         sourceUri: { uri: `${SITE_URL}/wallet-program-black.png` },
-        contentDescription: { defaultValue: { language: "es", value: "Ophelia Jump Studio" } },
+        contentDescription: { defaultValue: { language: "es", value: "Punto Neutro" } },
       },
       heroImage: {
         sourceUri: { uri: `${SITE_URL}/wallet-hero-black.png` },
-        contentDescription: { defaultValue: { language: "es", value: "Ophelia Jump Studio" } },
+        contentDescription: { defaultValue: { language: "es", value: "Punto Neutro" } },
       },
       hexBackgroundColor: GW_HEX_BG,
       reviewStatus: "UNDER_REVIEW",
@@ -3486,8 +3451,8 @@ function formatWalletEventSchedule(eventPass) {
 function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking, activeEventPass, passKind = "membership" }) {
   const isEventPass = String(passKind || "membership") === "event";
   const objectId = isEventPass
-    ? `${GW_ISSUER_ID}.ophelia_event_${String(activeEventPass?.eventId || "event").replace(/-/g, "")}_${userId.replace(/-/g, "")}`
-    : `${GW_ISSUER_ID}.ophelia_${userId.replace(/-/g, "")}`;
+    ? `${GW_ISSUER_ID}.pn_event_${String(activeEventPass?.eventId || "event").replace(/-/g, "")}_${userId.replace(/-/g, "")}`
+    : `${GW_ISSUER_ID}.pn_${userId.replace(/-/g, "")}`;
 
   // ── Determine pass type and details based on membership ──────────────────
   const hasMembership = !isEventPass && !!membership;
@@ -3500,9 +3465,10 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     ? normalizeClassCategory(membership.class_category, "all")
     : "all";
   const membershipCategoryLabel =
-    membershipCategory === "jumping" ? "Jumping" :
-      membershipCategory === "pilates" ? "Pilates" :
-        membershipCategory === "mixto" ? "Mixto" : "General";
+    membershipCategory === "pilates" ? "Pilates" :
+      membershipCategory === "bienestar" ? "Bienestar" :
+        membershipCategory === "funcional" ? "Funcional" :
+          membershipCategory === "mixto" ? "Mixto" : "General";
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
   const classLimit = Number(membership?.class_limit ?? 0);
   const hasIconStampMode = hasMembership && !isUnlimited && classLimit > 0;
@@ -3513,7 +3479,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
 
   // Header label
-  let passHeader = "OPHELIA CLUB";
+  let passHeader = "PUNTO NEUTRO CLUB";
   if (hasEventPass) {
     passHeader = "PASE DE EVENTO";
   } else if (hasMembership) {
@@ -3644,7 +3610,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   // Row 5: Points
   textModules.push({
     id: "puntos",
-    header: "PUNTOS OPHELIA CLUB",
+    header: "PUNTOS PUNTO NEUTRO",
     body: `${points.toLocaleString("es-MX")} pts`,
   });
 
@@ -4011,11 +3977,11 @@ function isAppleApnsConfigured() {
 function buildAppleWalletSerialFromUserId(userId) {
   const cleaned = String(userId || "").trim();
   if (!cleaned) return "";
-  return `ophelia_${cleaned.replace(/-/g, "")}`;
+  return `pn_${cleaned.replace(/-/g, "")}`;
 }
 
 function parseUserIdFromAppleWalletSerial(serial) {
-  const raw = String(serial || "").replace(/^ophelia_/, "").trim();
+  const raw = String(serial || "").replace(/^pn_/, "").trim();
   if (!/^[0-9a-fA-F]{32}$/.test(raw)) return null;
   return raw.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, "$1-$2-$3-$4-$5").toLowerCase();
 }
@@ -4036,7 +4002,7 @@ function findAssetDir() {
     path.join(process.cwd(), "dist"),
   ];
   for (const dir of candidates) {
-    if (fs.existsSync(path.join(dir, "ophelia-logo.png"))) {
+    if (fs.existsSync(path.join(dir, "pn-logo.png"))) {
       return dir;
     }
   }
@@ -4550,8 +4516,8 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const eventTimeLong = eventStartTimeLabel && eventEndTimeLabel
     ? `${eventStartTimeLabel} - ${eventEndTimeLabel}`
     : (eventStartTimeLabel || "Horario por confirmar");
-  const eventLocationShort = truncateWalletField(activeEventPass?.eventLocation || "Ophelia Studio", 24);
-  const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Ophelia Studio", 38);
+  const eventLocationShort = truncateWalletField(activeEventPass?.eventLocation || "Punto Neutro", 24);
+  const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Punto Neutro", 38);
   const eventCodeLabel = truncateWalletField(activeEventPass?.passCode || "—", 18);
   const eventRelevantDate = (() => {
     if (!hasEventPass || !hasValidEventDate) return new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
@@ -4584,9 +4550,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     ? normalizeClassCategory(membership.class_category, "all")
     : "all";
   const membershipCategoryLabel =
-    membershipCategory === "jumping" ? "Jumping" :
-      membershipCategory === "pilates" ? "Pilates" :
-        membershipCategory === "mixto" ? "Mixto" : "General";
+    membershipCategory === "pilates" ? "Pilates" :
+      membershipCategory === "bienestar" ? "Bienestar" :
+        membershipCategory === "funcional" ? "Funcional" :
+          membershipCategory === "mixto" ? "Mixto" : "General";
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
   const isTrialSingleSession = hasMembership && String(membership.repeat_key || "").startsWith("trial_single_session");
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
@@ -4594,12 +4561,12 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const passAccent = hasEventPass
     ? "rgb(231, 235, 110)"
     : membershipCategory === "pilates"
-      ? "rgb(197, 214, 144)"
-      : membershipCategory === "jumping"
-        ? "rgb(211, 133, 194)"
-        : membershipCategory === "mixto"
+      ? "rgb(181, 191, 156)"
+      : membershipCategory === "bienestar"
+        ? "rgb(148, 134, 122)"
+        : membershipCategory === "funcional"
           ? "rgb(178, 152, 218)"
-          : "rgb(171, 156, 197)";
+          : "rgb(181, 191, 156)";
   const passForeground = hasEventPass ? "rgb(249, 247, 232)" : "rgb(247, 245, 255)";
   const passBackground = hasEventPass ? "rgb(31, 0, 71)" : "rgb(20, 11, 31)";
   const classLimit = hasMembership ? Number(membership.class_limit ?? 0) : 0;
@@ -4825,14 +4792,14 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 
   backFields.push(
     { key: "cliente", label: "CLIENTE", value: userName },
-    { key: "puntos", label: "PUNTOS OPHELIA CLUB", value: `${points.toLocaleString("es-MX")} pts` },
+    { key: "puntos", label: "PUNTOS PUNTO NEUTRO", value: `${points.toLocaleString("es-MX")} pts` },
     { key: "web", label: "RESERVAR EN LÍNEA", value: `${SITE_URL}/app/bookings` },
     {
       key: "terms",
       label: "TÉRMINOS",
       value: hasEventPass
         ? "Pase válido para un acceso al evento indicado. Presenta el QR en recepción."
-        : "Válido para clases de trampolín. Presenta tu pase al ingresar.",
+        : "Válido para clases de Punto Neutro. Presenta tu pase al ingresar.",
     }
   );
 
@@ -4893,10 +4860,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     passTypeIdentifier: APPLE_PASS_TYPE_ID,
     serialNumber,
     teamIdentifier: APPLE_TEAM_ID,
-    organizationName: "Ophelia Jump Studio",
+    organizationName: "Punto Neutro",
     description: hasEventPass
-      ? `Evento — ${activeEventPass?.eventTitle || "Ophelia Studio"}`
-      : `${membershipCategoryLabel} — Ophelia Jump Studio`,
+      ? `Evento — ${activeEventPass?.eventTitle || "Punto Neutro"}`
+      : `${membershipCategoryLabel} — Punto Neutro`,
     logoText: "",
     foregroundColor: passForeground,
     backgroundColor: passBackground,
@@ -4940,17 +4907,17 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const assetCategory =
     hasEventPass
       ? "event"
-      : membershipCategory === "jumping"
-        ? "jumping"
-        : membershipCategory === "pilates"
-          ? "pilates"
+      : membershipCategory === "pilates"
+        ? "pilates"
+        : membershipCategory === "bienestar"
+          ? "bienestar"
           : "mixto";
 
   const iconPath = findAssetFile([
     `wallet-icon-${assetCategory}.png`,
     "wallet-icon-event.png",
     "wallet-icon-mixto.png",
-    "ophelia-logo.png",
+    "pn-logo.png",
   ]);
   const icon2xPath = findAssetFile([
     `wallet-icon-${assetCategory}@2x.png`,
@@ -4959,7 +4926,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     `wallet-icon-${assetCategory}.png`,
     "wallet-icon-event.png",
     "wallet-icon-mixto.png",
-    "ophelia-logo.png",
+    "pn-logo.png",
   ]);
   const icon3xPath = findAssetFile([
     `wallet-icon-${assetCategory}@3x.png`,
@@ -4971,20 +4938,20 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     `wallet-icon-${assetCategory}.png`,
     "wallet-icon-event.png",
     "wallet-icon-mixto.png",
-    "ophelia-logo.png",
+    "pn-logo.png",
   ]);
 
   const logoPath = findAssetFile([
     "wallet-logo.png",
-    "ophelia-logo-full.png",
-    "ophelia-logo.png",
+    "pn-logo-full.png",
+    "pn-logo.png",
     "wallet-logo-black.png",
   ]);
   const logo2xPath = findAssetFile([
     "wallet-logo@2x.png",
     "wallet-logo.png",
-    "ophelia-logo-full.png",
-    "ophelia-logo.png",
+    "pn-logo-full.png",
+    "pn-logo.png",
     "wallet-logo-black@2x.png",
     "wallet-logo-black.png",
   ]);
@@ -4992,8 +4959,8 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     "wallet-logo@3x.png",
     "wallet-logo@2x.png",
     "wallet-logo.png",
-    "ophelia-logo-full.png",
-    "ophelia-logo.png",
+    "pn-logo-full.png",
+    "pn-logo.png",
     "wallet-logo-black@3x.png",
     "wallet-logo-black@2x.png",
     "wallet-logo-black.png",
@@ -5004,7 +4971,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     "wallet-thumb-event.png",
     `wallet-icon-${assetCategory}.png`,
     "wallet-icon-event.png",
-    "ophelia-logo.png",
+    "pn-logo.png",
   ]);
   const thumb2xPath = findAssetFile([
     `wallet-thumb-${assetCategory}@2x.png`,
@@ -5015,7 +4982,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     "wallet-icon-event@2x.png",
     `wallet-icon-${assetCategory}.png`,
     "wallet-icon-event.png",
-    "ophelia-logo.png",
+    "pn-logo.png",
   ]);
 
   let dynamicStripName = "none";
@@ -5024,8 +4991,8 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   let strip3xPath = null;
   if (!hasEventPass) {
     const stripCategory =
-      membershipCategory === "jumping" ? "jumping"
-        : membershipCategory === "pilates" ? "pilates"
+      membershipCategory === "pilates" ? "pilates"
+        : membershipCategory === "bienestar" ? "bienestar"
           : "mixto";
     dynamicStripName = shouldUseStampStrip
       ? `wallet-strip-${stripCategory}-t${stripStampState.total}-r${stripStampState.remaining}.png`
@@ -5181,7 +5148,7 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
         });
         console.log("[Apple Wallet] ✅ .pkpass generated, size:", pkpassBuffer.length, "bytes");
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-        res.setHeader("Content-Disposition", `attachment; filename="ophelia-pass.pkpass"`);
+        res.setHeader("Content-Disposition", `attachment; filename="puntoneutro-pass.pkpass"`);
         res.setHeader("Content-Length", pkpassBuffer.length);
         return res.send(pkpassBuffer);
       } catch (pkpassErr) {
@@ -5223,8 +5190,8 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Ophelia Club">
-<title>Ophelia Club — ${userName}</title>
+<meta name="apple-mobile-web-app-title" content="Punto Neutro">
+<title>Punto Neutro — ${userName}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -5256,21 +5223,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <body>
 <div class="pass">
   <div class="header">
-    <div class="logo">Ophelia Studio</div>
+    <div class="logo">Punto Neutro</div>
     <div class="badge">Club</div>
   </div>
   <div class="name">${userName}</div>
   <div class="points-section">
     <div class="points-label">Puntos acumulados</div>
     <div class="points">${points}</div>
-    <div class="points-sub">Ophelia Club</div>
+    <div class="points-sub">Punto Neutro</div>
   </div>
   <div class="qr-section">
     <div class="qr-wrap">
       <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrCode)}&bgcolor=FFFFFF&color=1a0b26" alt="QR Code" />
     </div>
   </div>
-  <div class="qr-hint">Tu código de acceso Ophelia</div>
+  <div class="qr-hint">Tu código de acceso Punto Neutro</div>
   <div class="fields">
     ${membershipHtml}
     ${nextBookingHtml}
@@ -5314,7 +5281,7 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
     const eventTimeLong = eventStartTimeLabel && eventEndTimeLabel
       ? `${eventStartTimeLabel} - ${eventEndTimeLabel}`
       : (eventStartTimeLabel || "Horario por confirmar");
-    const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Ophelia Studio", 38);
+    const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Punto Neutro", 38);
 
     if (isAppleWalletConfigured()) {
       const pkpassBuffer = await generateApplePkpass({
@@ -5327,7 +5294,7 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
         activeEventPass,
       });
       res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-      res.setHeader("Content-Disposition", `attachment; filename="ophelia-event-pass.pkpass"`);
+      res.setHeader("Content-Disposition", `attachment; filename="puntoneutro-event-pass.pkpass"`);
       res.setHeader("Content-Length", pkpassBuffer.length);
       return res.send(pkpassBuffer);
     }
@@ -5337,7 +5304,7 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Pase de Evento — Ophelia</title>
+<title>Pase de Evento — Punto Neutro</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -5359,7 +5326,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   <div class="pass">
     <div class="header">
       <span class="badge">Pase de evento</span>
-      <div class="title">${activeEventPass.eventTitle || "Evento Ophelia"}</div>
+      <div class="title">${activeEventPass.eventTitle || "Evento Punto Neutro"}</div>
     </div>
     <div class="meta">
       <div class="meta-item">
@@ -5372,7 +5339,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
       </div>
       <div class="meta-item" style="grid-column:1 / span 2;">
         <div class="meta-label">Sede</div>
-        <div class="meta-value">${eventLocationLong || "Ophelia Studio"}</div>
+        <div class="meta-value">${eventLocationLong || "Punto Neutro"}</div>
       </div>
     </div>
     <div class="qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(activeEventPass.passCode || qrCode)}&bgcolor=FFFFFF&color=1F0047" alt="QR"/></div>
@@ -5448,8 +5415,8 @@ app.get("/api/wallet/apple/debug", authMiddleware, async (req, res) => {
     },
     assetDir: findAssetDir(),
     assetsFound: {
-      "ophelia-logo.png": fs.existsSync(path.join(findAssetDir(), "ophelia-logo.png")),
-      "ophelia-logo-full.png": fs.existsSync(path.join(findAssetDir(), "ophelia-logo-full.png")),
+      "pn-logo.png": fs.existsSync(path.join(findAssetDir(), "pn-logo.png")),
+      "pn-logo-full.png": fs.existsSync(path.join(findAssetDir(), "pn-logo-full.png")),
     },
     opensslVersion: "unknown",
     keyValidation: "not tested",
@@ -5912,7 +5879,7 @@ app.post("/api/admin/class-types", adminMiddleware, async (req, res) => {
       `INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [name.trim(), subtitle || null, description || null,
-      category || "jumping", intensity || "media",
+      category || "pilates", intensity || "media",
       level || "Todos los niveles", duration_min || 50, capacity || 10,
       color || "#c026d3", emoji || "🏃", sort_order ?? 0]
     );
@@ -6065,7 +6032,7 @@ app.post("/api/admin/plans", adminMiddleware, async (req, res) => {
   } = req.body;
   if (!name?.trim() || price === undefined) return res.status(400).json({ message: "name y price requeridos" });
   try {
-    const validCats = ["jumping", "pilates", "mixto", "all"];
+    const validCats = ["pilates", "bienestar", "funcional", "mixto", "all"];
     const cat = validCats.includes(class_category) ? class_category : "all";
     const nonTransferable = parseBooleanFlag(is_non_transferable);
     const nonRepeatable = parseBooleanFlag(is_non_repeatable);
@@ -6092,7 +6059,7 @@ app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
     features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
   } = req.body;
   try {
-    const validCats = ["jumping", "pilates", "mixto", "all"];
+    const validCats = ["pilates", "bienestar", "funcional", "mixto", "all"];
     const cat = validCats.includes(class_category) ? class_category : null;
     const nonTransferable = parseBooleanFlag(is_non_transferable);
     const nonRepeatable = parseBooleanFlag(is_non_repeatable);
@@ -6325,8 +6292,8 @@ app.get("/api/public/review-tags", async (_req, res) => {
 app.post("/api/class-types", adminMiddleware, async (req, res) => {
   const { name, color, category, defaultDuration, maxCapacity, isActive } = req.body;
   if (!name?.trim()) return res.status(400).json({ message: "name requerido" });
-  const validCategories = ["jumping", "pilates"];
-  const cat = validCategories.includes(category) ? category : "jumping";
+  const validCategories = ["pilates", "bienestar", "funcional", "mixto", "all"];
+  const cat = validCategories.includes(category) ? category : "pilates";
   try {
     const r = await pool.query(
       `INSERT INTO class_types (name, color, category, duration_min, capacity, is_active, sort_order)
@@ -6340,7 +6307,7 @@ app.post("/api/class-types", adminMiddleware, async (req, res) => {
 // PUT /api/class-types/:id — alias CRUD (admin)
 app.put("/api/class-types/:id", adminMiddleware, async (req, res) => {
   const { name, color, category, defaultDuration, maxCapacity, isActive } = req.body;
-  const validCategories = ["jumping", "pilates"];
+  const validCategories = ["pilates", "bienestar", "funcional", "mixto", "all"];
   const cat = validCategories.includes(category) ? category : null;
   try {
     const r = await pool.query(
@@ -7146,7 +7113,7 @@ app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
 
       if (createAlreadyInUse) {
         return res.status(409).json({
-          message: `No se pudo obtener QR para la instancia "${EVOLUTION_INSTANCE}". Ese nombre ya está en uso. Cambia EVOLUTION_INSTANCE_NAME en Railway por un nombre único (ej. ophelia-jump-studio-2026).`,
+          message: `No se pudo obtener QR para la instancia "${EVOLUTION_INSTANCE}". Ese nombre ya está en uso. Cambia EVOLUTION_INSTANCE_NAME en Railway por un nombre único (ej. punto-neutro-studio-2026).`,
         });
       }
       return res.status(502).json({ message: "Evolution respondió sin QR. Intenta nuevamente en unos segundos." });
@@ -7182,7 +7149,7 @@ app.post("/api/evolution/send-test", adminMiddleware, async (req, res) => {
     const number = normalisePhone(phone);
     await queueWhatsAppSend(
       number,
-      "✅ Mensaje de prueba desde Ophelia Jump Studio. ¡WhatsApp conectado correctamente!",
+      "✅ Mensaje de prueba desde Punto Neutro. ¡WhatsApp conectado correctamente!",
     );
     return res.json({ data: { message: "Mensaje de prueba enviado correctamente" } });
   } catch (err) {
@@ -8123,7 +8090,7 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
       name, description, price, currency, durationDays, classLimit, classCategory,
       features, isActive, sortOrder, isNonTransferable, isNonRepeatable, repeatKey,
     } = req.body;
-    const validCats = ["jumping", "pilates", "mixto", "all"];
+    const validCats = ["pilates", "bienestar", "funcional", "mixto", "all"];
     const cat = validCats.includes(classCategory) ? classCategory : null;
     const nonTransferable = parseBooleanFlag(isNonTransferable ?? req.body.is_non_transferable);
     const nonRepeatable = parseBooleanFlag(isNonRepeatable ?? req.body.is_non_repeatable);
@@ -8225,7 +8192,7 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
       isNonTransferable, isNonRepeatable, repeatKey,
     } = req.body;
     if (!name) return res.status(400).json({ message: "Nombre requerido" });
-    const validCats = ["jumping", "pilates", "mixto", "all"];
+    const validCats = ["pilates", "bienestar", "funcional", "mixto", "all"];
     const cat = validCats.includes(classCategory) ? classCategory : "all";
     const nonTransferable = parseBooleanFlag(isNonTransferable ?? req.body.is_non_transferable);
     const nonRepeatable = parseBooleanFlag(isNonRepeatable ?? req.body.is_non_repeatable);
@@ -8338,9 +8305,8 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
       await client.query("ROLLBACK");
-      const label = clsCategory === "jumping" ? "Jumping" : clsCategory === "pilates" ? "Pilates" : "esta";
       return res.status(403).json({
-        message: `La membresía de la clienta no incluye clases de ${label}.`,
+        message: `La membresía de la clienta no incluye este tipo de clase.`,
       });
     }
 
@@ -8925,7 +8891,7 @@ app.post("/api/discount-codes", adminMiddleware, async (req, res) => {
         ? null
         : normalizeClassCategory(classCategory, "__invalid__");
     if (normalizedCategory === "__invalid__") {
-      return res.status(400).json({ message: "Categoría inválida. Usa: all, jumping, pilates o mixto." });
+      return res.status(400).json({ message: "Categoría inválida. Usa: all, pilates, bienestar, funcional o mixto." });
     }
     const normalizedChannel =
       channel === undefined || channel === null || channel === ""
@@ -8995,7 +8961,7 @@ app.put("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
         ? null
         : normalizeClassCategory(classCategory, "__invalid__");
     if (normalizedCategory === "__invalid__") {
-      return res.status(400).json({ message: "Categoría inválida. Usa: all, jumping, pilates o mixto." });
+      return res.status(400).json({ message: "Categoría inválida. Usa: all, pilates, bienestar, funcional o mixto." });
     }
     const normalizedChannel =
       channel === undefined || channel === null || channel === ""
@@ -10402,13 +10368,13 @@ app.post("/api/admin/test-emails", adminMiddleware, async (req, res) => {
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const jobs = [
-    { label: "Membresía activada", fn: () => sendMembershipActivated({ to: testTo, name: testName, planName: "Jumping — 4 Clases", startDate: new Date().toISOString(), endDate: new Date(Date.now() + 30 * 86400000).toISOString(), classLimit: 4 }) },
-    { label: "Reserva confirmada", fn: () => sendBookingConfirmed({ to: testTo, name: testName, className: "Jumping Fitness", date: new Date().toISOString(), startTime: "09:00", instructor: "Instructora Diana", classesLeft: 3, isWaitlist: false }) },
-    { label: "Reserva cancelada (a tiempo)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Jumping Dance", date: new Date().toISOString(), startTime: "11:00", creditRestored: true, isLate: false, classesLeft: 4 }) },
-    { label: "Reserva cancelada (tardía)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Strong Jump", date: new Date().toISOString(), startTime: "18:00", creditRestored: false, isLate: true, classesLeft: 3 }) },
+    { label: "Membresía activada", fn: () => sendMembershipActivated({ to: testTo, name: testName, planName: "4 Clases", startDate: new Date().toISOString(), endDate: new Date(Date.now() + 30 * 86400000).toISOString(), classLimit: 4 }) },
+    { label: "Reserva confirmada", fn: () => sendBookingConfirmed({ to: testTo, name: testName, className: "Pilates Matt Clásico", date: new Date().toISOString(), startTime: "09:00", instructor: "Instructora Angelina", classesLeft: 3, isWaitlist: false }) },
+    { label: "Reserva cancelada (a tiempo)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Flex & Flow", date: new Date().toISOString(), startTime: "11:00", creditRestored: true, isLate: false, classesLeft: 4 }) },
+    { label: "Reserva cancelada (tardía)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Body Strong", date: new Date().toISOString(), startTime: "18:00", creditRestored: false, isLate: true, classesLeft: 3 }) },
     { label: "Recordatorio semanal", fn: () => sendWeeklyReminder({ to: testTo, name: testName, classesLeft: 2, endDate: new Date(Date.now() + 15 * 86400000).toISOString() }) },
-    { label: "Renovación (última clase)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "Jumping — 4 Clases", classesLeft: 1, endDate: new Date(Date.now() + 5 * 86400000).toISOString(), reason: "last_class" }) },
-    { label: "Renovación (por vencer)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "Pilates — Mensual Ilimitado", classesLeft: null, endDate: new Date(Date.now() + 3 * 86400000).toISOString(), reason: "expiring_soon" }) },
+    { label: "Renovación (última clase)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "4 Clases", classesLeft: 1, endDate: new Date(Date.now() + 5 * 86400000).toISOString(), reason: "last_class" }) },
+    { label: "Renovación (por vencer)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "Mensual Ilimitado", classesLeft: null, endDate: new Date(Date.now() + 3 * 86400000).toISOString(), reason: "expiring_soon" }) },
     { label: "Reset de contraseña", fn: () => sendPasswordResetEmail({ to: testTo, name: testName, token: "test-token-123456" }) },
   ];
 
@@ -10548,7 +10514,7 @@ async function bootServer() {
   // Initialize Google Wallet loyalty class if configured
   ensureGoogleWalletClass().catch(() => { });
   app.listen(PORT, () => {
-    console.log(`🚀 Ophelia API + Frontend → http://localhost:${PORT}`);
+    console.log(`🚀 Punto Neutro API + Frontend → http://localhost:${PORT}`);
   });
 }
 

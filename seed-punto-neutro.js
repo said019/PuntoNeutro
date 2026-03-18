@@ -31,7 +31,7 @@ async function run() {
             {
                 name: "Body Strong",
                 description: "Una clase de intensidad moderada, dinámica y retadora, que busca logra un funcionamiento integral y funcional del cuerpo sin dejar ejecución y cuidado de los movimientos. ¡Conoce y desafía tus propios límites!",
-                category: "jumping", color: "#94867a", emoji: "flame", duration_min: 50, sort_order: 4
+                category: "funcional", color: "#94867a", emoji: "flame", duration_min: 50, sort_order: 4
             }
         ];
 
