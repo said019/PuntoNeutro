@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle } from "lucide-react";
-import opheliaLogo from "@/assets/punto-neutro-logo.png";
+import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 
 const schema = z.object({
   password: z
@@ -57,7 +57,7 @@ const ResetPassword = () => {
         {/* Logo */}
         <div className="flex justify-center mb-2">
           <Link to="/">
-            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
         </div>
         {done ? (

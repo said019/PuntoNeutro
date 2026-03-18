@@ -28,16 +28,14 @@ const STEP_META = [
 
 // ── Category groups for plan display ──────────────────────
 function groupPlans(plans: any[]) {
-  const groups: Record<string, any[]> = { jumping: [], pilates: [], mixto: [], otro: [] };
+  const groups: Record<string, any[]> = { pilates: [], bienestar: [], otro: [] };
   for (const p of plans) {
     const cat = p.classCategory ?? p.class_category ?? "";
-    if (cat === "jumping") groups.jumping.push(p);
-    else if (cat === "pilates") groups.pilates.push(p);
-    else if (cat === "mixto") groups.mixto.push(p);
+    if (cat === "pilates") groups.pilates.push(p);
+    else if (cat === "bienestar") groups.bienestar.push(p);
     else if (cat === "all") groups.otro.push(p);
-    else if (p.name?.toLowerCase().includes("jumping") || p.name?.toLowerCase().includes("jump")) groups.jumping.push(p);
-    else if (p.name?.toLowerCase().includes("pilates")) groups.pilates.push(p);
-    else if (p.name?.toLowerCase().includes("mixto")) groups.mixto.push(p);
+    else if (p.name?.toLowerCase().includes("pilates") || p.name?.toLowerCase().includes("mat") || p.name?.toLowerCase().includes("flow")) groups.pilates.push(p);
+    else if (p.name?.toLowerCase().includes("body") || p.name?.toLowerCase().includes("strong") || p.name?.toLowerCase().includes("flex")) groups.bienestar.push(p);
     else groups.otro.push(p);
   }
   return groups;
@@ -198,15 +196,13 @@ const CashAssignment = () => {
           {Object.entries(planGroups).map(([group, items]) => {
             if (!items.length) return null;
             const groupColors: Record<string, string> = {
-              jumping: "text-[#94867a]",
               pilates: "text-[#b5bf9c]",
-              mixto: "text-[#ebede5]",
+              bienestar: "text-[#94867a]",
               otro: "text-white/50",
             };
             const groupLabels: Record<string, string> = {
-              jumping: "Paquetes Jumping",
               pilates: "Paquetes Pilates",
-              mixto: "Paquetes Mixto",
+              bienestar: "Paquetes Bienestar",
               otro: "Otros paquetes",
             };
             return (

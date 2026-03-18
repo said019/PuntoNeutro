@@ -28,9 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus } from "lucide-react";
 
 const CATEGORIES = [
-  { value: "jumping", label: "Jumping",       color: "bg-[#94867a]/20 text-[#94867a] border-[#94867a]/30" },
   { value: "pilates", label: "Pilates",        color: "bg-[#b5bf9c]/20 text-[#b5bf9c] border-[#b5bf9c]/30" },
-  { value: "mixto",   label: "Mixto",          color: "bg-yellow-400/15 text-yellow-400 border-yellow-400/30" },
+  { value: "bienestar", label: "Bienestar",    color: "bg-[#94867a]/20 text-[#94867a] border-[#94867a]/30" },
   { value: "all",     label: "Todas (sin filtro)", color: "bg-white/10 text-white/60 border-white/15" },
 ] as const;
 
@@ -43,7 +42,7 @@ const planSchema = z.object({
   currency: z.string().default("MXN"),
   durationDays: z.coerce.number().min(1),
   classLimit: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().nullable()),
-  classCategory: z.enum(["jumping", "pilates", "mixto", "all"]).default("all"),
+  classCategory: z.enum(["pilates", "bienestar", "all"]).default("all"),
   features: z.string().optional(),
   isActive: z.boolean().default(true),
   isNonTransferable: z.boolean().default(false),
@@ -195,7 +194,7 @@ const PlansList = () => {
                       <TableCell>{p.classLimit == null ? "Ilimitado" : p.classLimit === 0 ? "0" : p.classLimit}</TableCell>
                       <TableCell>
                         {(() => {
-                          const cat = CATEGORIES.find((c) => c.value === (p.classCategory ?? "all")) ?? CATEGORIES[3];
+                          const cat = CATEGORIES.find((c) => c.value === (p.classCategory ?? "all")) ?? CATEGORIES[2];
                           return <Badge className={`border ${cat.color}`}>{cat.label}</Badge>;
                         })()}
                       </TableCell>

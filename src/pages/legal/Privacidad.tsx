@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import opheliaLogo from "@/assets/punto-neutro-logo.png";
+import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 import api from "@/lib/api";
 
 const Privacidad = () => {
@@ -20,7 +20,7 @@ const Privacidad = () => {
       {/* Nav */}
       <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border px-6 lg:px-[60px] py-4 flex items-center justify-between">
         <button onClick={() => navigate("/")} className="flex items-center bg-transparent border-none cursor-pointer">
-          <img src={opheliaLogo} alt="Punto Neutro" className="h-14 w-auto object-contain" />
+          <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-14 w-auto object-contain" />
         </button>
         <button
           onClick={() => navigate(-1)}
@@ -40,7 +40,7 @@ const Privacidad = () => {
         </h1>
 
         {dynamicPolicy ? (
-          <div className="prose-ophelia space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
+          <div className="prose-neutral space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
             <p className="text-foreground font-medium">
               Última actualización: {new Date().toLocaleDateString("es-MX")}
             </p>
@@ -49,7 +49,7 @@ const Privacidad = () => {
             </div>
           </div>
         ) : (
-          <div className="prose-ophelia space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
+          <div className="prose-neutral space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
             <p className="text-foreground font-medium">
               Última actualización: 26 de febrero de 2026
             </p>

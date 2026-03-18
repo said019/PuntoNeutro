@@ -18,14 +18,14 @@ import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus } from "lucide-react";
 
 const PALETTE_COLORS = [
-  { label: "Violeta", value: "#b5bf9c" },
-  { label: "Rosa", value: "#94867a" },
-  { label: "Lima", value: "#ebede5" },
-  { label: "Púrpura", value: "#8B5CF6" },
-  { label: "Primario", value: "#c026d3" },
+  { label: "Sage", value: "#b5bf9c" },
+  { label: "Taupe", value: "#94867a" },
+  { label: "Crema", value: "#ebede5" },
   { label: "Azul", value: "#3B82F6" },
   { label: "Esmeralda", value: "#10B981" },
   { label: "Naranja", value: "#F97316" },
+  { label: "Rosa", value: "#EC4899" },
+  { label: "Índigo", value: "#6366F1" },
 ];
 
 const typeSchema = z.object({

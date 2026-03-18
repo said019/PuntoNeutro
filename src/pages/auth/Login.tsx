@@ -6,9 +6,9 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
-import ophelia31 from "@/assets/ophelia-31.jpg";
-import ophelia50 from "@/assets/ophelia-50.jpg";
-import opheliaLogo from "@/assets/punto-neutro-logo.png";
+import pnImg4 from "@/assets/punto-neutro-images/pnImg4.jpg";
+import pnImg9 from "@/assets/punto-neutro-images/pnImg9.jpg";
+import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 
 const schema = z.object({
   email: z.string().email("Email inválido"),
@@ -60,7 +60,7 @@ const Login = () => {
       {/* ── LEFT PANEL — foto ── */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <img
-          src={ophelia31}
+          src={pnImg4}
           alt="Punto Neutro"
           className="absolute inset-0 w-full h-full object-cover scale-105"
         />
@@ -72,7 +72,7 @@ const Login = () => {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* logo */}
           <Link to="/" className="block">
-            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
 
           {/* quote */}
@@ -82,17 +82,16 @@ const Login = () => {
               San Juan del Río · Querétaro
             </div>
             <h2 className="font-bebas text-[clamp(3rem,5vw,5.5rem)] leading-[0.92] text-foreground mb-4">
-              SIENTE<br />
-              <span className="text-primary">EL VUELO</span><br />
-              EN CADA<br />
-              <span className="[-webkit-text-stroke:2px_hsl(var(--foreground)/0.5)] text-transparent">SALTO</span>
+              MOVIMIENTO<br />
+              <span className="text-primary">CON</span><br />
+              <span className="[-webkit-text-stroke:2px_hsl(var(--foreground)/0.5)] text-transparent">PROPÓSITO</span>
             </h2>
             <p className="text-muted-foreground text-[0.9rem] leading-[1.7] max-w-[340px]">
-              Más de 500 alumnas ya eligieron transformar su cuerpo y liberar su mente en Punto Neutro.
+              Pilates, bienestar y equilibrio. Encuentra tu centro en Punto Neutro.
             </p>
             {/* stats */}
             <div className="flex gap-6 mt-8">
-              {[["500+", "Alumnas activas"], ["12", "Clases / semana"], ["800 kcal", "Por sesión"]].map(([n, l]) => (
+              {[["4", "Disciplinas"], ["20+", "Clases / semana"], ["10", "Lugares por clase"]].map(([n, l]) => (
                 <div key={l}>
                   <div className="font-bebas text-2xl text-foreground">{n}</div>
                   <div className="text-[0.72rem] text-muted-foreground uppercase tracking-widest leading-tight">{l}</div>
@@ -113,7 +112,7 @@ const Login = () => {
 
           {/* Mobile logo */}
           <Link to="/" className="lg:hidden block mb-10">
-            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
 
           {/* heading */}

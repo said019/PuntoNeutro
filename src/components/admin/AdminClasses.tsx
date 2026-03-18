@@ -7,7 +7,7 @@ interface ClassType {
   name: string;
   subtitle: string | null;
   description: string | null;
-  category: "jumping" | "pilates" | "mixto";
+  category: "pilates" | "bienestar";
   intensity: "ligera" | "media" | "pesada" | "todas";
   color: string;
   emoji: string;
@@ -26,9 +26,8 @@ const INTENSITIES = [
 ];
 
 const CATEGORIES = [
-  { value: "jumping", label: "🏃 Jumping", badge: "bg-fuchsia-500/20 text-fuchsia-400" },
-  { value: "pilates", label: "🧘 Pilates", badge: "bg-pink-500/20 text-pink-400" },
-  { value: "mixto",   label: "🔀 Mixto",   badge: "bg-violet-500/20 text-violet-400" },
+  { value: "pilates", label: "🧘 Pilates", badge: "bg-[#b5bf9c]/20 text-[#b5bf9c]" },
+  { value: "bienestar", label: "� Bienestar", badge: "bg-[#94867a]/20 text-[#94867a]" },
 ];
 
 const INTENSITY_BADGE: Record<string, string> = {
@@ -40,9 +39,9 @@ const INTENSITY_BADGE: Record<string, string> = {
 
 const EMPTY = {
   name: "", subtitle: "", description: "",
-  category: "jumping" as ClassType["category"],
+  category: "pilates" as ClassType["category"],
   intensity: "media" as ClassType["intensity"],
-  color: "#c026d3", emoji: "🏃",
+  color: "#b5bf9c", emoji: "🧘",
   level: "Todos los niveles", duration_min: 50, capacity: 15,
   sort_order: 0,
 };
@@ -106,9 +105,8 @@ const AdminClasses = () => {
   }
 
   const groups = [
-    { label: "🏃 Jumping", items: classes.filter(c => c.category === "jumping") },
     { label: "🧘 Pilates", items: classes.filter(c => c.category === "pilates") },
-    { label: "🔀 Mixto",   items: classes.filter(c => c.category === "mixto")   },
+    { label: "� Bienestar", items: classes.filter(c => c.category === "bienestar") },
   ];
 
   return (
@@ -122,7 +120,7 @@ const AdminClasses = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <input
             value={form.name} onChange={e => set("name", e.target.value)}
-            placeholder="Nombre  ej: Jumping Fitness"
+            placeholder="Nombre  ej: Pilates Matt Clásico"
             className="bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary sm:col-span-2"
           />
           <input

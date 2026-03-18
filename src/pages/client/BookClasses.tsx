@@ -19,27 +19,27 @@ import type { BookingClient } from "@/types/booking";
 const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 // ── Category helpers ──────────────────────────────────────────────────────────
-type ClassCat = "jumping" | "pilates" | "mixto" | "all";
+type ClassCat = "pilates" | "bienestar" | "all";
 
 const CAT_COLORS: Record<ClassCat, { bg: string; text: string; border: string; dot: string }> = {
-  jumping: { bg: "bg-[#94867a]/15", text: "text-[#94867a]",  border: "border-[#94867a]/40", dot: "bg-[#94867a]"  },
-  pilates: { bg: "bg-[#b5bf9c]/15", text: "text-[#b5bf9c]",  border: "border-[#b5bf9c]/40", dot: "bg-[#b5bf9c]"  },
-  mixto:   { bg: "bg-[#ebede5]/15", text: "text-[#ebede5]",  border: "border-[#ebede5]/40", dot: "bg-[#ebede5]"  },
-  all:     { bg: "bg-white/5",      text: "text-white/60",   border: "border-white/15",     dot: "bg-white/40"   },
+  pilates:   { bg: "bg-[#b5bf9c]/15", text: "text-[#b5bf9c]",  border: "border-[#b5bf9c]/40", dot: "bg-[#b5bf9c]"  },
+  bienestar: { bg: "bg-[#94867a]/15", text: "text-[#94867a]",  border: "border-[#94867a]/40", dot: "bg-[#94867a]"  },
+  all:       { bg: "bg-white/5",      text: "text-white/60",   border: "border-white/15",     dot: "bg-white/40"   },
 };
 
 const CAT_LABELS: Record<ClassCat, string> = {
-  jumping: "Jumping", pilates: "Pilates", mixto: "Mixto", all: "Todas",
+  pilates: "Pilates", bienestar: "Bienestar", all: "Todas",
 };
 
 function inferClassCat(name: string): ClassCat {
   const n = name?.toLowerCase() ?? "";
-  if (n.includes("pilates") || n.includes("mat") || n.includes("flow") || n.includes("hot")) return "pilates";
-  return "jumping"; // jump, strong jump, dance, tone, mindful jump → jumping
+  if (n.includes("pilates") || n.includes("mat") || n.includes("flow") || n.includes("clásico") || n.includes("terapéutico")) return "pilates";
+  if (n.includes("flex") || n.includes("body") || n.includes("strong")) return "bienestar";
+  return "pilates"; // default to pilates
 }
 
 function canBook(classCat: ClassCat, membershipCat: ClassCat | null): boolean {
-  if (!membershipCat || membershipCat === "all" || membershipCat === "mixto") return true;
+  if (!membershipCat || membershipCat === "all") return true;
   return classCat === membershipCat;
 }
 
@@ -166,7 +166,7 @@ const BookClasses = () => {
           )}
 
           {/* Filter hint */}
-          {membershipCat && membershipCat !== "all" && membershipCat !== "mixto" && (
+          {membershipCat && membershipCat !== "all" && (
             <div className="flex items-center gap-1.5 text-xs px-1">
               <CheckCircle2 size={11} className={CAT_COLORS[membershipCat].text} />
               <span className="text-white/40">
@@ -239,7 +239,7 @@ const BookClasses = () => {
 
           {/* Legend */}
           <div className="flex flex-wrap gap-2 pt-1">
-            {(["jumping", "pilates"] as ClassCat[]).map(cat => (
+            {(["pilates", "bienestar"] as ClassCat[]).map(cat => (
               <div key={cat} className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium", CAT_COLORS[cat].bg, CAT_COLORS[cat].text, CAT_COLORS[cat].border)}>
                 <div className={cn("w-1.5 h-1.5 rounded-full", CAT_COLORS[cat].dot)} />
                 {CAT_LABELS[cat]}

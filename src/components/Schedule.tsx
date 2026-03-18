@@ -44,16 +44,15 @@ interface ScheduleClass {
 // ─── Fallback colors ──────────────────────────────────────────────────────────
 
 const fallbackColors: Record<string, string> = {
-  "Jumping Fitness": "#94867a",
-  "Jumping Dance":   "#b5bf9c",
-  "Jump & Tone":     "#ebede5",
-  "Strong Jump":     "#94867a",
-  "Mindful Jump":    "#b5bf9c",
-  "Hot Pilates":     "#ebede5",
-  "Flow Pilates":    "#94867a",
-  "Pilates Mat":     "#b5bf9c",
+  "Pilates Matt Clásico": "#b5bf9c",
+  "Pilates Terapéutico":  "#94867a",
+  "Flex & Flow":          "#b5bf9c",
+  "Body Strong":          "#94867a",
+  "Pilates Clásico":      "#b5bf9c",
+  "Flow Pilates":         "#b5bf9c",
+  "Pilates Mat":          "#b5bf9c",
 };
-const DEFAULT_COLOR = "#A48550";
+const DEFAULT_COLOR = "#94867a";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -210,13 +209,13 @@ export default function Schedule() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <section id="horario" className="scroll-mt-16 bg-[#0e0b12] relative overflow-hidden">
+    <section id="horario" className="scroll-mt-16 bg-[#2d2d2d] relative overflow-hidden">
 
       {/* ── Atmospheric glows ─────────────────────────────────────────────── */}
       <div className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full"
-        style={{ background: "radial-gradient(ellipse, rgba(164,133,80,0.10) 0%, transparent 70%)" }} />
+        style={{ background: "radial-gradient(ellipse, rgba(181,191,156,0.10) 0%, transparent 70%)" }} />
       <div className="pointer-events-none fixed bottom-0 right-0 w-[400px] h-[400px] rounded-full"
-        style={{ background: "radial-gradient(ellipse, rgba(202,113,225,0.06) 0%, transparent 70%)" }} />
+        style={{ background: "radial-gradient(ellipse, rgba(148,134,122,0.08) 0%, transparent 70%)" }} />
 
       <div className="relative z-10 max-w-[1200px] mx-auto px-6 lg:px-10">
 
@@ -225,7 +224,7 @@ export default function Schedule() {
 
           {/* Studio label */}
           <p className="text-[11px] font-normal tracking-[0.25em] uppercase text-white/40 mb-8">
-            ✦ Punto Neutro · Jumping &amp; Pilates
+            ✦ Punto Neutro · Pilates &amp; Bienestar
           </p>
 
           {/* Month nav */}
@@ -265,8 +264,8 @@ export default function Schedule() {
                   disabled={past}
                   onClick={() => setSelectedDate(day)}
                   style={selected ? {
-                    background: "linear-gradient(135deg, var(--color-primary, #A48550) 0%, #7a6038 100%)",
-                    boxShadow: "0 8px 32px rgba(164,133,80,0.38), inset 0 0 0 1px rgba(255,255,255,0.1)",
+                    background: "linear-gradient(135deg, var(--color-primary, #94867a) 0%, #6b5d53 100%)",
+                    boxShadow: "0 8px 32px rgba(148,134,122,0.38), inset 0 0 0 1px rgba(255,255,255,0.1)",
                     transform: "translateY(-3px) scale(1.04)",
                     borderColor: "transparent",
                   } : {}}
@@ -300,7 +299,7 @@ export default function Schedule() {
                         className="w-1 h-1 rounded-full transition-all"
                         style={{
                           background: selected ? "rgba(255,255,255,0.75)"
-                            : todayDay ? "var(--color-primary, #A48550)"
+                            : todayDay ? "var(--color-primary, #94867a)"
                             : "rgba(255,255,255,0.25)",
                         }}
                       />
@@ -394,8 +393,8 @@ export default function Schedule() {
                     animationDelay: `${idx * 0.07}s`,
                     ["--card-accent" as string]: accent,
                     background: isPast
-                      ? "linear-gradient(135deg, rgba(30,22,18,0.95) 0%, rgba(20,15,12,0.95) 100%)"
-                      : `linear-gradient(135deg, ${accent}0d 0%, ${accent}05 60%, rgba(14,11,18,0.6) 100%)`,
+                      ? "linear-gradient(135deg, rgba(45,45,45,0.95) 0%, rgba(35,35,35,0.95) 100%)"
+                      : `linear-gradient(135deg, ${accent}0d 0%, ${accent}05 60%, rgba(45,45,45,0.6) 100%)`,
                     borderColor: isPast ? "rgba(255,255,255,0.05)" : `${accent}28`,
                   }}
                   className={[
@@ -523,7 +522,7 @@ export default function Schedule() {
                           background: full
                             ? `linear-gradient(90deg, ${accent}, ${accent}cc)`
                             : spotsPercent > 60
-                            ? `linear-gradient(90deg, rgba(167,139,250,0.8), ${accent})`
+                            ? `linear-gradient(90deg, rgba(181,191,156,0.8), ${accent})`
                             : `linear-gradient(90deg, ${accent}cc, ${accent})`,
                           boxShadow: full ? `0 0 8px ${accent}88` : "none",
                         }}

@@ -6,8 +6,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, Check, ArrowRight } from "lucide-react";
-import ophelia28 from "@/assets/ophelia-28.jpg";
-import opheliaLogo from "@/assets/punto-neutro-logo.png";
+import pnImg9 from "@/assets/punto-neutro-images/pnImg9.jpg";
+import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 
 const schema = z.object({
   displayName: z.string().min(2, "Mínimo 2 caracteres"),
@@ -86,7 +86,7 @@ const Register = () => {
       {/* ── LEFT PANEL — photo ── */}
       <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden">
         <img
-          src={ophelia28}
+          src={pnImg9}
           alt="Punto Neutro"
           className="absolute inset-0 w-full h-full object-cover scale-105"
         />
@@ -95,7 +95,7 @@ const Register = () => {
 
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <Link to="/" className="block">
-            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
 
           <div>
@@ -110,7 +110,7 @@ const Register = () => {
               <span className="[-webkit-text-stroke:2px_hsl(var(--foreground)/0.5)] text-transparent">TRANSFORMACIÓN</span>
             </h2>
             <p className="text-muted-foreground text-[0.88rem] leading-[1.7] max-w-[320px] mb-8">
-              Únete a más de 500 mujeres que ya eligieron sentir el vuelo. Registra tu cuenta en segundos.
+              Únete a nuestro estudio de pilates y bienestar. Registra tu cuenta en segundos.
             </p>
             {/* benefits list */}
             <div className="flex flex-col gap-3">
@@ -142,7 +142,7 @@ const Register = () => {
 
           {/* Mobile logo */}
           <Link to="/" className="lg:hidden block mb-8">
-            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
 
           {/* heading */}

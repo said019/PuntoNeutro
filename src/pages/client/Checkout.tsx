@@ -10,7 +10,6 @@ import {
   Check, Loader2, CreditCard, Copy, Banknote, Building2,
   Tag, ChevronRight, ArrowLeft, Upload, CheckCircle, Sparkles,
 } from "lucide-react";
-import imgTrampoline from "@/assets/trampoline_2982156.png";
 import imgPilates from "@/assets/pilates_2320695.png";
 
 type Step = "select" | "method" | "bank" | "cash" | "upload" | "done";
@@ -23,13 +22,12 @@ function flag(value: unknown): boolean {
   return false;
 }
 
-function detectPlanCategory(plan: any): "jumping" | "pilates" | "mixto" | "all" {
+function detectPlanCategory(plan: any): "pilates" | "bienestar" | "all" {
   const raw = String(plan.classCategory ?? plan.class_category ?? "").toLowerCase();
-  if (["jumping", "pilates", "mixto", "all"].includes(raw)) return raw as "jumping" | "pilates" | "mixto" | "all";
+  if (["pilates", "bienestar", "all"].includes(raw)) return raw as "pilates" | "bienestar" | "all";
   const byName = String(plan.name ?? "").toLowerCase();
-  if (byName.includes("jump")) return "jumping";
-  if (byName.includes("pilates")) return "pilates";
-  if (byName.includes("mixto")) return "mixto";
+  if (byName.includes("pilates") || byName.includes("mat") || byName.includes("flow") || byName.includes("clásico") || byName.includes("terapéutico")) return "pilates";
+  if (byName.includes("body") || byName.includes("strong") || byName.includes("flex")) return "bienestar";
   return "all";
 }
 
@@ -43,17 +41,12 @@ const PlanCard = ({
   const nonRepeatable = flag(plan.isNonRepeatable ?? plan.is_non_repeatable);
   const category = detectPlanCategory(plan);
   const categoryLabel =
-    category === "jumping" ? "Jumping" :
     category === "pilates" ? "Pilates" :
-    category === "mixto" ? "Mixto" : "General";
+    category === "bienestar" ? "Bienestar" : "General";
   const accent =
-    category === "jumping" ? "#94867a" :
-    category === "pilates" ? "#ebede5" :
-    category === "mixto" ? "#b5bf9c" : "#b5bf9c";
-  const iconSrc =
-    category === "jumping" ? imgTrampoline :
-    category === "pilates" ? imgPilates :
-    category === "mixto" ? imgTrampoline : imgTrampoline;
+    category === "pilates" ? "#b5bf9c" :
+    category === "bienestar" ? "#94867a" : "#b5bf9c";
+  const iconSrc = imgPilates;
 
   return (
     <button
@@ -188,16 +181,16 @@ const Checkout = () => {
     return acc;
   }, {});
 
-  const categoryOrder = ["jumping", "pilates", "mixto", "all", "otro"];
+  const categoryOrder = ["pilates", "bienestar", "all", "otro"];
   const sortedCategories = [
     ...categoryOrder.filter((c) => grouped[c]),
     ...Object.keys(grouped).filter((c) => !categoryOrder.includes(c)),
   ];
 
   const categoryLabel = (cat: string) => {
-    if (cat === "jumping") return "Jumping";
     if (cat === "pilates") return "Pilates";
-    if (cat === "mixto") return "Mixto";
+    if (cat === "bienestar") return "Bienestar";
+    if (cat === "mixto") return "General";
     if (cat === "all") return "General";
     return "Otro";
   };

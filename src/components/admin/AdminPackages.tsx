@@ -7,16 +7,15 @@ interface Package {
   name: string;
   num_classes: string;
   price: number;
-  category: "jumping" | "pilates" | "mixtos";
+  category: "pilates" | "bienestar";
   validity_days: number;
   is_active: boolean;
   sort_order: number;
 }
 
 const CATEGORIES: { key: Package["category"]; label: string }[] = [
-  { key: "jumping", label: "Paquetes Jumping" },
   { key: "pilates", label: "Paquetes Pilates" },
-  { key: "mixtos", label: "Paquetes Mixtos" },
+  { key: "bienestar", label: "Paquetes Bienestar" },
 ];
 
 const AdminPackages = () => {
@@ -25,7 +24,7 @@ const AdminPackages = () => {
   const [name, setName] = useState("");
   const [numClasses, setNumClasses] = useState("");
   const [price, setPrice] = useState("");
-  const [category, setCategory] = useState<Package["category"]>("jumping");
+  const [category, setCategory] = useState<Package["category"]>("pilates");
   const [validityDays, setValidityDays] = useState("30");
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -69,7 +68,7 @@ const AdminPackages = () => {
   });
 
   const resetForm = () => {
-    setName(""); setNumClasses(""); setPrice(""); setCategory("jumping"); setValidityDays("30"); setEditId(null);
+    setName(""); setNumClasses(""); setPrice(""); setCategory("pilates"); setValidityDays("30"); setEditId(null);
   };
 
   const startEdit = (p: Package) => {
@@ -94,9 +93,8 @@ const AdminPackages = () => {
   };
 
   const CATEGORY_BADGE: Record<Package["category"], string> = {
-    jumping: "bg-fuchsia-500/20 text-fuchsia-300",
-    pilates: "bg-pink-500/20 text-pink-300",
-    mixtos: "bg-violet-500/20 text-violet-300",
+    pilates: "bg-[#b5bf9c]/20 text-[#b5bf9c]",
+    bienestar: "bg-[#94867a]/20 text-[#94867a]",
   };
 
   return (
@@ -138,9 +136,8 @@ const AdminPackages = () => {
             onChange={(e) => setCategory(e.target.value as Package["category"])}
             className="col-span-2 sm:col-span-3 bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary"
           >
-            <option value="jumping">Jumping</option>
             <option value="pilates">Pilates</option>
-            <option value="mixtos">Mixtos</option>
+            <option value="bienestar">Bienestar</option>
           </select>
         </div>
         <div className="flex gap-3 mt-4">

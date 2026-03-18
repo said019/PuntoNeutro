@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import opheliaLogo from "@/assets/punto-neutro-logo.png";
+import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
   BookOpen, DollarSign,
@@ -118,7 +118,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           )}
         >
           {!isCompact && (
-            <img src={opheliaLogo} alt="Punto Neutro" className="h-14 w-auto object-contain" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-14 w-auto object-contain" />
           )}
 
           <button

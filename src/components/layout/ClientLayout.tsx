@@ -7,7 +7,7 @@ import {
   ChevronRight, Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import opheliaLogo from "@/assets/punto-neutro-logo.png";
+import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 
 /* ── Navigation groups ─────────────────────────────────────────────── */
 const NAV_GROUPS = [
@@ -125,7 +125,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
         {/* ── Logo / Brand ── */}
         <div className="relative flex h-20 items-center justify-between px-5 border-b border-white/[0.06]">
           <Link to="/" className="flex items-center no-underline">
-            <img src={opheliaLogo} alt="Punto Neutro" className="h-16 w-auto" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-16 w-auto" />
           </Link>
           <button
             onClick={() => setOpen(false)}
@@ -241,7 +241,7 @@ const ClientLayout = ({ children }: { children: React.ReactNode }) => {
           </button>
 
           <Link to="/">
-            <img src={opheliaLogo} alt="Punto Neutro" className="h-12 w-auto" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-12 w-auto" />
           </Link>
 
           <Link to="/app/notifications" className="rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">

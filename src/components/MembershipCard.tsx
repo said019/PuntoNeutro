@@ -9,19 +9,17 @@ import { es } from "date-fns/locale";
 import { Infinity as InfinityIcon, CalendarDays } from "lucide-react";
 import { safeParse } from "@/lib/utils";
 import type { ClientMembership } from "@/types/membership";
-import imgTrampoline from "@/assets/trampoline_2982156.png";
 import imgPilates    from "@/assets/pilates_2320695.png";
 
 // ─────────────────────────────────────────────
 // Categoría
 // ─────────────────────────────────────────────
-type PlanCategory = "jumping" | "pilates" | "mixto" | "other";
+type PlanCategory = "pilates" | "bienestar" | "other";
 
 function detectCategory(planName: string): PlanCategory {
   const lower = planName.toLowerCase();
-  if (lower.includes("mixto"))   return "mixto";
-  if (lower.includes("jumping")) return "jumping";
-  if (lower.includes("pilates")) return "pilates";
+  if (lower.includes("body") || lower.includes("strong") || lower.includes("flex")) return "bienestar";
+  if (lower.includes("pilates") || lower.includes("mat") || lower.includes("flow") || lower.includes("terapéutico") || lower.includes("clásico")) return "pilates";
   return "other";
 }
 
@@ -29,85 +27,65 @@ function detectCategory(planName: string): PlanCategory {
 // Paleta Punto Neutro
 // ─────────────────────────────────────────────
 const PALETTE = {
-  jumping: {
-    gradient:     "linear-gradient(145deg, #1a0522 0%, #2b0635 55%, #160420 100%)",
-    noise:        "rgba(225,92,184,0.04)",
+  pilates: {
+    gradient:     "linear-gradient(145deg, #1a1f12 0%, #2a3318 55%, #1a1f12 100%)",
+    noise:        "rgba(181,191,156,0.04)",
+    glow1:        "#b5bf9c",
+    glow2:        "#ebede5",
+    accent:       "#b5bf9c",
+    accentLight:  "#ebede5",
+    badge:        "rgba(181,191,156,0.18)",
+    badgeText:    "#ebede5",
+    badgeBorder:  "rgba(181,191,156,0.35)",
+    label:        "Pilates",
+    border:       "rgba(181,191,156,0.30)",
+    stampBg:      "rgba(181,191,156,0.12)",
+    stampBorder:  "rgba(181,191,156,0.30)",
+    iconHighlight:"#b5bf9c",
+    iconMuted:    "rgba(255,255,255,0.26)",
+    progressFrom: "#b5bf9c",
+    progressTo:   "#ebede5",
+    divider:      "rgba(181,191,156,0.15)",
+  },
+  bienestar: {
+    gradient:     "linear-gradient(145deg, #1f1a17 0%, #332c27 55%, #1f1a17 100%)",
+    noise:        "rgba(148,134,122,0.04)",
     glow1:        "#94867a",
     glow2:        "#ebede5",
     accent:       "#94867a",
     accentLight:  "#ebede5",
-    badge:        "rgba(225,92,184,0.18)",
+    badge:        "rgba(148,134,122,0.18)",
     badgeText:    "#ebede5",
-    badgeBorder:  "rgba(225,92,184,0.35)",
-    label:        "Jumping",
-    border:       "rgba(225,92,184,0.30)",
-    stampBg:      "rgba(225,92,184,0.12)",
-    stampBorder:  "rgba(225,92,184,0.30)",
+    badgeBorder:  "rgba(148,134,122,0.35)",
+    label:        "Bienestar",
+    border:       "rgba(148,134,122,0.30)",
+    stampBg:      "rgba(148,134,122,0.12)",
+    stampBorder:  "rgba(148,134,122,0.30)",
     iconHighlight:"#ebede5",
     iconMuted:    "rgba(255,255,255,0.28)",
     progressFrom: "#94867a",
     progressTo:   "#ebede5",
-    divider:      "rgba(225,92,184,0.15)",
-  },
-  pilates: {
-    gradient:     "linear-gradient(145deg, #0d1205 0%, #181f07 55%, #0c1005 100%)",
-    noise:        "rgba(231,235,110,0.03)",
-    glow1:        "#ebede5",
-    glow2:        "#ebede5",
-    accent:       "#ebede5",
-    accentLight:  "#ebede5",
-    badge:        "rgba(231,235,110,0.14)",
-    badgeText:    "#ebede5",
-    badgeBorder:  "rgba(231,235,110,0.30)",
-    label:        "Pilates",
-    border:       "rgba(231,235,110,0.25)",
-    stampBg:      "rgba(231,235,110,0.10)",
-    stampBorder:  "rgba(231,235,110,0.28)",
-    iconHighlight:"#94867a",
-    iconMuted:    "rgba(255,255,255,0.26)",
-    progressFrom: "#ebede5",
-    progressTo:   "#ebede5",
-    divider:      "rgba(231,235,110,0.13)",
-  },
-  mixto: {
-    gradient:     "linear-gradient(145deg, #0c0520 0%, #1a0a34 55%, #0b0418 100%)",
-    noise:        "rgba(202,113,225,0.04)",
-    glow1:        "#b5bf9c",
-    glow2:        "#b5bf9c",
-    accent:       "#b5bf9c",
-    accentLight:  "#b5bf9c",
-    badge:        "rgba(202,113,225,0.18)",
-    badgeText:    "#b5bf9c",
-    badgeBorder:  "rgba(202,113,225,0.35)",
-    label:        "Mixto",
-    border:       "rgba(202,113,225,0.30)",
-    stampBg:      "rgba(202,113,225,0.12)",
-    stampBorder:  "rgba(202,113,225,0.30)",
-    iconHighlight:"#ebede5",
-    iconMuted:    "rgba(255,255,255,0.30)",
-    progressFrom: "#b5bf9c",
-    progressTo:   "#b5bf9c",
-    divider:      "rgba(202,113,225,0.15)",
+    divider:      "rgba(148,134,122,0.15)",
   },
   other: {
-    gradient:     "linear-gradient(145deg, #160420 0%, #250535 55%, #120318 100%)",
-    noise:        "rgba(254,165,220,0.03)",
+    gradient:     "linear-gradient(145deg, #1a1a1a 0%, #2d2d2d 55%, #1a1a1a 100%)",
+    noise:        "rgba(235,237,229,0.03)",
     glow1:        "#94867a",
     glow2:        "#b5bf9c",
     accent:       "#ebede5",
     accentLight:  "#b5bf9c",
-    badge:        "rgba(254,165,220,0.14)",
+    badge:        "rgba(235,237,229,0.14)",
     badgeText:    "#ebede5",
-    badgeBorder:  "rgba(254,165,220,0.30)",
+    badgeBorder:  "rgba(235,237,229,0.30)",
     label:        "Membresía",
-    border:       "rgba(254,165,220,0.25)",
-    stampBg:      "rgba(254,165,220,0.10)",
-    stampBorder:  "rgba(254,165,220,0.28)",
+    border:       "rgba(235,237,229,0.25)",
+    stampBg:      "rgba(235,237,229,0.10)",
+    stampBorder:  "rgba(235,237,229,0.28)",
     iconHighlight:"#ebede5",
     iconMuted:    "rgba(255,255,255,0.28)",
     progressFrom: "#94867a",
     progressTo:   "#b5bf9c",
-    divider:      "rgba(254,165,220,0.13)",
+    divider:      "rgba(235,237,229,0.13)",
   },
 } satisfies Record<PlanCategory, {
   gradient: string; noise: string; glow1: string; glow2: string;
@@ -204,10 +182,8 @@ function StampGrid({
   const size = classLimit <= 4 ? 52 : classLimit <= 8 ? 44 : classLimit <= 12 ? 38 : classLimit <= 16 ? 32 : 26;
   const cols = classLimit <= 4 ? classLimit : classLimit <= 8 ? 4 : classLimit <= 12 ? 6 : classLimit <= 16 ? 4 : 5;
 
-  const getImg = (i: number) => {
-    if (category === "pilates") return imgPilates;
-    if (category === "mixto")   return i % 2 === 0 ? imgTrampoline : imgPilates;
-    return imgTrampoline;
+  const getImg = (_i: number) => {
+    return imgPilates;
   };
 
   return (

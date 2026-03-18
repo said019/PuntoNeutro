@@ -6,7 +6,7 @@ interface ScheduleSlot {
   id: string;
   time_slot: string;
   day_of_week: number;
-  class_label: "JUMPING" | "PILATES" | "SORPRESA";
+  class_label: "PILATES" | "BIENESTAR" | "ESPECIAL";
   shift: "morning" | "evening";
   is_active: boolean;
 }
@@ -14,9 +14,9 @@ interface ScheduleSlot {
 const DAYS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 
 const LABEL_STYLE: Record<string, string> = {
-  JUMPING: "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30",
-  PILATES: "bg-pink-500/20 text-pink-300 border border-pink-500/30",
-  SORPRESA: "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30",
+  PILATES: "bg-[#b5bf9c]/20 text-[#b5bf9c] border border-[#b5bf9c]/30",
+  BIENESTAR: "bg-[#94867a]/20 text-[#94867a] border border-[#94867a]/30",
+  ESPECIAL: "bg-[#ebede5]/20 text-[#ebede5] border border-[#ebede5]/30",
 };
 
 const AdminSchedule = () => {
@@ -24,7 +24,7 @@ const AdminSchedule = () => {
 
   const [timeSlot, setTimeSlot] = useState("");
   const [dayOfWeek, setDayOfWeek] = useState(1);
-  const [classLabel, setClassLabel] = useState<"JUMPING" | "PILATES" | "SORPRESA">("JUMPING");
+  const [classLabel, setClassLabel] = useState<"PILATES" | "BIENESTAR" | "ESPECIAL">("PILATES");
   const [shift, setShift] = useState<"morning" | "evening">("morning");
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -64,7 +64,7 @@ const AdminSchedule = () => {
   const resetForm = () => {
     setTimeSlot("");
     setDayOfWeek(1);
-    setClassLabel("JUMPING");
+    setClassLabel("PILATES");
     setShift("morning");
     setEditId(null);
     setSaving(false);
@@ -134,7 +134,7 @@ const AdminSchedule = () => {
                                 setDayOfWeek(day);
                                 setShift(list === morningSlots ? "morning" : "evening");
                                 setEditId(null);
-                                setClassLabel("JUMPING");
+                                setClassLabel("PILATES");
                               }}
                               className="text-muted-foreground/30 hover:text-muted-foreground text-lg leading-none transition-colors"
                             >
@@ -198,12 +198,12 @@ const AdminSchedule = () => {
           </select>
           <select
             value={classLabel}
-            onChange={(e) => setClassLabel(e.target.value as "JUMPING" | "PILATES" | "SORPRESA")}
+            onChange={(e) => setClassLabel(e.target.value as "PILATES" | "BIENESTAR" | "ESPECIAL")}
             className="bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary"
           >
-            <option value="JUMPING">JUMPING</option>
             <option value="PILATES">PILATES</option>
-            <option value="SORPRESA">SORPRESA</option>
+            <option value="BIENESTAR">BIENESTAR</option>
+            <option value="ESPECIAL">ESPECIAL</option>
           </select>
           <select
             value={shift}

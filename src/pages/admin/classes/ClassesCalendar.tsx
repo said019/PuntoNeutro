@@ -28,14 +28,14 @@ import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizo
 
 /* ── Palette ── */
 const PALETTE_COLORS = [
-  { label: "Rosa", value: "#94867a" },
-  { label: "Violeta", value: "#b5bf9c" },
-  { label: "Lima", value: "#ebede5" },
-  { label: "Púrpura", value: "#8B5CF6" },
-  { label: "Magenta", value: "#c026d3" },
+  { label: "Taupe", value: "#94867a" },
+  { label: "Sage", value: "#b5bf9c" },
+  { label: "Crema", value: "#ebede5" },
   { label: "Azul", value: "#3B82F6" },
   { label: "Esmeralda", value: "#10B981" },
   { label: "Naranja", value: "#F97316" },
+  { label: "Rosa", value: "#EC4899" },
+  { label: "Índigo", value: "#6366F1" },
 ];
 
 /* ── Types ── */
@@ -61,7 +61,7 @@ interface ClassType {
   id: string;
   name: string;
   color: string;
-  category?: "jumping" | "pilates";
+  category?: "pilates" | "bienestar";
   defaultDuration?: number;
   durationMin?: number;
   maxCapacity?: number;
@@ -102,7 +102,7 @@ type ClassFormData = z.infer<typeof classSchema>;
 const typeSchema = z.object({
   name: z.string().min(1),
   color: z.string().default("#b5bf9c"),
-  category: z.enum(["jumping", "pilates"]).default("jumping"),
+  category: z.enum(["pilates", "bienestar"]).default("pilates"),
   defaultDuration: z.coerce.number().min(1),
   maxCapacity: z.coerce.number().min(1),
   isActive: z.boolean().default(true),
@@ -653,7 +653,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
   const [editing, setEditing] = useState<ClassType | null>(null);
   const form = useForm<TypeFormData>({
     resolver: zodResolver(typeSchema),
-    defaultValues: { color: "#b5bf9c", category: "jumping", defaultDuration: 50, maxCapacity: 10, isActive: true },
+    defaultValues: { color: "#b5bf9c", category: "pilates", defaultDuration: 50, maxCapacity: 10, isActive: true },
   });
 
   const createMutation = useMutation({
@@ -684,7 +684,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
     form.reset({
       name: t.name,
       color: t.color,
-      category: (t.category === "pilates" ? "pilates" : "jumping") as "jumping" | "pilates",
+      category: (t.category === "pilates" ? "pilates" : "bienestar") as "pilates" | "bienestar",
       defaultDuration: t.defaultDuration ?? t.durationMin ?? 50,
       maxCapacity: t.maxCapacity ?? t.capacity ?? 10,
       isActive: t.isActive ?? true,
@@ -693,7 +693,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
     setOpen(true);
   };
   const openCreate = () => {
-    form.reset({ color: "#b5bf9c", category: "jumping", defaultDuration: 50, maxCapacity: 10, isActive: true });
+    form.reset({ color: "#b5bf9c", category: "pilates", defaultDuration: 50, maxCapacity: 10, isActive: true });
     setEditing(null);
     setOpen(true);
   };
@@ -723,7 +723,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
                       <p className="truncate text-sm font-semibold text-white">{t.name}</p>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {t.category === "jumping" && <Badge className="bg-[#94867a]/20 text-[#94867a] border border-[#94867a]/30">Jumping</Badge>}
+                      {t.category === "bienestar" && <Badge className="bg-[#94867a]/20 text-[#94867a] border border-[#94867a]/30">Bienestar</Badge>}
                       {t.category === "pilates" && <Badge className="bg-[#b5bf9c]/20 text-[#b5bf9c] border border-[#b5bf9c]/30">Pilates</Badge>}
                       {!t.category && <Badge variant="secondary">—</Badge>}
                       <Badge variant="outline">{(t.defaultDuration ?? t.durationMin ?? "—") + " min"}</Badge>
@@ -774,7 +774,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
                   <TableCell><div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: t.color }} /></TableCell>
                   <TableCell className="font-medium">{t.name}</TableCell>
                   <TableCell>
-                    {t.category === "jumping" && <Badge className="bg-[#94867a]/20 text-[#94867a] border border-[#94867a]/30">Jumping</Badge>}
+                    {t.category === "bienestar" && <Badge className="bg-[#94867a]/20 text-[#94867a] border border-[#94867a]/30">Bienestar</Badge>}
                     {t.category === "pilates" && <Badge className="bg-[#b5bf9c]/20 text-[#b5bf9c] border border-[#b5bf9c]/30">Pilates</Badge>}
                     {!t.category && <Badge variant="secondary">—</Badge>}
                   </TableCell>
@@ -821,14 +821,14 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
               <Label>Categoría</Label>
               <Select
                 value={form.watch("category")}
-                onValueChange={(v) => form.setValue("category", v as "jumping" | "pilates")}
+                onValueChange={(v) => form.setValue("category", v as "pilates" | "bienestar")}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="jumping">Jumping</SelectItem>
                   <SelectItem value="pilates">Pilates</SelectItem>
+                  <SelectItem value="bienestar">Bienestar</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1069,8 +1069,8 @@ function GenerateTab({
       {/* ── Step 4: Time + Capacity ── */}
       <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
         <div className="flex items-center gap-2 mb-1">
-          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] text-xs font-bold">4</span>
-          <span className="text-xs font-semibold text-[#8B5CF6]/70 uppercase tracking-wider">Horario y capacidad</span>
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#94867a]/20 text-[#94867a] text-xs font-bold">4</span>
+          <span className="text-xs font-semibold text-[#94867a]/70 uppercase tracking-wider">Horario y capacidad</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5">
@@ -1483,7 +1483,7 @@ function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
             <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
             <div className="space-y-1">
               <Label>Especialidades (separadas por coma)</Label>
-              <Input {...form.register("specialties")} placeholder="Ej: Jumping, Pilates, Cardio" />
+              <Input {...form.register("specialties")} placeholder="Ej: Pilates, Flex & Flow, Body Strong" />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">

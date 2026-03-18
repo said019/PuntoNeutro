@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import opheliaLogo from "@/assets/punto-neutro-logo.png";
+import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 import api from "@/lib/api";
 
 const Terminos = () => {
@@ -20,7 +20,7 @@ const Terminos = () => {
       {/* Nav */}
       <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border px-6 lg:px-[60px] py-4 flex items-center justify-between">
         <button onClick={() => navigate("/")} className="flex items-center bg-transparent border-none cursor-pointer">
-          <img src={opheliaLogo} alt="Punto Neutro" className="h-14 w-auto object-contain" />
+          <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-14 w-auto object-contain" />
         </button>
         <button
           onClick={() => navigate(-1)}
@@ -40,7 +40,7 @@ const Terminos = () => {
         </h1>
 
         {dynamicPolicy ? (
-          <div className="prose-ophelia space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
+          <div className="prose-neutral space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
             <p className="text-foreground font-medium">
               Última actualización: {new Date().toLocaleDateString("es-MX")}
             </p>
@@ -49,7 +49,7 @@ const Terminos = () => {
             </div>
           </div>
         ) : (
-          <div className="prose-ophelia space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
+          <div className="prose-neutral space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
             <p className="text-foreground font-medium">
               Última actualización: 26 de febrero de 2026
             </p>
@@ -62,7 +62,7 @@ const Terminos = () => {
             <ul className="list-disc pl-6 space-y-2">
               <li><strong className="text-foreground">"Estudio"</strong> se refiere a Punto Neutro y sus instalaciones en San Juan del Río, Querétaro.</li>
               <li><strong className="text-foreground">"Alumna/o"</strong> se refiere a cualquier persona registrada en la plataforma que asiste a clases.</li>
-              <li><strong className="text-foreground">"Paquete"</strong> se refiere a los planes de clases adquiridos (jumping, pilates o mixtos).</li>
+              <li><strong className="text-foreground">"Paquete"</strong> se refiere a los planes de clases adquiridos (pilates, bienestar o complementos).</li>
               <li><strong className="text-foreground">"Clase"</strong> se refiere a cada sesión de ejercicio programada en el estudio.</li>
             </ul>
 
@@ -117,10 +117,10 @@ const Terminos = () => {
 
             <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">8. Vestimenta y artículos personales</h2>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Para clases de jumping: ropa deportiva cómoda y <strong className="text-foreground">tenis deportivos obligatorios</strong>.</li>
-              <li>Para clases de pilates: ropa deportiva y <strong className="text-foreground">calcetas antideslizantes</strong>.</li>
+              <li>Para todas las clases: ropa deportiva cómoda y <strong className="text-foreground">calcetas antideslizantes</strong>.</li>
+              <li>Para clases de pilates: se recomienda ropa ajustada para mejor corrección postural.</li>
               <li>Todos los artículos personales deben guardarse en los lockers proporcionados.</li>
-              <li>No se permite llevar objetos personales (incluida agua) al área de mat/trampolines para evitar accidentes.</li>
+              <li>No se permite llevar objetos personales (incluida agua) al área de mat para evitar accidentes.</li>
               <li>El celular debe permanecer en silencio durante la clase.</li>
               <li>El estudio no se hace responsable por objetos perdidos o robados.</li>
             </ul>
