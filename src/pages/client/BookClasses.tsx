@@ -107,7 +107,8 @@ const BookClasses = () => {
 
   const classes: any[] = Array.isArray(classesData?.data) ? classesData.data : Array.isArray(classesData) ? classesData : [];
   const myBookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
-  const membership = membershipData?.data ?? null;
+  const rawMem = membershipData?.data !== undefined ? membershipData.data : membershipData;
+  const membership = rawMem && typeof rawMem === "object" && "id" in rawMem ? rawMem : null;
   const hasActive = membership?.status === "active";
   const membershipCat: ClassCat | null = hasActive
     ? ((membership.classCategory ?? membership.class_category ?? "all") as ClassCat)

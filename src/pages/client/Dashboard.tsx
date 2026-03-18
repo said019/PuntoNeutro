@@ -29,7 +29,12 @@ const Dashboard = () => {
     queryFn: async () => (await api.get("/bookings/my-bookings")).data,
   });
 
-  const membership: ClientMembership | null = membershipData?.data ?? membershipData ?? null;
+  // API returns { data: <membership|null> } — extract the inner payload.
+  // Guard against the wrapper object being truthy when the actual value is null.
+  const rawMembership = membershipData?.data !== undefined ? membershipData.data : membershipData;
+  const membership: ClientMembership | null =
+    rawMembership && typeof rawMembership === "object" && "id" in rawMembership ? rawMembership : null;
+
   const bookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
 
   const upcomingBookings = bookings
