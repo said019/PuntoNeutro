@@ -274,7 +274,7 @@ export function MembershipCard({ membership }: MembershipCardProps) {
             </span>
 
             <h3
-              className="font-gulfs text-2xl leading-tight text-white"
+              className="font-gulfs text-2xl leading-tight text-[#2d2d2d]"
               style={{ textShadow: `0 0 24px ${pal.accent}55` }}
             >
               {planName}
@@ -297,7 +297,7 @@ export function MembershipCard({ membership }: MembershipCardProps) {
               >
                 {classesRemaining}
               </span>
-              <span className="font-alilato text-[9px] uppercase tracking-widest text-white/40 mt-0.5 leading-tight text-center">
+              <span className="font-alilato text-[9px] uppercase tracking-widest text-[#2d2d2d]/40 mt-0.5 leading-tight text-center">
                 de {classLimit}<br />clases
               </span>
             </div>
@@ -342,7 +342,7 @@ export function MembershipCard({ membership }: MembershipCardProps) {
                     }}
                   />
                 </div>
-                <p className="font-alilato text-[10px] text-white/30">
+                <p className="font-alilato text-[10px] text-[#2d2d2d]/30">
                   {used} de {classLimit} clases usadas
                 </p>
               </div>
@@ -355,8 +355,8 @@ export function MembershipCard({ membership }: MembershipCardProps) {
           >
             <InfinityIcon size={20} style={{ color: pal.accent }} />
             <div>
-              <p className="font-gulfs text-base text-white">Clases ilimitadas</p>
-              <p className="font-alilato text-[11px] text-white/40">Sin límite de sesiones</p>
+              <p className="font-gulfs text-base text-[#2d2d2d]">Clases ilimitadas</p>
+              <p className="font-alilato text-[11px] text-[#2d2d2d]/40">Sin límite de sesiones</p>
             </div>
           </div>
         ) : null}
@@ -367,9 +367,9 @@ export function MembershipCard({ membership }: MembershipCardProps) {
             <div className="h-px w-full" style={{ background: pal.divider }} />
             <div className="flex items-center gap-2">
               <CalendarDays size={12} style={{ color: pal.accent, opacity: 0.8 }} />
-              <span className="font-alilato text-[11px] text-white/40">
+              <span className="font-alilato text-[11px] text-[#2d2d2d]/40">
                 Vence el{" "}
-                <span className="text-white/65 font-medium">
+                <span className="text-[#2d2d2d]/65 font-medium">
                   {format(safeParse(endDate), "d 'de' MMMM yyyy", { locale: es })}
                 </span>
                 {daysRemaining !== null && (

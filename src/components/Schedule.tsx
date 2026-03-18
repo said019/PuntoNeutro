@@ -223,7 +223,7 @@ export default function Schedule() {
         <div className="pt-14 pb-0">
 
           {/* Studio label */}
-          <p className="text-[11px] font-normal tracking-[0.25em] uppercase text-white/40 mb-8">
+          <p className="text-[11px] font-normal tracking-[0.25em] uppercase text-[#2d2d2d]/40 mb-8">
             ✦ Punto Neutro · Pilates &amp; Bienestar
           </p>
 
@@ -231,17 +231,17 @@ export default function Schedule() {
           <div className="flex items-center gap-5 mb-8">
             <button
               onClick={() => setWeekStart((p) => subWeeks(p, 1))}
-              className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/50 hover:border-primary hover:text-primary transition-all"
+              className="w-10 h-10 rounded-full border border-[#94867a]/15 bg-[#94867a]/[0.06] flex items-center justify-center text-[#2d2d2d]/50 hover:border-primary hover:text-primary transition-all"
             >
               <ChevronLeft size={16} />
             </button>
-            <h2 className="flex-1 font-serif text-[2.1rem] font-light tracking-tight text-white">
+            <h2 className="flex-1 font-serif text-[2.1rem] font-light tracking-tight text-[#2d2d2d]">
               <span className="capitalize">{format(weekStart, "MMMM", { locale: es })}</span>{" "}
               <span className="font-bold text-primary">{format(weekStart, "yyyy")}</span>
             </h2>
             <button
               onClick={() => setWeekStart((p) => addWeeks(p, 1))}
-              className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/50 hover:border-primary hover:text-primary transition-all"
+              className="w-10 h-10 rounded-full border border-[#94867a]/15 bg-[#94867a]/[0.06] flex items-center justify-center text-[#2d2d2d]/50 hover:border-primary hover:text-primary transition-all"
             >
               <ChevronRight size={16} />
             </button>
@@ -273,15 +273,15 @@ export default function Schedule() {
                     "flex flex-col items-center gap-1.5 px-5 py-3.5 rounded-[20px] min-w-[72px] select-none transition-all duration-200 border",
                     past ? "opacity-25 cursor-not-allowed" : "cursor-pointer",
                     selected
-                      ? "text-white"
+                      ? "text-[#2d2d2d]"
                       : todayDay
-                      ? "bg-white/5 border-primary/30 text-white"
-                      : "bg-white/[0.04] border-white/8 text-white/80 hover:border-primary/30 hover:-translate-y-0.5",
+                      ? "bg-[#94867a]/[0.06] border-primary/30 text-[#2d2d2d]"
+                      : "bg-[#94867a]/[0.06] border-[#94867a]/12 text-[#2d2d2d]/80 hover:border-primary/30 hover:-translate-y-0.5",
                   ].join(" ")}
                 >
                   <span className={[
                     "text-[10px] font-semibold tracking-[0.12em] uppercase transition-colors",
-                    selected ? "text-white/75" : "text-white/40",
+                    selected ? "text-[#2d2d2d]/75" : "text-[#2d2d2d]/40",
                   ].join(" ")}>
                     {format(day, "EEE", { locale: es })}
                   </span>
@@ -313,9 +313,9 @@ export default function Schedule() {
 
         {/* ── FILTERS ROW ─────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 flex-wrap">
-          <div className="font-serif text-[1.35rem] font-semibold text-white">
+          <div className="font-serif text-[1.35rem] font-semibold text-[#2d2d2d]">
             {filteredClasses.length} clase{filteredClasses.length !== 1 ? "s" : ""}{" "}
-            <span className="text-white/40 text-base font-light font-sans">
+            <span className="text-[#2d2d2d]/40 text-base font-light font-sans">
               · {format(selectedDate, "EEE d 'de' MMMM", { locale: es })}
             </span>
           </div>
@@ -327,8 +327,8 @@ export default function Schedule() {
                 className={[
                   "px-4 py-[7px] rounded-full text-xs font-medium transition-all border tracking-wide",
                   filter === "all"
-                    ? "bg-primary border-transparent text-white shadow-[0_4px_16px_rgba(164,133,80,0.35)]"
-                    : "bg-white/[0.04] border-white/10 text-white/50 hover:border-primary/40 hover:text-primary",
+                    ? "bg-primary border-transparent text-[#2d2d2d] shadow-[0_4px_16px_rgba(164,133,80,0.35)]"
+                    : "bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]/50 hover:border-primary/40 hover:text-primary",
                 ].join(" ")}
               >
                 Todas
@@ -340,8 +340,8 @@ export default function Schedule() {
                   className={[
                     "px-4 py-[7px] rounded-full text-xs font-medium transition-all border tracking-wide",
                     filter === t
-                      ? "bg-primary border-transparent text-white shadow-[0_4px_16px_rgba(164,133,80,0.35)]"
-                      : "bg-white/[0.04] border-white/10 text-white/50 hover:border-primary/40 hover:text-primary",
+                      ? "bg-primary border-transparent text-[#2d2d2d] shadow-[0_4px_16px_rgba(164,133,80,0.35)]"
+                      : "bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]/50 hover:border-primary/40 hover:text-primary",
                   ].join(" ")}
                 >
                   {t}
@@ -353,12 +353,12 @@ export default function Schedule() {
 
         {/* ── CARDS ───────────────────────────────────────────────────────── */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-24 text-white/30 gap-2">
+          <div className="flex items-center justify-center py-24 text-[#2d2d2d]/30 gap-2">
             <Loader2 size={20} className="animate-spin" />
             <span className="text-sm tracking-wide">Cargando clases…</span>
           </div>
         ) : filteredClasses.length === 0 ? (
-          <div className="text-center py-24 text-white/30">
+          <div className="text-center py-24 text-[#2d2d2d]/30">
             <p className="text-sm">No hay clases para este día.</p>
             {filter !== "all" && (
               <button onClick={() => setFilter("all")} className="mt-3 text-primary text-sm underline underline-offset-2">
@@ -450,8 +450,8 @@ export default function Schedule() {
                         className={[
                           "px-5 py-[9px] rounded-full text-[12px] font-semibold tracking-wide transition-all",
                           full
-                            ? "bg-white/8 text-white/30 cursor-not-allowed"
-                            : "text-white hover:scale-105",
+                            ? "bg-white/8 text-[#2d2d2d]/30 cursor-not-allowed"
+                            : "text-[#2d2d2d] hover:scale-105",
                         ].join(" ")}
                         style={!full ? {
                           background: `linear-gradient(135deg, ${accent} 0%, ${accent}cc 100%)`,
@@ -464,17 +464,17 @@ export default function Schedule() {
                   </div>
 
                   {/* ── Class name ── */}
-                  <h3 className="font-serif text-[1.6rem] font-semibold leading-tight tracking-tight text-white mb-4">
+                  <h3 className="font-serif text-[1.6rem] font-semibold leading-tight tracking-tight text-[#2d2d2d] mb-4">
                     {cls.name}
                   </h3>
 
                   {/* ── Time row ── */}
-                  <div className="flex items-center gap-2 mb-3 text-white/40 text-[13px] font-medium">
+                  <div className="flex items-center gap-2 mb-3 text-[#2d2d2d]/40 text-[13px] font-medium">
                     <Clock size={13} className="opacity-60 shrink-0" />
-                    <span className="text-white text-[14px] font-medium">
+                    <span className="text-[#2d2d2d] text-[14px] font-medium">
                       {formatTime(cls.time)}{cls.endTime ? ` — ${cls.endTime.slice(0, 5)}` : ""}
                     </span>
-                    <span className="ml-auto bg-white/8 text-white/40 text-[11px] px-2 py-0.5 rounded-md">
+                    <span className="ml-auto bg-white/8 text-[#2d2d2d]/40 text-[11px] px-2 py-0.5 rounded-md">
                       {cls.duration} min
                     </span>
                   </div>
@@ -495,7 +495,7 @@ export default function Schedule() {
                         {initials}
                       </span>
                     )}
-                    <span className="text-[13px] text-white/40 font-normal">{cls.instructor}</span>
+                    <span className="text-[13px] text-[#2d2d2d]/40 font-normal">{cls.instructor}</span>
                   </div>
 
                   {/* ── Divider ── */}
@@ -504,7 +504,7 @@ export default function Schedule() {
                   {/* ── Capacity bar ── */}
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-white/30">Lugares</span>
+                      <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#2d2d2d]/30">Lugares</span>
                       <span
                         className="text-[12px] font-semibold"
                         style={{ color: full ? accent : "rgba(255,255,255,0.8)" }}
@@ -540,15 +540,15 @@ export default function Schedule() {
           <p className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-2">
             ¿Primera vez en Punto Neutro?
           </p>
-          <h3 className="font-bebas text-[clamp(1.8rem,3vw,2.5rem)] leading-none text-white mb-3">
+          <h3 className="font-bebas text-[clamp(1.8rem,3vw,2.5rem)] leading-none text-[#2d2d2d] mb-3">
             Prueba una clase sin compromiso
           </h3>
-          <p className="text-sm text-white/40 mb-7 max-w-sm mx-auto">
+          <p className="text-sm text-[#2d2d2d]/40 mb-7 max-w-sm mx-auto">
             Reserva tu sesión muestra y descubre por qué cientos de mujeres eligen Punto Neutro.
           </p>
           <Link
             to="/auth/register?returnUrl=/app/book"
-            className="inline-flex items-center gap-2 bg-primary text-white px-8 py-3.5 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(164,133,80,0.35)] transition-all"
+            className="inline-flex items-center gap-2 bg-primary text-[#2d2d2d] px-8 py-3.5 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(164,133,80,0.35)] transition-all"
           >
             Reservar mi primera clase
             <span className="text-[0.7rem]">↗</span>

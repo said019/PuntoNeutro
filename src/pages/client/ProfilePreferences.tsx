@@ -51,7 +51,7 @@ const ProfilePreferences = () => {
           <h1 className="text-xl font-bold">Preferencias de notificación</h1>
           <div className="space-y-4">
             {items.map(({ key, label, desc }) => (
-              <div key={key} className="flex items-center justify-between rounded-xl border border-white/[0.08] p-4 hover:border-[#b5bf9c]/30 transition-colors">
+              <div key={key} className="flex items-center justify-between rounded-xl border border-[#94867a]/15 p-4 hover:border-[#b5bf9c]/30 transition-colors">
                 <div className="space-y-0.5">
                   <Label className="text-sm font-medium">{label}</Label>
                   <p className="text-xs text-muted-foreground">{desc}</p>

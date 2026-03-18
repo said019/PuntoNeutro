@@ -218,7 +218,7 @@ const AdminPackages = () => {
 
       {/* Delete confirm */}
       {deleteId && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-[#94867a]/20 flex items-center justify-center z-50 p-4">
           <div className="bg-background border border-border rounded-2xl p-6 max-w-sm w-full">
             <h3 className="font-semibold text-foreground mb-2">Eliminar paquete</h3>
             <p className="text-sm text-muted-foreground mb-6">Esta accion no se puede deshacer.</p>

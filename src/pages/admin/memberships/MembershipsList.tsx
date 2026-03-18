@@ -126,7 +126,7 @@ const MembershipTable = ({ status, title }: { status?: string; title: string }) 
                       <div className="flex items-center gap-2">
                         <span>{m.planName ?? m.planId}</span>
                         {cat && cat !== "all" && (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border capitalize ${catColors[cat] ?? "text-white/40 border-white/10"}`}>
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border capitalize ${catColors[cat] ?? "text-[#2d2d2d]/40 border-[#94867a]/15"}`}>
                             {cat}
                           </span>
                         )}
@@ -251,7 +251,7 @@ const MembershipsList = () => {
               <div className="space-y-1">
                 <Label>Cliente</Label>
                 <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#2d2d2d]/30" />
                   <Input
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
@@ -289,7 +289,7 @@ const MembershipsList = () => {
                         <button
                           type="button"
                           key={u.id}
-                          className="w-full px-3 py-2 text-left hover:bg-white/5 border-b last:border-b-0 border-border"
+                          className="w-full px-3 py-2 text-left hover:bg-[#94867a]/[0.06] border-b last:border-b-0 border-border"
                           onClick={() => {
                             setSelectedUser(u);
                             form.setValue("userId", u.id, { shouldValidate: true });

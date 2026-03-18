@@ -17,7 +17,7 @@ const ProfileLink = ({
       "flex items-center justify-between rounded-2xl border p-4 transition-all duration-200",
       danger
         ? "border-red-500/20 hover:bg-red-500/10 hover:border-red-500/40"
-        : "border-white/[0.08] hover:border-[#94867a]/30 hover:bg-white/[0.03]"
+        : "border-[#94867a]/15 hover:border-[#94867a]/30 hover:bg-[#94867a]/[0.05]"
     )}
   >
     <div className="flex items-center gap-3.5">
@@ -68,7 +68,7 @@ const Profile = () => {
         <div className="max-w-lg mx-auto space-y-6">
 
           {/* ── Header card ── */}
-          <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#1a0d1a] via-[#130d18] to-[#0d0d14] p-6">
+          <div className="relative overflow-hidden rounded-3xl border border-[#94867a]/15 bg-gradient-to-br from-[#e2e5da] via-[#e8eadf] to-[#ebede5] p-6">
             {/* Ambient glow */}
             <div className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full bg-[#94867a]/15 blur-[40px]" />
             <div className="pointer-events-none absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-[#b5bf9c]/10 blur-[30px]" />
@@ -81,7 +81,7 @@ const Profile = () => {
                     ? <img src={(user?.photoUrl ?? user?.photo_url)!} className="h-20 w-20 rounded-2xl object-cover" alt={name} />
                     : initials}
                 </div>
-                <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-emerald-400 border-2 border-[#0d0d14]" />
+                <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-emerald-400 border-2 border-[#ebede5]" />
               </div>
 
               {/* Info */}

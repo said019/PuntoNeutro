@@ -75,37 +75,37 @@ const GenerateClasses = () => {
       <AdminLayout>
         <div className="admin-page max-w-2xl">
           <div className="mb-7">
-            <h1 className="text-3xl font-bold text-white mb-1">Generar Clases</h1>
-            <p className="text-sm text-white/35">Crea clases en bloque para un rango de fechas</p>
+            <h1 className="text-3xl font-bold text-[#2d2d2d] mb-1">Generar Clases</h1>
+            <p className="text-sm text-[#2d2d2d]/35">Crea clases en bloque para un rango de fechas</p>
           </div>
 
           <form onSubmit={form.handleSubmit((d) => generateMutation.mutate(d))} className="space-y-6">
             {/* Selects */}
-            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+            <div className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-5 space-y-4">
               <p className="text-[11px] text-[#b5bf9c]/70 font-semibold uppercase tracking-wider">Clase e instructor</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Tipo de clase</Label>
+                  <Label className="text-[#2d2d2d]/60 text-xs">Tipo de clase</Label>
                   <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
-                    <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                    <SelectTrigger className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]">
                       <SelectValue placeholder="Seleccionar tipo" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#0f0518] border-white/10">
+                    <SelectContent className="bg-[#e2e5da] border-[#94867a]/15">
                       {(Array.isArray(typesData?.data) ? typesData.data : []).map((t) => (
-                        <SelectItem key={t.id} value={t.id} className="text-white">{t.name}</SelectItem>
+                        <SelectItem key={t.id} value={t.id} className="text-[#2d2d2d]">{t.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Instructor</Label>
+                  <Label className="text-[#2d2d2d]/60 text-xs">Instructor</Label>
                   <Select onValueChange={(v) => form.setValue("instructorId", v)}>
-                    <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                    <SelectTrigger className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]">
                       <SelectValue placeholder="Seleccionar instructor" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#0f0518] border-white/10">
+                    <SelectContent className="bg-[#e2e5da] border-[#94867a]/15">
                       {(Array.isArray(instructorsData?.data) ? instructorsData.data : []).map((i) => (
-                        <SelectItem key={i.id} value={i.id} className="text-white">{i.displayName}</SelectItem>
+                        <SelectItem key={i.id} value={i.id} className="text-[#2d2d2d]">{i.displayName}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -114,11 +114,11 @@ const GenerateClasses = () => {
             </div>
 
             {/* Date range */}
-            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+            <div className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-5 space-y-4">
               <p className="text-[11px] text-[#94867a]/70 font-semibold uppercase tracking-wider">Rango de fechas</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Fecha inicio</Label>
+                  <Label className="text-[#2d2d2d]/60 text-xs">Fecha inicio</Label>
                   <DatePicker
                     value={form.watch("startDate")}
                     onChange={(v) => form.setValue("startDate", v)}
@@ -126,7 +126,7 @@ const GenerateClasses = () => {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Fecha fin</Label>
+                  <Label className="text-[#2d2d2d]/60 text-xs">Fecha fin</Label>
                   <DatePicker
                     value={form.watch("endDate")}
                     onChange={(v) => form.setValue("endDate", v)}
@@ -138,18 +138,18 @@ const GenerateClasses = () => {
             </div>
 
             {/* Time range */}
-            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
+            <div className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-5 space-y-4">
               <p className="text-[11px] text-[#ebede5]/70 font-semibold uppercase tracking-wider">Horario</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Hora inicio</Label>
+                  <Label className="text-[#2d2d2d]/60 text-xs">Hora inicio</Label>
                   <TimePicker
                     value={form.watch("startTime")}
                     onChange={(v) => form.setValue("startTime", v)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Hora fin</Label>
+                  <Label className="text-[#2d2d2d]/60 text-xs">Hora fin</Label>
                   <TimePicker
                     value={form.watch("endTime")}
                     onChange={(v) => form.setValue("endTime", v)}
@@ -157,17 +157,17 @@ const GenerateClasses = () => {
                 </div>
               </div>
               <div className="space-y-1 max-w-[150px]">
-                <Label className="text-white/60 text-xs">Capacidad máxima</Label>
+                <Label className="text-[#2d2d2d]/60 text-xs">Capacidad máxima</Label>
                 <Input
                   type="number"
-                  className="bg-white/[0.04] border-white/[0.08] text-white"
+                  className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]"
                   {...form.register("maxCapacity")}
                 />
               </div>
             </div>
 
             {/* Days of week */}
-            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-3">
+            <div className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-5 space-y-3">
               <p className="text-[11px] text-[#b5bf9c]/70 font-semibold uppercase tracking-wider">Días de la semana</p>
               <div className="flex flex-wrap gap-2">
                 {DAYS.map((d) => (
@@ -177,8 +177,8 @@ const GenerateClasses = () => {
                     onClick={() => toggleDay(d.value)}
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                       selectedDays.includes(d.value)
-                        ? "bg-gradient-to-r from-[#94867a] to-[#b5bf9c] text-white shadow-[0_0_10px_rgba(225,92,184,0.3)]"
-                        : "bg-white/[0.04] border border-white/[0.07] text-white/45 hover:text-white/75 hover:border-white/20"
+                        ? "bg-gradient-to-r from-[#94867a] to-[#b5bf9c] text-white shadow-[0_0_10px_rgba(148,134,122,0.3)]"
+                        : "bg-[#94867a]/[0.06] border border-[#94867a]/15 text-[#2d2d2d]/45 hover:text-[#2d2d2d]/75 hover:border-[#94867a]/25"
                     }`}
                   >
                     {d.label}

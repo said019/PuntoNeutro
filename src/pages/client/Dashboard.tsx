@@ -169,7 +169,7 @@ const Dashboard = () => {
                         {v.thumbnail_url && (
                           <img src={v.thumbnail_url} className="object-cover w-full h-full group-hover:scale-105 transition-transform" />
                         )}
-                        <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs rounded px-1">
+                        <div className="absolute bottom-1 right-1 bg-[#94867a]/25 text-[#2d2d2d] text-xs rounded px-1">
                           {Math.floor((v.duration_seconds ?? 0) / 60)} min
                         </div>
                       </div>

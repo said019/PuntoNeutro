@@ -24,7 +24,7 @@ type ClassCat = "pilates" | "bienestar" | "all";
 const CAT_COLORS: Record<ClassCat, { bg: string; text: string; border: string; dot: string }> = {
   pilates:   { bg: "bg-[#b5bf9c]/15", text: "text-[#b5bf9c]",  border: "border-[#b5bf9c]/40", dot: "bg-[#b5bf9c]"  },
   bienestar: { bg: "bg-[#94867a]/15", text: "text-[#94867a]",  border: "border-[#94867a]/40", dot: "bg-[#94867a]"  },
-  all:       { bg: "bg-white/5",      text: "text-white/60",   border: "border-white/15",     dot: "bg-white/40"   },
+  all:       { bg: "bg-[#94867a]/[0.06]",      text: "text-[#2d2d2d]/60",   border: "border-[#94867a]/20",     dot: "bg-[#94867a]/20"   },
 };
 
 const CAT_LABELS: Record<ClassCat, string> = {
@@ -64,16 +64,16 @@ const MembershipBanner = ({ membership }: { membership: any }) => {
         {!isUnlimited && (
           <div className="text-right">
             <div className={cn("text-base font-bold leading-none", colors.text)}>{remaining}</div>
-            <div className="text-[10px] text-white/40">clases</div>
+            <div className="text-[10px] text-[#2d2d2d]/40">clases</div>
           </div>
         )}
         {isUnlimited && <span className={cn("text-xs font-bold", colors.text)}>∞ Ilimitado</span>}
         {endDate && (
           <div className="text-right">
-            <div className="text-xs font-medium text-white/70">
+            <div className="text-xs font-medium text-[#2d2d2d]/70">
               {new Date(endDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
             </div>
-            <div className="text-[10px] text-white/40">vencimiento</div>
+            <div className="text-[10px] text-[#2d2d2d]/40">vencimiento</div>
           </div>
         )}
       </div>
@@ -169,7 +169,7 @@ const BookClasses = () => {
           {membershipCat && membershipCat !== "all" && (
             <div className="flex items-center gap-1.5 text-xs px-1">
               <CheckCircle2 size={11} className={CAT_COLORS[membershipCat].text} />
-              <span className="text-white/40">
+              <span className="text-[#2d2d2d]/40">
                 Tu membresía <span className={cn("font-semibold", CAT_COLORS[membershipCat].text)}>{CAT_LABELS[membershipCat]}</span> solo permite reservar clases de esa categoría.
               </span>
             </div>
@@ -204,8 +204,8 @@ const BookClasses = () => {
                               "w-full text-left rounded-lg border p-1.5 text-xs transition-all relative",
                               isBooked  && "border-green-500/40 bg-green-500/10",
                               !isBooked && !disabled && cn(c.border, "hover:opacity-90 cursor-pointer", c.bg),
-                              !isBooked && isPast  && "opacity-30 cursor-not-allowed border-white/8 bg-transparent",
-                              !isBooked && locked  && "opacity-25 cursor-not-allowed border-white/5 bg-transparent",
+                              !isBooked && isPast  && "opacity-30 cursor-not-allowed border-[#94867a]/12 bg-transparent",
+                              !isBooked && locked  && "opacity-25 cursor-not-allowed border-[#94867a]/10 bg-transparent",
                             )}
                           >
                             <div className="flex items-center gap-1 mb-0.5">
@@ -214,7 +214,7 @@ const BookClasses = () => {
                                 {cls.class_type_name}
                               </p>
                             </div>
-                            <p className="text-white/40 text-[10px]">
+                            <p className="text-[#2d2d2d]/40 text-[10px]">
                               {cls.start_time ? format(safeParse(cls.start_time), "HH:mm") : "—"}
                             </p>
                             {isBooked && (
@@ -224,7 +224,7 @@ const BookClasses = () => {
                             )}
                             {locked && (
                               <span className="absolute top-1 right-1">
-                                <Lock size={8} className="text-white/20" />
+                                <Lock size={8} className="text-[#2d2d2d]/20" />
                               </span>
                             )}
                           </button>
@@ -245,7 +245,7 @@ const BookClasses = () => {
                 {CAT_LABELS[cat]}
               </div>
             ))}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 bg-white/5 text-[11px] font-medium text-white/30">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#94867a]/15 bg-[#94867a]/[0.06] text-[11px] font-medium text-[#2d2d2d]/30">
               <Lock size={9} /> Requiere otra membresía
             </div>
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-green-500/30 bg-green-500/8 text-[11px] font-medium text-green-400">

@@ -55,8 +55,8 @@ const Waitlist = () => {
       <AdminLayout>
         <div className="admin-page max-w-3xl">
           <div className="mb-7">
-            <h1 className="text-3xl font-bold text-white mb-1">Lista de Espera</h1>
-            <p className="text-sm text-white/35">
+            <h1 className="text-3xl font-bold text-[#2d2d2d] mb-1">Lista de Espera</h1>
+            <p className="text-sm text-[#2d2d2d]/35">
               {selectedClassId
                 ? "Alumnas en lista de espera para esta clase"
                 : "Selecciona una clase para ver su lista de espera"}
@@ -67,7 +67,7 @@ const Waitlist = () => {
             <div className="space-y-5">
               <button
                 onClick={() => setSelectedClassId(null)}
-                className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors"
+                className="flex items-center gap-2 text-sm text-[#2d2d2d]/40 hover:text-[#2d2d2d]/70 transition-colors"
               >
                 <ChevronLeft size={14} /> Volver al calendario
               </button>
@@ -75,14 +75,14 @@ const Waitlist = () => {
               {rosterLoading ? (
                 <Skeleton className="h-20 rounded-2xl" />
               ) : classInfo && (
-                <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+                <div className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-5">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: classInfo.color || "#94867a" }} />
-                        <h2 className="text-xl font-bold text-white">{classInfo.classTypeName}</h2>
+                        <h2 className="text-xl font-bold text-[#2d2d2d]">{classInfo.classTypeName}</h2>
                       </div>
-                      <p className="text-sm text-white/50">
+                      <p className="text-sm text-[#2d2d2d]/50">
                         {classInfo.startsAt
                           ? format(new Date(classInfo.startsAt), "EEEE d 'de' MMMM · HH:mm", { locale: es })
                           : classInfo.date ?? "—"}
@@ -108,7 +108,7 @@ const Waitlist = () => {
                   ? Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
                   : roster.length === 0
                     ? (
-                      <div className="text-center py-12 text-white/25 text-sm">
+                      <div className="text-center py-12 text-[#2d2d2d]/25 text-sm">
                         <Users size={28} className="mx-auto mb-2 opacity-30" />
                         No hay alumnas en lista de espera
                       </div>
@@ -122,10 +122,10 @@ const Waitlist = () => {
                           #{idx + 1}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-white/90 truncate">{entry.displayName}</p>
+                          <p className="font-semibold text-sm text-[#2d2d2d]/90 truncate">{entry.displayName}</p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-white/35 truncate">{entry.email}</span>
-                            {entry.phone && <span className="text-xs text-white/25">{entry.phone}</span>}
+                            <span className="text-xs text-[#2d2d2d]/35 truncate">{entry.email}</span>
+                            {entry.phone && <span className="text-xs text-[#2d2d2d]/25">{entry.phone}</span>}
                           </div>
                           {entry.planName && (
                             <p className="text-[10px] text-[#b5bf9c]/60 mt-0.5">
@@ -149,16 +149,16 @@ const Waitlist = () => {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setWeekStart((w) => subWeeks(w, 1))}
-                  className="w-8 h-8 rounded-lg border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 flex items-center justify-center transition-all"
+                  className="w-8 h-8 rounded-lg border border-[#94867a]/15 text-[#2d2d2d]/40 hover:text-[#2d2d2d]/70 hover:border-[#94867a]/25 flex items-center justify-center transition-all"
                 >
                   <ChevronLeft size={14} />
                 </button>
-                <span className="text-sm font-semibold text-white/70 min-w-[200px] text-center">
+                <span className="text-sm font-semibold text-[#2d2d2d]/70 min-w-[200px] text-center">
                   {format(weekStart, "d MMM", { locale: es })} – {format(weekEnd, "d MMM yyyy", { locale: es })}
                 </span>
                 <button
                   onClick={() => setWeekStart((w) => addWeeks(w, 1))}
-                  className="w-8 h-8 rounded-lg border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 flex items-center justify-center transition-all"
+                  className="w-8 h-8 rounded-lg border border-[#94867a]/15 text-[#2d2d2d]/40 hover:text-[#2d2d2d]/70 hover:border-[#94867a]/25 flex items-center justify-center transition-all"
                 >
                   <ChevronRight size={14} />
                 </button>
@@ -185,7 +185,7 @@ const Waitlist = () => {
                       <div className="flex items-center gap-2 mb-2">
                         <p className={cn(
                           "text-xs font-semibold uppercase tracking-wider",
-                          isToday ? "text-[#94867a]" : "text-white/30"
+                          isToday ? "text-[#94867a]" : "text-[#2d2d2d]/30"
                         )}>
                           {format(day, "EEEE d", { locale: es })}
                         </p>
@@ -207,19 +207,19 @@ const Waitlist = () => {
                               <button
                                 key={cls.id}
                                 onClick={() => setSelectedClassId(cls.id)}
-                                className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-[#b5bf9c]/30 hover:bg-[#b5bf9c]/5 transition-all group text-left"
+                                className="w-full flex items-center gap-4 p-4 rounded-xl border border-[#94867a]/15 bg-[#94867a]/[0.04] hover:border-[#b5bf9c]/30 hover:bg-[#b5bf9c]/5 transition-all group text-left"
                               >
                                 <span
                                   className="w-2.5 h-2.5 rounded-full shrink-0"
                                   style={{ backgroundColor: cls.class_type_color ?? cls.color ?? "#b5bf9c" }}
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-white/85 truncate">
+                                  <p className="text-sm font-semibold text-[#2d2d2d]/85 truncate">
                                     {cls.class_type_name ?? cls.className ?? "Clase"}
                                   </p>
-                                  <p className="text-xs text-white/35">{time} · {cls.instructor_name ?? "—"}</p>
+                                  <p className="text-xs text-[#2d2d2d]/35">{time} · {cls.instructor_name ?? "—"}</p>
                                 </div>
-                                <ChevronRight size={14} className="text-white/20 group-hover:text-[#b5bf9c]/60 transition-colors" />
+                                <ChevronRight size={14} className="text-[#2d2d2d]/20 group-hover:text-[#b5bf9c]/60 transition-colors" />
                               </button>
                             );
                           })}
@@ -230,7 +230,7 @@ const Waitlist = () => {
                 })}
 
                 {!classesLoading && classes.length === 0 && (
-                  <div className="text-center py-16 text-white/25 text-sm">
+                  <div className="text-center py-16 text-[#2d2d2d]/25 text-sm">
                     <Calendar size={28} className="mx-auto mb-2 opacity-30" />
                     No hay clases programadas esta semana
                   </div>

@@ -159,8 +159,8 @@ const ClientsList = () => {
           {/* Header */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-7">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-1">Clientas</h1>
-              <p className="text-sm text-white/35">{clients.length} clientas registradas</p>
+              <h1 className="text-3xl font-bold text-[#2d2d2d] mb-1">Clientas</h1>
+              <p className="text-sm text-[#2d2d2d]/35">{clients.length} clientas registradas</p>
             </div>
             <button
               onClick={() => setManualOpen(true)}
@@ -172,9 +172,9 @@ const ClientsList = () => {
 
           {/* Search */}
           <div className="relative mb-5 max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#2d2d2d]/30" />
             <Input
-              className="pl-8 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/25 focus:border-[#94867a]/40"
+              className="pl-8 bg-[#94867a]/[0.05] border-[#94867a]/15 text-[#2d2d2d] placeholder:text-[#94867a]/40 focus:border-[#94867a]/40"
               placeholder="Buscar clienta..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -182,46 +182,46 @@ const ClientsList = () => {
           </div>
 
           {/* Table */}
-          <div className="rounded-2xl border border-white/[0.07] overflow-hidden bg-white/[0.01]">
+          <div className="rounded-2xl border border-[#94867a]/15 overflow-hidden bg-[#94867a]/[0.03]">
             <Table>
               <TableHeader>
-                <TableRow className="border-white/[0.07] hover:bg-transparent">
-                  <TableHead className="text-white/40 font-semibold text-xs uppercase tracking-wider">Nombre</TableHead>
-                  <TableHead className="text-white/40 font-semibold text-xs uppercase tracking-wider">Email</TableHead>
-                  <TableHead className="text-white/40 font-semibold text-xs uppercase tracking-wider">Teléfono</TableHead>
+                <TableRow className="border-[#94867a]/15 hover:bg-transparent">
+                  <TableHead className="text-[#2d2d2d]/40 font-semibold text-xs uppercase tracking-wider">Nombre</TableHead>
+                  <TableHead className="text-[#2d2d2d]/40 font-semibold text-xs uppercase tracking-wider">Email</TableHead>
+                  <TableHead className="text-[#2d2d2d]/40 font-semibold text-xs uppercase tracking-wider">Teléfono</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading
                   ? Array(5).fill(0).map((_, i) => (
-                    <TableRow key={i} className="border-white/[0.05]">
+                    <TableRow key={i} className="border-[#94867a]/12">
                       {Array(4).fill(0).map((_, j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full bg-white/[0.05]" /></TableCell>
+                        <TableCell key={j}><Skeleton className="h-4 w-full bg-[#94867a]/[0.06]" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                   : clients.map((c) => (
-                    <TableRow key={c.id} className="border-white/[0.05] hover:bg-white/[0.03] transition-colors">
-                      <TableCell className="font-semibold text-white/85">{c.displayName}</TableCell>
-                      <TableCell className="text-sm text-white/45">{c.email}</TableCell>
-                      <TableCell className="text-sm text-white/45">{c.phone ?? "—"}</TableCell>
+                    <TableRow key={c.id} className="border-[#94867a]/12 hover:bg-[#94867a]/[0.05] transition-colors">
+                      <TableCell className="font-semibold text-[#2d2d2d]/85">{c.displayName}</TableCell>
+                      <TableCell className="text-sm text-[#2d2d2d]/45">{c.email}</TableCell>
+                      <TableCell className="text-sm text-[#2d2d2d]/45">{c.phone ?? "—"}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-white/30 hover:text-white/70 hover:bg-white/5">
+                            <Button variant="ghost" size="icon" className="text-[#2d2d2d]/30 hover:text-[#2d2d2d]/70 hover:bg-[#94867a]/[0.06]">
                               <MoreHorizontal size={14} />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent className="bg-[#0f0518] border-white/10">
+                          <DropdownMenuContent className="bg-[#e2e5da] border-[#94867a]/15">
                             <DropdownMenuItem
-                              className="text-white/70 hover:text-white focus:text-white hover:bg-white/5 focus:bg-white/5"
+                              className="text-[#2d2d2d]/70 hover:text-[#2d2d2d] focus:text-[#2d2d2d] hover:bg-[#94867a]/[0.06] focus:bg-[#94867a]/[0.06]"
                               onClick={() => navigate(`/admin/clients/${c.id}`)}
                             >
                               Ver detalle
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              className="text-white/70 hover:text-white focus:text-white hover:bg-white/5 focus:bg-white/5"
+                              className="text-[#2d2d2d]/70 hover:text-[#2d2d2d] focus:text-[#2d2d2d] hover:bg-[#94867a]/[0.06] focus:bg-[#94867a]/[0.06]"
                               onClick={() => openEdit(c)}
                             >
                               Editar
@@ -244,45 +244,45 @@ const ClientsList = () => {
 
         {/* ── Edit dialog ──────────────────────────────────────────────────── */}
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent className="max-w-lg bg-[#0f0518] border-white/10 text-white">
+          <DialogContent className="max-w-lg bg-[#e2e5da] border-[#94867a]/15 text-[#2d2d2d]">
             <DialogHeader>
-              <DialogTitle className="text-white">Editar clienta</DialogTitle>
+              <DialogTitle className="text-[#2d2d2d]">Editar clienta</DialogTitle>
             </DialogHeader>
             <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Nombre</Label>
-                  <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("displayName")} />
+                  <Label className="text-[#2d2d2d]/60 text-xs">Nombre</Label>
+                  <Input className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]" {...editForm.register("displayName")} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Email</Label>
-                  <Input type="email" className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("email")} />
+                  <Label className="text-[#2d2d2d]/60 text-xs">Email</Label>
+                  <Input type="email" className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]" {...editForm.register("email")} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Teléfono</Label>
-                  <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("phone")} />
+                  <Label className="text-[#2d2d2d]/60 text-xs">Teléfono</Label>
+                  <Input className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]" {...editForm.register("phone")} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Fecha de nacimiento</Label>
+                  <Label className="text-[#2d2d2d]/60 text-xs">Fecha de nacimiento</Label>
                   <DatePicker value={editForm.watch("dateOfBirth")} onChange={(v) => editForm.setValue("dateOfBirth", v)} />
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="text-white/60 text-xs">Notas de salud</Label>
-                <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("healthNotes")} />
+                <Label className="text-[#2d2d2d]/60 text-xs">Notas de salud</Label>
+                <Input className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]" {...editForm.register("healthNotes")} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Contacto de emergencia</Label>
-                  <Input className="bg-white/[0.04] border-white/[0.08] text-white" placeholder="Nombre" {...editForm.register("emergencyContactName")} />
+                  <Label className="text-[#2d2d2d]/60 text-xs">Contacto de emergencia</Label>
+                  <Input className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]" placeholder="Nombre" {...editForm.register("emergencyContactName")} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Teléfono emergencia</Label>
-                  <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("emergencyContactPhone")} />
+                  <Label className="text-[#2d2d2d]/60 text-xs">Teléfono emergencia</Label>
+                  <Input className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]" {...editForm.register("emergencyContactPhone")} />
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" className="border-white/10 text-white/60 hover:bg-white/5" onClick={() => setEditOpen(false)}>Cancelar</Button>
+                <Button type="button" variant="outline" className="border-[#94867a]/15 text-[#2d2d2d]/60 hover:bg-[#94867a]/[0.06]" onClick={() => setEditOpen(false)}>Cancelar</Button>
                 <Button
                   type="submit"
                   disabled={updateMutation.isPending}
@@ -297,13 +297,13 @@ const ClientsList = () => {
 
         {/* ── Manual registration dialog ───────────────────────────────────── */}
         <Dialog open={manualOpen} onOpenChange={(v) => { setManualOpen(v); if (!v) manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") }); }}>
-          <DialogContent className="max-w-xl bg-[#0f0518] border-white/10 text-white max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-xl bg-[#e2e5da] border-[#94867a]/15 text-[#2d2d2d] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-white flex items-center gap-2">
+              <DialogTitle className="text-[#2d2d2d] flex items-center gap-2">
                 <UserPlus size={18} className="text-[#94867a]" />
                 Nueva clienta
               </DialogTitle>
-              <p className="text-xs text-white/35 mt-0.5">Registro manual · La clienta recibe su contraseña por email</p>
+              <p className="text-xs text-[#2d2d2d]/35 mt-0.5">Registro manual · La clienta recibe su contraseña por email</p>
             </DialogHeader>
 
             <form onSubmit={manualForm.handleSubmit(onManualSubmit)} className="space-y-5 pt-1">
@@ -312,9 +312,9 @@ const ClientsList = () => {
                 <p className="text-[11px] text-[#94867a]/70 font-semibold uppercase tracking-wider mb-3">Datos personales</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1 col-span-2">
-                    <Label className="text-white/60 text-xs">Nombre completo *</Label>
+                    <Label className="text-[#2d2d2d]/60 text-xs">Nombre completo *</Label>
                     <Input
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
+                      className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d] placeholder:text-[#94867a]/40"
                       placeholder="Ana García"
                       {...manualForm.register("displayName")}
                     />
@@ -323,10 +323,10 @@ const ClientsList = () => {
                     )}
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Email *</Label>
+                    <Label className="text-[#2d2d2d]/60 text-xs">Email *</Label>
                     <Input
                       type="email"
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
+                      className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d] placeholder:text-[#94867a]/40"
                       placeholder="ana@email.com"
                       {...manualForm.register("email")}
                     />
@@ -335,21 +335,21 @@ const ClientsList = () => {
                     )}
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Teléfono</Label>
+                    <Label className="text-[#2d2d2d]/60 text-xs">Teléfono</Label>
                     <Input
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
+                      className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d] placeholder:text-[#94867a]/40"
                       placeholder="55 1234 5678"
                       {...manualForm.register("phone")}
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Fecha de nacimiento</Label>
+                    <Label className="text-[#2d2d2d]/60 text-xs">Fecha de nacimiento</Label>
                     <DatePicker value={manualForm.watch("dateOfBirth")} onChange={(v) => manualForm.setValue("dateOfBirth", v)} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Notas de salud</Label>
+                    <Label className="text-[#2d2d2d]/60 text-xs">Notas de salud</Label>
                     <Input
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
+                      className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d] placeholder:text-[#94867a]/40"
                       placeholder="Lesiones, condiciones..."
                       {...manualForm.register("healthNotes")}
                     />
@@ -362,21 +362,21 @@ const ClientsList = () => {
                 <p className="text-[11px] text-[#b5bf9c]/70 font-semibold uppercase tracking-wider mb-3">Membresía (opcional)</p>
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Plan</Label>
+                    <Label className="text-[#2d2d2d]/60 text-xs">Plan</Label>
                     <Select
                       value={selectedPlanId ?? "none"}
                       onValueChange={(v) => manualForm.setValue("planId", v === "none" ? undefined : v)}
                     >
-                      <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                      <SelectTrigger className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]">
                         <SelectValue placeholder="Sin plan (solo crear cuenta)" />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#0f0518] border-white/10">
-                        <SelectItem value="none" className="text-white/50">Sin plan</SelectItem>
+                      <SelectContent className="bg-[#e2e5da] border-[#94867a]/15">
+                        <SelectItem value="none" className="text-[#2d2d2d]/50">Sin plan</SelectItem>
                         {plans.map((p) => (
-                          <SelectItem key={p.id} value={p.id} className="text-white">
+                          <SelectItem key={p.id} value={p.id} className="text-[#2d2d2d]">
                             {p.name}
                             {p.price > 0 && (
-                              <span className="ml-2 text-white/40">${p.price.toLocaleString("es-MX")}</span>
+                              <span className="ml-2 text-[#2d2d2d]/40">${p.price.toLocaleString("es-MX")}</span>
                             )}
                           </SelectItem>
                         ))}
@@ -387,7 +387,7 @@ const ClientsList = () => {
                   {/* Show price of selected plan */}
                   {selectedPlan && (
                     <div className="flex items-center justify-between rounded-xl border border-[#b5bf9c]/20 bg-[#b5bf9c]/5 px-4 py-2.5">
-                      <span className="text-sm text-white/70">{selectedPlan.name}</span>
+                      <span className="text-sm text-[#2d2d2d]/70">{selectedPlan.name}</span>
                       <span className="text-lg font-bold text-[#b5bf9c]">${selectedPlan.price.toLocaleString("es-MX")}</span>
                     </div>
                   )}
@@ -395,7 +395,7 @@ const ClientsList = () => {
                   {/* Payment method — only if plan selected */}
                   {selectedPlanId && selectedPlanId !== "none" && (
                     <div className="space-y-1">
-                      <Label className="text-white/60 text-xs">Método de pago</Label>
+                      <Label className="text-[#2d2d2d]/60 text-xs">Método de pago</Label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {PAYMENT_METHODS.map(({ value, label, Icon }) => (
                           <button
@@ -406,7 +406,7 @@ const ClientsList = () => {
                               "flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-all",
                               paymentMethod === value
                                 ? "border-[#94867a]/50 bg-[#94867a]/10 text-[#94867a]"
-                                : "border-white/[0.07] bg-white/[0.02] text-white/40 hover:border-white/20 hover:text-white/60"
+                                : "border-[#94867a]/15 bg-[#94867a]/[0.04] text-[#2d2d2d]/40 hover:border-[#94867a]/25 hover:text-[#2d2d2d]/60"
                             )}
                           >
                             <Icon size={16} />
@@ -420,7 +420,7 @@ const ClientsList = () => {
                   {/* Start date — only if plan selected */}
                   {selectedPlanId && selectedPlanId !== "none" && (
                     <div className="space-y-1">
-                      <Label className="text-white/60 text-xs">Fecha de inicio</Label>
+                      <Label className="text-[#2d2d2d]/60 text-xs">Fecha de inicio</Label>
                       <DatePicker value={manualForm.watch("startDate")} onChange={(v) => manualForm.setValue("startDate", v)} />
                     </div>
                   )}
@@ -429,9 +429,9 @@ const ClientsList = () => {
 
               {/* Internal notes */}
               <div className="space-y-1">
-                <Label className="text-white/60 text-xs">Notas internas</Label>
+                <Label className="text-[#2d2d2d]/60 text-xs">Notas internas</Label>
                 <Input
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
+                  className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d] placeholder:text-[#94867a]/40"
                   placeholder="Referida por, observaciones..."
                   {...manualForm.register("notes")}
                 />
@@ -441,7 +441,7 @@ const ClientsList = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-white/10 text-white/60 hover:bg-white/5"
+                  className="border-[#94867a]/15 text-[#2d2d2d]/60 hover:bg-[#94867a]/[0.06]"
                   onClick={() => setManualOpen(false)}
                 >
                   Cancelar

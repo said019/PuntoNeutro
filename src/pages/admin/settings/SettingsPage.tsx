@@ -589,7 +589,7 @@ const VenueMediaSettings = () => {
 
       {mediaUrl ? (
         <div className="space-y-2">
-          <div className="rounded-lg border border-border overflow-hidden bg-black/30">
+          <div className="rounded-lg border border-border overflow-hidden bg-[#94867a]/10">
             {mediaType === "video" ? (
               <video src={mediaUrl} controls className="w-full max-h-[360px] object-cover bg-black" />
             ) : (

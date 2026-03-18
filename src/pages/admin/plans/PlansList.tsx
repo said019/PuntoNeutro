@@ -30,7 +30,7 @@ import { MoreHorizontal, Plus } from "lucide-react";
 const CATEGORIES = [
   { value: "pilates", label: "Pilates",        color: "bg-[#b5bf9c]/20 text-[#b5bf9c] border-[#b5bf9c]/30" },
   { value: "bienestar", label: "Bienestar",    color: "bg-[#94867a]/20 text-[#94867a] border-[#94867a]/30" },
-  { value: "all",     label: "Todas (sin filtro)", color: "bg-white/10 text-white/60 border-white/15" },
+  { value: "all",     label: "Todas (sin filtro)", color: "bg-[#94867a]/10 text-[#2d2d2d]/60 border-[#94867a]/20" },
 ] as const;
 
 type CategoryValue = (typeof CATEGORIES)[number]["value"];

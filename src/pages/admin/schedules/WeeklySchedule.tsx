@@ -89,22 +89,22 @@ const WeeklySchedule = () => {
   }, {} as Record<number, Schedule[]>);
 
   const scheduleCard = (s: Schedule) => (
-    <div key={s.id} className="mb-2 p-2.5 bg-white/[0.03] rounded-xl border border-white/[0.05] text-xs">
-      <div className="font-semibold text-white/80 text-[11px] truncate">{s.classTypeName ?? s.classTypeId}</div>
+    <div key={s.id} className="mb-2 p-2.5 bg-[#94867a]/[0.05] rounded-xl border border-[#94867a]/12 text-xs">
+      <div className="font-semibold text-[#2d2d2d]/80 text-[11px] truncate">{s.classTypeName ?? s.classTypeId}</div>
       <div className="text-[#ebede5]/70 text-[10px] mt-0.5">{s.startTime}–{s.endTime}</div>
-      <div className="text-white/35 text-[10px] truncate">{s.instructorName ?? s.instructorId}</div>
+      <div className="text-[#2d2d2d]/35 text-[10px] truncate">{s.instructorName ?? s.instructorId}</div>
       <div className="flex items-center justify-between mt-1.5">
-        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${s.isActive ? "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/5" : "text-white/25 border-white/10"}`}>
+        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${s.isActive ? "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/5" : "text-[#2d2d2d]/25 border-[#94867a]/15"}`}>
           {s.isActive ? "Activo" : "Inactivo"}
         </span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 min-h-[44px] min-w-[44px] text-white/20 hover:text-white/60">
+            <Button variant="ghost" size="icon" className="h-7 w-7 min-h-[44px] min-w-[44px] text-[#2d2d2d]/20 hover:text-[#2d2d2d]/60">
               <MoreHorizontal size={12} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="bg-[#0f0518] border-white/10">
-            <DropdownMenuItem className="text-white/70 hover:text-white" onClick={() => openEdit(s)}>Editar</DropdownMenuItem>
+          <DropdownMenuContent className="bg-[#e2e5da] border-[#94867a]/15">
+            <DropdownMenuItem className="text-[#2d2d2d]/70 hover:text-[#2d2d2d]" onClick={() => openEdit(s)}>Editar</DropdownMenuItem>
             <DropdownMenuItem className="text-[#f87171]" onClick={() => { if (window.confirm("¿Eliminar este horario?")) deleteMutation.mutate(s.id); }}>Eliminar</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -116,14 +116,14 @@ const WeeklySchedule = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-5xl">
-          <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="admin-title font-bold text-white">Horarios semanales</h1>
-              <p className="text-sm text-white/35">Plantilla semanal para crear clases más rápido.</p>
+              <h1 className="admin-title font-bold text-[#2d2d2d]">Horarios semanales</h1>
+              <p className="text-sm text-[#2d2d2d]/35">Plantilla semanal para crear clases más rápido.</p>
             </div>
             <button
               onClick={() => openCreate(isMobile ? mobileDay : new Date().getDay())}
-              className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#94867a] to-[#b5bf9c] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#94867a] to-[#b5bf9c] px-4 py-2 text-sm font-semibold text-[#2d2d2d] transition-opacity hover:opacity-90"
             >
               <Plus size={14} /> Nuevo horario
             </button>
@@ -131,7 +131,7 @@ const WeeklySchedule = () => {
 
           {isMobile ? (
             <div className="space-y-3">
-              <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/[0.02] p-2">
+              <div className="overflow-x-auto rounded-xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-2">
                 <div className="flex min-w-max gap-2">
                   {DAYS.map((day, i) => {
                     const active = mobileDay === i;
@@ -143,24 +143,24 @@ const WeeklySchedule = () => {
                         className={cn(
                           "flex min-h-[52px] min-w-[84px] flex-col items-center justify-center rounded-xl border px-2 text-xs transition-colors",
                           active
-                            ? "border-[#94867a]/60 bg-gradient-to-r from-[#94867a]/20 to-[#b5bf9c]/20 text-white"
-                            : "border-white/10 bg-black/30 text-white/70",
+                            ? "border-[#94867a]/60 bg-gradient-to-r from-[#94867a]/20 to-[#b5bf9c]/20 text-[#2d2d2d]"
+                            : "border-[#94867a]/15 bg-[#94867a]/10 text-[#2d2d2d]/70",
                         )}
                       >
                         <span className="text-[10px] uppercase">{day.slice(0, 3)}</span>
                         <span className="text-base font-bold leading-none">{grouped[i].length}</span>
-                        <span className="mt-0.5 text-[10px] text-white/55">clases</span>
+                        <span className="mt-0.5 text-[10px] text-[#2d2d2d]/55">clases</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+              <div className="rounded-xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-3">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-white/45">{DAYS[mobileDay].slice(0, 3)}</p>
-                    <p className="text-sm font-semibold text-white">{DAYS[mobileDay]}</p>
+                    <p className="text-xs uppercase tracking-widest text-[#2d2d2d]/45">{DAYS[mobileDay].slice(0, 3)}</p>
+                    <p className="text-sm font-semibold text-[#2d2d2d]">{DAYS[mobileDay]}</p>
                   </div>
                   <Button size="sm" className="h-9" onClick={() => openCreate(mobileDay)}>
                     <Plus size={14} className="mr-1" /> Nueva
@@ -168,7 +168,7 @@ const WeeklySchedule = () => {
                 </div>
 
                 {grouped[mobileDay].length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-white/10 p-6 text-center text-xs text-white/45">
+                  <div className="rounded-lg border border-dashed border-[#94867a]/15 p-6 text-center text-xs text-[#2d2d2d]/45">
                     Sin horarios para este día.
                   </div>
                 ) : (
@@ -179,12 +179,12 @@ const WeeklySchedule = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-3">
               {DAYS.map((day, i) => (
-                <div key={i} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3">
+                <div key={i} className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-3">
                   <p className="text-[10px] font-bold text-center mb-3 text-[#b5bf9c]/60 uppercase tracking-widest">
                     {day.slice(0, 3)}
                   </p>
                   {grouped[i].length === 0 ? (
-                    <p className="text-center text-white/15 text-xs py-3">—</p>
+                    <p className="text-center text-[#2d2d2d]/15 text-xs py-3">—</p>
                   ) : grouped[i].map((s) => scheduleCard(s))}
                 </div>
               ))}
@@ -193,9 +193,9 @@ const WeeklySchedule = () => {
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-w-md bg-[#0f0518] border-white/10 text-white">
+          <DialogContent className="max-w-md bg-[#e2e5da] border-[#94867a]/15 text-[#2d2d2d]">
             <DialogHeader>
-              <DialogTitle className="text-white">{editing ? "Editar horario" : "Nuevo horario"}</DialogTitle>
+              <DialogTitle className="text-[#2d2d2d]">{editing ? "Editar horario" : "Nuevo horario"}</DialogTitle>
             </DialogHeader>
             <form
               onSubmit={form.handleSubmit((d) =>
@@ -204,57 +204,57 @@ const WeeklySchedule = () => {
               className="space-y-4"
             >
               <div className="space-y-1">
-                <Label className="text-white/60 text-xs">Día</Label>
+                <Label className="text-[#2d2d2d]/60 text-xs">Día</Label>
                 <Select
                   value={String(form.watch("dayOfWeek"))}
                   onValueChange={(v) => form.setValue("dayOfWeek", Number(v))}
                 >
-                  <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                  <SelectTrigger className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]">
                     <SelectValue placeholder="Seleccionar día" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0f0518] border-white/10">
+                  <SelectContent className="bg-[#e2e5da] border-[#94867a]/15">
                     {DAYS.map((d, i) => (
-                      <SelectItem key={i} value={String(i)} className="text-white">{d}</SelectItem>
+                      <SelectItem key={i} value={String(i)} className="text-[#2d2d2d]">{d}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-white/60 text-xs">Tipo de clase</Label>
+                <Label className="text-[#2d2d2d]/60 text-xs">Tipo de clase</Label>
                 <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
-                  <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                  <SelectTrigger className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]">
                     <SelectValue placeholder="Tipo" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0f0518] border-white/10">
+                  <SelectContent className="bg-[#e2e5da] border-[#94867a]/15">
                     {(Array.isArray(typesData?.data) ? typesData.data : []).map((t) => (
-                      <SelectItem key={t.id} value={t.id} className="text-white">{t.name}</SelectItem>
+                      <SelectItem key={t.id} value={t.id} className="text-[#2d2d2d]">{t.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-white/60 text-xs">Instructor</Label>
+                <Label className="text-[#2d2d2d]/60 text-xs">Instructor</Label>
                 <Select onValueChange={(v) => form.setValue("instructorId", v)}>
-                  <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                  <SelectTrigger className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]">
                     <SelectValue placeholder="Instructor" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0f0518] border-white/10">
+                  <SelectContent className="bg-[#e2e5da] border-[#94867a]/15">
                     {(Array.isArray(instructorsData?.data) ? instructorsData.data : []).map((i) => (
-                      <SelectItem key={i.id} value={i.id} className="text-white">{i.displayName}</SelectItem>
+                      <SelectItem key={i.id} value={i.id} className="text-[#2d2d2d]">{i.displayName}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Hora inicio</Label>
+                  <Label className="text-[#2d2d2d]/60 text-xs">Hora inicio</Label>
                   <TimePicker
                     value={form.watch("startTime")}
                     onChange={(v) => form.setValue("startTime", v)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Hora fin</Label>
+                  <Label className="text-[#2d2d2d]/60 text-xs">Hora fin</Label>
                   <TimePicker
                     value={form.watch("endTime")}
                     onChange={(v) => form.setValue("endTime", v)}
@@ -262,22 +262,22 @@ const WeeklySchedule = () => {
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="text-white/60 text-xs">Capacidad máx.</Label>
+                <Label className="text-[#2d2d2d]/60 text-xs">Capacidad máx.</Label>
                 <Input
                   type="number"
-                  className="bg-white/[0.04] border-white/[0.08] text-white"
+                  className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]"
                   {...form.register("maxCapacity")}
                 />
               </div>
               <div className="flex items-center gap-3">
                 <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
-                <Label className="text-white/60 text-xs">Activo</Label>
+                <Label className="text-[#2d2d2d]/60 text-xs">Activo</Label>
               </div>
               <DialogFooter>
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-white/10 text-white/60 hover:bg-white/5"
+                  className="border-[#94867a]/15 text-[#2d2d2d]/60 hover:bg-[#94867a]/[0.06]"
                   onClick={() => setOpen(false)}
                 >
                   Cancelar
