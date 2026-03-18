@@ -466,10 +466,10 @@ const Checkout = () => {
                 </p>
               </div>
               <button
-                onClick={() => window.location.replace("/app/orders")}
+                onClick={() => window.location.replace("/app")}
                 className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity"
               >
-                Ver mis órdenes
+                Ir a mi panel
               </button>
             </div>
           )}
@@ -532,10 +532,10 @@ const Checkout = () => {
                 Verificaremos tu pago en breve. Recibirás una notificación cuando tu membresía esté activa.
               </p>
               <button
-                onClick={() => window.location.replace("/app/orders")}
+                onClick={() => window.location.replace("/app")}
                 className="mt-2 px-6 py-2.5 rounded-xl text-sm font-semibold border border-[#94867a]/20 text-[#2d2d2d]/70 hover:text-[#2d2d2d] hover:border-[#94867a]/30 transition-all"
               >
-                Ver mis órdenes
+                Ir a mi panel
               </button>
             </div>
           )}
