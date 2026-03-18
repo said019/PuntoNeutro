@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
 import ophelia31 from "@/assets/ophelia-31.jpg";
 import ophelia50 from "@/assets/ophelia-50.jpg";
-import opheliaLogo from "@/assets/ophelia-logo-full.png";
+import opheliaLogo from "@/assets/punto-neutro-logo.png";
 
 const schema = z.object({
   email: z.string().email("Email inválido"),

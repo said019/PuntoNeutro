@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle } from "lucide-react";
-import opheliaLogo from "@/assets/ophelia-logo-full.png";
+import opheliaLogo from "@/assets/punto-neutro-logo.png";
 
 const schema = z.object({ email: z.string().email("Email inválido") });
 type FormValues = { email: string };

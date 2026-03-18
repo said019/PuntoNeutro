@@ -7,7 +7,7 @@ import {
   ChevronRight, Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import opheliaLogo from "@/assets/ophelia-logo-full.png";
+import opheliaLogo from "@/assets/punto-neutro-logo.png";
 
 /* ── Navigation groups ─────────────────────────────────────────────── */
 const NAV_GROUPS = [

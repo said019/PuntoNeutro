@@ -7,7 +7,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, Check, ArrowRight } from "lucide-react";
 import ophelia28 from "@/assets/ophelia-28.jpg";
-import opheliaLogo from "@/assets/ophelia-logo-full.png";
+import opheliaLogo from "@/assets/punto-neutro-logo.png";
 
 const schema = z.object({
   displayName: z.string().min(2, "Mínimo 2 caracteres"),
@@ -267,9 +267,8 @@ const Register = () => {
                 <button
                   type="button"
                   onClick={() => setValue("acceptsTerms", !acceptsTerms)}
-                  className={`mt-0.5 w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center transition-all ${
-                    acceptsTerms ? "bg-primary border-primary" : "border-border group-hover:border-primary/50"
-                  }`}
+                  className={`mt-0.5 w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center transition-all ${acceptsTerms ? "bg-primary border-primary" : "border-border group-hover:border-primary/50"
+                    }`}
                 >
                   {acceptsTerms && <Check size={12} className="text-primary-foreground" />}
                 </button>
@@ -285,9 +284,8 @@ const Register = () => {
                 <button
                   type="button"
                   onClick={() => setValue("acceptsCommunications", !acceptsCommunications)}
-                  className={`mt-0.5 w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center transition-all ${
-                    acceptsCommunications ? "bg-primary border-primary" : "border-border group-hover:border-primary/50"
-                  }`}
+                  className={`mt-0.5 w-5 h-5 rounded-md border flex-shrink-0 flex items-center justify-center transition-all ${acceptsCommunications ? "bg-primary border-primary" : "border-border group-hover:border-primary/50"
+                    }`}
                 >
                   {acceptsCommunications && <Check size={12} className="text-primary-foreground" />}
                 </button>

@@ -4,14 +4,15 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import Schedule from "@/components/Schedule";
-import { Dumbbell, Music, Waves, Flame, Zap, Heart, Activity, Sparkles, Flower2, type LucideIcon, ChevronLeft, ChevronRight } from "lucide-react";
-import ophelia14 from "@/assets/ophelia-14.jpg";
-import ophelia15 from "@/assets/ophelia-15.jpg";
-import ophelia28 from "@/assets/ophelia-28.jpg";
-import ophelia31 from "@/assets/ophelia-31.jpg";
-import ophelia32 from "@/assets/ophelia-32.jpg";
-import ophelia38 from "@/assets/ophelia-38.jpg";
-import ophelia50 from "@/assets/ophelia-50.jpg";
+import { Dumbbell, Music, Waves, Flame, Zap, Heart, Activity, Sparkles, Flower2, Clock, type LucideIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import pnImg1 from "@/assets/punto-neutro-images/1000452084.jpg";
+import pnImg2 from "@/assets/punto-neutro-images/1000452086.jpg";
+import pnImg3 from "@/assets/punto-neutro-images/1000452092.jpg";
+import pnImg4 from "@/assets/punto-neutro-images/1000452104.jpg";
+import pnImg5 from "@/assets/punto-neutro-images/1000452105.jpg";
+import pnImg6 from "@/assets/punto-neutro-images/1000452106.jpg";
+import pnCafe1 from "@/assets/punto-neutro-images/1000452109.jpg";
+import pnCafe2 from "@/assets/punto-neutro-images/1000452120.jpg";
 import opheliaLogo from "@/assets/punto-neutro-logo.png";
 import imgTrampoline from "@/assets/trampoline_2982156.png";
 import imgPilates from "@/assets/pilates_2320695.png";
@@ -87,7 +88,7 @@ const FALLBACK_TRIAL_PLANS: TrialPlanRow[] = [
   { id: "trial-pilates", name: "Clase muestra Pilates", classCategory: "pilates", price: 65, durationDays: 7, classLimit: 1, isNonTransferable: true, isNonRepeatable: true },
 ];
 
-const GALLERY_IMAGES = [ophelia31, ophelia14, ophelia50, ophelia28, ophelia15, ophelia38, ophelia32];
+const GALLERY_IMAGES = [pnImg1, pnImg2, pnImg3, pnImg4, pnImg5, pnImg6, pnCafe1, pnCafe2];
 
 /* ───── Helpers ───── */
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -315,47 +316,50 @@ const Index = () => {
         )}
       </nav>
 
-      {/* ── HERO — Full-width photo, "Where Focus Goes, Energy Flows" ── */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0">
-          <img src={ophelia31} alt="Alumnas en Punto Neutro" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
-        </div>
-        <div className="relative z-10 text-center px-6 lg:px-[60px] pt-[140px] pb-20 max-w-[900px] mx-auto">
-          <p className="font-alilato italic text-[clamp(1.1rem,2.2vw,1.6rem)] text-[#ebede5]/80 mb-6 animate-fade-up delay-200 tracking-wide">
-            &ldquo;Where Focus Goes, Energy Flows&rdquo;
-          </p>
-          <h1 className="font-bebas text-[clamp(3.5rem,8vw,7rem)] leading-[0.9] tracking-tight text-[#ebede5] animate-fade-up delay-400 mb-8">
-            LIBERA TU ENERGÍA<br />
-            <span className="text-primary">Y DESCUBRE</span><br />
-            <span style={{ WebkitTextStroke: "2px rgba(249,247,232,0.5)", color: "transparent" }}>LO FUERTE QUE ERES</span>
+      {/* ── HERO — Minimalist, Flat Design ── */}
+      <section className="relative min-h-[90vh] flex flex-col lg:flex-row items-center pt-[100px] pb-20 px-6 lg:px-[60px] bg-[#ebede5] overflow-hidden">
+        {/* Text Content */}
+        <div className="flex-1 z-10 w-full lg:max-w-[50%] flex flex-col items-center lg:items-start text-center lg:text-left pt-10 lg:pt-0">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-[0.7rem] uppercase tracking-[0.15em] font-medium mb-8 animate-fade-up">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            Punto Neutro Studio
+          </div>
+
+          <h1 className="font-bebas text-[clamp(4rem,10vw,8.5rem)] leading-[0.85] tracking-tight text-[#2d2d2d] animate-fade-up delay-200 mb-6 w-full">
+            ENCUENTRA<br />
+            <span className="text-primary">TU CENTRO</span>
           </h1>
-          <p className="text-[clamp(0.95rem,1.3vw,1.15rem)] text-[#ebede5]/75 leading-[1.8] max-w-[600px] mx-auto mb-10 animate-fade-up delay-600">
-            Un espacio donde cada entrenamiento se celebra, cada logro importa
-            y cada persona encuentra su propio ritmo.<br />
-            <span className="text-primary font-medium">Aquí no solo entrenas… aquí vuelves a ti.</span>
+
+          <p className="text-[clamp(1.05rem,1.5vw,1.25rem)] text-[#2d2d2d]/70 leading-[1.6] max-w-[500px] mb-10 animate-fade-up delay-400">
+            Un espacio creado para que reconectes contigo misma a través del movimiento consciente.
+            Pilates, Jumping y Coffee en un solo lugar.
           </p>
-          <div className="flex gap-4 justify-center items-center flex-wrap animate-fade-up delay-800">
+
+          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto animate-fade-up delay-600">
             <button
               onClick={() => navigate("/auth/register")}
-              className="bg-primary text-primary-foreground px-10 py-[18px] rounded-full text-[0.9rem] font-medium tracking-wider uppercase inline-flex items-center gap-[10px] hover:-translate-y-[3px] hover:scale-[1.02] hover:shadow-[0_20px_50px_hsl(var(--primary)/0.4)] transition-all"
+              className="bg-[#2d2d2d] text-[#ebede5] px-10 py-[18px] rounded-full text-[0.85rem] font-medium tracking-wider uppercase inline-flex items-center justify-center gap-[10px] hover:bg-primary transition-colors"
             >
               Comenzar hoy
-              <span className="w-[22px] h-[22px] bg-primary-foreground/20 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
+              <span className="w-[22px] h-[22px] bg-white/10 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
             </button>
             <button
               onClick={() => scrollTo("clases")}
-              className="text-[#ebede5] text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity bg-transparent border-none cursor-pointer"
+              className="px-8 py-[18px] rounded-full text-[0.85rem] text-[#2d2d2d] border border-[#2d2d2d]/20 font-medium tracking-wider uppercase flex items-center justify-center gap-2 hover:bg-[#2d2d2d]/5 transition-colors"
             >
-              <span className="w-[42px] h-[42px] border border-[#ebede5]/30 rounded-full flex items-center justify-center text-[0.8rem]">▶</span>
               Ver clases
             </button>
           </div>
         </div>
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-pulse-dot z-10">
-          <div className="w-[1px] h-10 bg-gradient-to-b from-transparent to-[#ebede5]/40" />
-          <span className="text-[0.6rem] tracking-[0.2em] uppercase text-[#ebede5]/40">Scroll</span>
+
+        {/* Image / Graphic Content */}
+        <div className="flex-1 w-full mt-16 lg:mt-0 relative h-[50vh] lg:h-[80vh] ml-0 lg:ml-10 animate-fade-up delay-500">
+          <div className="absolute inset-0 rounded-[2.5rem] overflow-hidden bg-[#d3d8c4] border-4 border-white shadow-2xl z-10 rotate-[-2deg] hover:rotate-0 transition-transform duration-700">
+            <img src={pnImg4} alt="Alumnas en Punto Neutro" className="w-full h-full object-cover scale-105" />
+          </div>
+          {/* Decorative elements */}
+          <div className="absolute top-10 -right-10 w-32 h-32 rounded-full bg-[#94867a]/20 blur-2xl" />
+          <div className="absolute -bottom-10 left-10 w-40 h-40 rounded-full bg-primary/20 blur-2xl" />
         </div>
       </section>
 
@@ -407,126 +411,123 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ── GALERÍA ROTATIVA ── */}
-      <section id="galeria" className="py-16 lg:py-24 px-6 lg:px-[60px] bg-secondary">
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
-          <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
-            <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Galería
-          </div>
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-10">
-            <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
-              VIVE LA<br />EXPERIENCIA
-            </h2>
-            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Cada sesión es única. Capturamos los mejores momentos de nuestras alumnas.
+      {/* ── COFFEE & GALERÍA — Bento Grid ── */}
+      <section id="galeria" className="py-20 lg:py-32 px-6 lg:px-[60px] bg-secondary border-y border-border">
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 max-w-[1200px] mx-auto">
+
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
+            <div>
+              <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
+                <span className="w-[30px] h-[1px] bg-primary inline-block" />
+                El Estudio & Coffee
+              </div>
+              <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">
+                MÁS QUE<br />UN ESTUDIO
+              </h2>
+            </div>
+            <p className="text-[0.95rem] text-muted-foreground max-w-[400px] leading-[1.8] lg:text-right">
+              Termina tu clase y relájate en nuestra barra de bebidas. Disfruta de una plática o simplemente respira antes de volver al mundo.
             </p>
           </div>
-          {/* Main carousel */}
-          <div className="relative rounded-3xl overflow-hidden bg-black h-[400px] sm:h-[500px] lg:h-[600px] mb-5 group">
-            {GALLERY_IMAGES.map((img, i) => (
-              <img key={i} src={img} alt={"Punto Neutro momento " + (i + 1)}
-                className={"absolute inset-0 w-full h-full object-contain transition-opacity duration-1000 " + (i === galleryIdx ? "opacity-100" : "opacity-0")} />
-            ))}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-            <button onClick={() => setGalleryIdx((prev) => (prev - 1 + GALLERY_IMAGES.length) % GALLERY_IMAGES.length)}
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60">
-              <ChevronLeft size={20} />
-            </button>
-            <button onClick={() => setGalleryIdx((prev) => (prev + 1) % GALLERY_IMAGES.length)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60">
-              <ChevronRight size={20} />
-            </button>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-              {GALLERY_IMAGES.map((_, i) => (
-                <button key={i} onClick={() => setGalleryIdx(i)}
-                  className={"w-2 h-2 rounded-full transition-all " + (i === galleryIdx ? "bg-primary w-6" : "bg-white/50 hover:bg-white/70")} />
-              ))}
+
+          <div className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-3 gap-4 h-auto md:h-[800px]">
+            {/* Main large image (Coffee/Juice) */}
+            <div className="md:col-span-2 md:row-span-2 rounded-3xl overflow-hidden relative group">
+              <img src={pnCafe1} alt="Cafetería Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+              <div className="absolute bottom-6 left-6 right-6">
+                <span className="bg-white/20 backdrop-blur-md text-white text-[0.65rem] uppercase tracking-wider px-3 py-1.5 rounded-full mb-3 inline-block">Coffee & Chill</span>
+                <h3 className="text-white font-syne font-bold text-2xl">Bebidas & Snacks</h3>
+              </div>
+            </div>
+
+            {/* Top right image (Studio vibe) */}
+            <div className="md:col-span-2 md:row-span-1 rounded-3xl overflow-hidden relative group hidden md:block">
+              <img src={pnImg6} alt="Pilates" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            </div>
+
+            {/* Middle right square 1 (Details) */}
+            <div className="md:col-span-1 md:row-span-1 rounded-3xl overflow-hidden relative group">
+              <img src={pnCafe2} alt="Detalles" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-primary/30 to-transparent" />
+            </div>
+
+            {/* Middle right square 2 (Community) */}
+            <div className="md:col-span-1 md:row-span-1 rounded-3xl overflow-hidden relative group">
+              <img src={pnImg5} alt="Comunidad" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+            </div>
+
+            {/* Bottom wide image (Action) */}
+            <div className="md:col-span-4 md:row-span-1 rounded-3xl overflow-hidden relative group">
+              <img src={pnImg3} alt="Entrenamiento" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
+              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-700" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-white font-bebas text-4xl tracking-wide opacity-80">RITMO Y ENERGÍA</p>
+              </div>
             </div>
           </div>
-          {/* Thumbnails */}
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-            {GALLERY_IMAGES.map((img, i) => (
-              <button key={i} onClick={() => setGalleryIdx(i)}
-                className={"rounded-xl overflow-hidden aspect-square transition-all " + (i === galleryIdx ? "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[0.95]" : "opacity-50 hover:opacity-80")}>
-                <img src={img} alt="" className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
+
         </div>
       </section>
-
-      {/* ── CLASES — 8 clases, card flip ── */}
-      <section id="clases" className="py-16 lg:py-24 px-6 lg:px-[60px]">
+      {/* ── CLASES — Flat Design ── */}
+      <section id="clases" className="py-16 lg:py-24 px-6 lg:px-[60px] bg-background">
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
-            Nuestras modalidades
+            Nuestras Modalidades
           </div>
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-10">
             <h2 className="font-bebas text-[clamp(2.8rem,4.5vw,4.5rem)] leading-[0.95] text-foreground">NUESTRAS CLASES</h2>
-            <p className="text-[0.88rem] text-muted-foreground max-w-[360px] leading-[1.7]">
-              Toca una clase para descubrir de qué se trata. Cada semana cambian los tipos, no los horarios.
+            <p className="text-[0.88rem] text-muted-foreground max-w-[400px] leading-[1.7]">
+              Descubre qué modalidad va mejor con tu energía. Entrenamientos diseñados para retarte y reconectarte.
             </p>
           </div>
-          <div className="flex flex-wrap gap-4 mb-10 text-[0.72rem] tracking-wider uppercase">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#94867a]" /> Jumping</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#b5bf9c]" /> Pilates</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#ebede5]" /> Mixto / Yoga</span>
-          </div>
         </div>
-        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {classTypes.slice(0, 8).map((c) => {
-            const catBorder: Record<string, string> = { jumping: "#94867a", pilates: "#b5bf9c", mixto: "#ebede5" };
-            const accent = catBorder[c.category] ?? "#94867a";
-            const isFlipped = flippedCard === c.id;
+
+        <div className="reveal opacity-0 translate-y-10 transition-all duration-700 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {classTypes.slice(0, 4).map((c) => {
+            const catColors: Record<string, string> = { jumping: "bg-[#94867a]/10 text-[#94867a]", pilates: "bg-[#b5bf9c]/20 text-[#7a855d]", mixto: "bg-[#ebede5] text-[#8a8c85]" };
+            const badgeStyle = catColors[c.category] ?? "bg-primary/10 text-primary";
             const Icon = getCardIcon(c.emoji, c.name);
+
             return (
-              <div key={c.id} className="cursor-pointer" style={{ perspective: "1000px" }}
-                onClick={() => setFlippedCard(isFlipped ? null : c.id)}>
-                <div style={{ transformStyle: "preserve-3d", transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)", transition: "transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)" }}>
-                  {/* Front */}
-                  <div className="rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-center min-h-[220px]"
-                    style={{ backfaceVisibility: "hidden", border: "1px solid " + accent + "40", background: accent + "08" }}>
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                      style={{ background: accent + "20", border: "1px solid " + accent + "30" }}>
-                      <Icon size={28} style={{ color: accent }} />
-                    </div>
-                    <h3 className="font-syne font-bold text-[1.05rem] text-foreground leading-tight">{c.name}</h3>
-                    {c.subtitle && <p className="text-[0.78rem] font-medium" style={{ color: accent }}>{c.subtitle}</p>}
-                    <div className="flex gap-3 text-[0.68rem] text-muted-foreground mt-auto">
-                      <span>{c.duration_min} min</span><span>·</span><span>{c.level}</span>
-                    </div>
-                    <p className="text-[0.65rem] text-muted-foreground/60 mt-1">Toca para ver más →</p>
+              <div key={c.id} className="group relative rounded-3xl p-8 bg-secondary/50 border border-border hover:bg-secondary hover:shadow-xl transition-all duration-500 overflow-hidden flex flex-col h-full">
+                {/* Decorative blob */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500" />
+
+                <div className="flex justify-between items-start mb-6">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${badgeStyle}`}>
+                    <Icon size={28} />
                   </div>
-                  {/* Back */}
-                  <div className="rounded-2xl p-6 flex flex-col justify-center gap-3 min-h-[220px] absolute inset-0"
-                    style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)", border: "2px solid " + accent, background: "linear-gradient(135deg, " + accent + "15, " + accent + "05)" }}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Icon size={18} style={{ color: accent }} />
-                      <h3 className="font-syne font-bold text-[0.95rem] text-foreground">{c.name}</h3>
-                    </div>
-                    <p className="text-[0.84rem] text-muted-foreground leading-[1.65] flex-1">{c.description}</p>
-                    <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: accent + "25" }}>
-                      <span className="text-[0.7rem]" style={{ color: accent }}>{c.category.toUpperCase()}</span>
-                      <span className="text-[0.7rem] text-muted-foreground">Max. {c.capacity} personas</span>
-                    </div>
-                  </div>
+                  <span className={`px-3 py-1 rounded-full text-[0.65rem] tracking-wider uppercase font-medium ${badgeStyle}`}>
+                    {c.category}
+                  </span>
+                </div>
+
+                <h3 className="font-syne font-bold text-[1.25rem] text-foreground mb-2 leading-tight group-hover:text-primary transition-colors">{c.name}</h3>
+                <p className="text-[0.88rem] text-muted-foreground leading-[1.7] mb-8 flex-1">
+                  {c.description}
+                </p>
+
+                <div className="flex items-center gap-4 text-[0.75rem] text-muted-foreground font-medium pt-5 border-t border-border mt-auto">
+                  <div className="flex items-center gap-1.5"><Clock size={14} /> {c.duration_min} min</div>
+                  <div className="w-1 h-1 rounded-full bg-border" />
+                  <div>{c.level}</div>
+                  <div className="w-1 h-1 rounded-full bg-border" />
+                  <div>Max. {c.capacity} per.</div>
                 </div>
               </div>
             );
           })}
         </div>
-        <p className="text-[0.72rem] text-muted-foreground text-center mt-8 tracking-wide">
-          CADA SEMANA CAMBIAN LOS TIPOS DE CLASES, NO LOS HORARIOS · TOCA UNA TARJETA PARA VER MÁS
-        </p>
-      </section>
+      </section >
 
       {/* ── HORARIO ── */}
-      <Schedule />
+      < Schedule />
 
       {/* ── PAQUETES ── */}
-      <section id="membresias" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary">
+      < section id="membresias" className="py-20 lg:py-[120px] px-6 lg:px-[60px] bg-secondary" >
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
@@ -655,10 +656,10 @@ const Index = () => {
             Vigencia desde la primera clase · Aplican términos y condiciones · Precios en MXN
           </p>
         </div>
-      </section>
+      </section >
 
       {/* ── INSTRUCTORAS — Emi & Mon ── */}
-      <section id="instructoras" className="py-16 lg:py-24 px-6 lg:px-[60px]">
+      < section id="instructoras" className="py-16 lg:py-24 px-6 lg:px-[60px]" >
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
@@ -741,10 +742,10 @@ const Index = () => {
             ))}
           </div>
         </div>
-      </section>
+      </section >
 
       {/* ── POLÍTICAS ── */}
-      <section id="politicas" className="py-16 lg:py-24 px-6 lg:px-[60px]">
+      < section id="politicas" className="py-16 lg:py-24 px-6 lg:px-[60px]" >
         <div className="reveal opacity-0 translate-y-10 transition-all duration-700">
           <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
             <span className="w-[30px] h-[1px] bg-primary inline-block" />
