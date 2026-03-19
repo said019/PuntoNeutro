@@ -17,6 +17,7 @@ import pnImg7 from "@/assets/punto-neutro-images/1000431479.jpg";
 import pnImg8 from "@/assets/punto-neutro-images/1000439853.jpg";
 import pnImg9 from "@/assets/punto-neutro-images/1000452523.jpg";
 import pnImg10 from "@/assets/punto-neutro-images/1000452524.jpg";
+import angiePhoto from "@/assets/punto-neutro-images/1000453952.jpg";
 import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 import imgPilates from "@/assets/pilates_2320695.png";
 
@@ -609,23 +610,23 @@ const Index = () => {
               ? instructors.map((inst) => ({
                 key: inst.id,
                 label: inst.displayName,
-                coachTitle: null as string | null,
+                coachTitle: inst.displayName?.toUpperCase() ?? null,
                 sub: Array.isArray(inst.specialties)
-                  ? (inst.specialties as unknown as string[]).join(" & ")
+                  ? (inst.specialties as unknown as string[]).join(" · ")
                   : typeof inst.specialties === "string" && inst.specialties ? inst.specialties : "Instructora",
                 bio: inst.bio || null,
                 funFact: null as string | null,
-                photoUrl: inst.photoUrl || null,
+                photoUrl: inst.photoUrl || angiePhoto,
                 photoFocusX: clampFocus(inst.photoFocusX),
-                photoFocusY: clampFocus(inst.photoFocusY),
+                photoFocusY: clampFocus(inst.photoFocusY) || 25,
               }))
               : [
                 {
-                  key: "angelina", label: "Angelina", coachTitle: "ANGELINA HUANTE",
+                  key: "angie", label: "Angie", coachTitle: "ANGIE",
                   sub: "Pilates Matt Clásico · Pilates Terapéutico · Flex & Flow · Body Strong",
-                  bio: "Especialista en Pilates y movimiento funcional. Enfocada en técnica, control corporal y bienestar integral.",
+                  bio: "Soy una profesional del movimiento apasionada por acompañar a las personas a sentirse mejor en su cuerpo desde un enfoque consciente, funcional y sostenible. Mi enfoque integra fuerza, movilidad y control corporal, adaptándose a cada persona y a cada proceso. Aquí no solo vienes a entrenar, vienes a conectar contigo, a avanzar a tu ritmo y a formar parte de una experiencia que equilibra movimiento y pausa.",
                   funFact: null,
-                  photoUrl: null, photoFocusX: 50, photoFocusY: 50
+                  photoUrl: angiePhoto, photoFocusX: 50, photoFocusY: 25
                 },
               ]
             ).map((inst) => (

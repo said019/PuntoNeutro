@@ -1136,11 +1136,10 @@ async function ensureSchema() {
     if (parseInt(instCount.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO instructors (display_name, email, bio, specialties, is_active) VALUES
-          ('Angelina Salas',   'angelina@puntoneutro.com.mx', 'Instructora certificada en Pilates Mat y movimiento terapéutico.', 'Pilates Matt Clásico,Pilates Terapéutico,Flex & Flow', true),
-          ('Instructora PN',   'instructora@puntoneutro.com.mx', 'Especialista en entrenamiento funcional y bienestar corporal.', 'Body Strong,Flex & Flow,Pilates Matt Clásico', true)
+          ('Angie', 'angie@puntoneutro.com.mx', 'Soy una profesional del movimiento apasionada por acompañar a las personas a sentirse mejor en su cuerpo desde un enfoque consciente, funcional y sostenible. Mi enfoque integra fuerza, movilidad y control corporal, adaptándose a cada persona y a cada proceso.', '["Pilates Matt Clásico","Pilates Terapéutico","Flex & Flow","Body Strong"]'::jsonb, true)
         ON CONFLICT DO NOTHING;
       `);
-      console.log("✅ Seeded 2 Punto Neutro instructors");
+      console.log("✅ Seeded Punto Neutro instructor (Angie)");
     }
 
     const classCount = await pool.query("SELECT COUNT(*) FROM classes");
