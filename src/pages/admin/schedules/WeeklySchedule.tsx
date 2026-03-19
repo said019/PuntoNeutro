@@ -180,7 +180,7 @@ const WeeklySchedule = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-3">
               {DAYS.map((day, i) => (
                 <div key={i} className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-3">
-                  <p className="text-[10px] font-bold text-center mb-3 text-[#b5bf9c]/60 uppercase tracking-widest">
+                  <p className="text-[10px] font-bold text-center mb-3 text-[#94867a]/60 uppercase tracking-widest">
                     {day.slice(0, 3)}
                   </p>
                   {grouped[i].length === 0 ? (

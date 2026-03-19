@@ -59,7 +59,7 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center justify-center text-white/25 hover:text-[#94867a] transition-colors disabled:opacity-30"
+      className="flex items-center justify-center text-[#94867a]/40 hover:text-[#94867a] transition-colors disabled:opacity-30"
     >
       {up ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
     </button>
@@ -69,8 +69,8 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
     return (
       <div
         className={cn(
-          "inline-flex w-full items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2",
-          "focus-within:border-[#94867a]/40 focus-within:bg-[#94867a]/[0.03]",
+          "inline-flex w-full items-center gap-2 rounded-xl border border-[#94867a]/15 bg-[#94867a]/[0.06] px-3 py-2",
+          "focus-within:border-[#94867a]/40 focus-within:bg-[#94867a]/[0.08]",
           disabled && "opacity-50 pointer-events-none",
           className,
         )}
@@ -82,7 +82,7 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
           value={value ?? `${pad(hours)}:${pad(minutes)}`}
           disabled={disabled}
           onChange={(e) => onChange?.(e.target.value)}
-          className="w-full bg-transparent text-sm text-white/90 focus:outline-none"
+          className="w-full bg-transparent text-sm text-[#2d2d2d] focus:outline-none"
           aria-label="Seleccionar hora"
         />
       </div>
@@ -92,8 +92,8 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 select-none",
-        "focus-within:border-[#94867a]/40 focus-within:bg-[#94867a]/[0.03]",
+        "inline-flex items-center gap-2 rounded-xl border border-[#94867a]/15 bg-[#94867a]/[0.06] px-3 py-2 select-none",
+        "focus-within:border-[#94867a]/40 focus-within:bg-[#94867a]/[0.08]",
         disabled && "opacity-50 pointer-events-none",
         className
       )}
@@ -103,7 +103,7 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
       {/* Hours */}
       <div className="flex flex-col items-center gap-0.5">
         <Spin up onClick={() => changeHours(1)} />
-        <span className="text-base font-bold text-white/90 w-7 text-center tabular-nums leading-none">
+        <span className="text-base font-bold text-[#2d2d2d] w-7 text-center tabular-nums leading-none">
           {pad(hours)}
         </span>
         <Spin up={false} onClick={() => changeHours(-1)} />
@@ -114,7 +114,7 @@ export const TimePicker = ({ value, onChange, className, disabled }: TimePickerP
       {/* Minutes */}
       <div className="flex flex-col items-center gap-0.5">
         <Spin up onClick={() => changeMinutes(5)} />
-        <span className="text-base font-bold text-white/90 w-7 text-center tabular-nums leading-none">
+        <span className="text-base font-bold text-[#2d2d2d] w-7 text-center tabular-nums leading-none">
           {pad(minutes)}
         </span>
         <Spin up={false} onClick={() => changeMinutes(-5)} />

@@ -14,9 +14,9 @@ interface ScheduleSlot {
 const DAYS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 
 const LABEL_STYLE: Record<string, string> = {
-  PILATES: "bg-[#b5bf9c]/20 text-[#b5bf9c] border border-[#b5bf9c]/30",
-  BIENESTAR: "bg-[#94867a]/20 text-[#94867a] border border-[#94867a]/30",
-  ESPECIAL: "bg-[#ebede5]/20 text-[#ebede5] border border-[#ebede5]/30",
+  PILATES: "bg-[#b5bf9c]/20 text-[#4a5638] border border-[#b5bf9c]/30",
+  BIENESTAR: "bg-[#94867a]/20 text-[#5a4f46] border border-[#94867a]/30",
+  ESPECIAL: "bg-[#94867a]/10 text-[#2d2d2d]/70 border border-[#94867a]/20",
 };
 
 const AdminSchedule = () => {
