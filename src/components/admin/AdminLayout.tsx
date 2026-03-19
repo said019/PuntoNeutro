@@ -106,8 +106,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex flex-col transition-transform duration-300 shrink-0",
-          "border-r border-[#94867a]/15",
-          "bg-gradient-to-b from-[#e2e5da] via-[#ebede5] to-[#ebede5]",
+          "border-r border-[#94867a]/20",
+          "bg-white shadow-[2px_0_12px_rgba(0,0,0,0.04)]",
           "w-[88vw] max-w-[300px] -translate-x-full lg:translate-x-0 lg:static",
           mobileOpen && "translate-x-0",
           collapsed ? "lg:w-[72px]" : "lg:w-[240px]",
@@ -116,11 +116,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         <div
           className={cn(
             "flex items-center border-b border-[#94867a]/15 shrink-0",
-            isCompact ? "justify-center px-3 py-5" : "justify-between px-4 py-4",
+            isCompact ? "justify-center px-3 py-5" : "justify-between px-5 py-6",
           )}
         >
           {!isCompact && (
-            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-20 w-auto object-contain" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-24 w-auto object-contain" />
           )}
 
           <button

@@ -470,8 +470,8 @@ const PendingOrders = () => {
               <p className="text-sm font-semibold text-[#2d2d2d]/80">Comprobante de pago</p>
               <button onClick={() => setPreviewUrl(null)} className="text-[#2d2d2d]/40 hover:text-[#2d2d2d] text-lg">✕</button>
             </div>
-            {previewUrl.endsWith(".pdf") ? (
-              <iframe src={previewUrl} className="w-full h-[60vh] rounded-lg" />
+            {previewUrl.includes("application/pdf") || previewUrl.endsWith(".pdf") ? (
+              <iframe src={previewUrl} className="w-full h-[60vh] rounded-lg border-0" title="Comprobante PDF" />
             ) : (
               <img src={previewUrl} alt="Comprobante" className="w-full rounded-lg" />
             )}
