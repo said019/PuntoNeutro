@@ -109,7 +109,7 @@ const Dashboard = () => {
             {/* Pending orders */}
             <Card
               className="cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => navigate("/admin/orders")}
+              onClick={() => navigate("/admin/payments?tab=pending")}
             >
               <CardHeader>
                 <CardTitle className="text-base flex items-center justify-between">

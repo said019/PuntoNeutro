@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, User, Package, CheckCircle2, CreditCard, Banknote, ArrowRight, ChevronLeft, History, Sparkles } from "lucide-react";
+import { Loader2, Search, User, Package, CheckCircle2, CreditCard, Banknote, ArrowRight, ChevronLeft, History, Sparkles, Clock, XCircle, Eye, ImageIcon } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 
@@ -340,6 +341,147 @@ const CashAssignment = () => {
   );
 };
 
+// ── Pending Orders (verify / reject) ─────────────────────
+const PendingOrders = () => {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery<{ data: any[] }>({
+    queryKey: ["admin-orders-pending"],
+    queryFn: async () => (await api.get("/admin/orders?status=pending_verification")).data,
+  });
+  const orders = Array.isArray(data?.data) ? data.data : [];
+
+  const verifyMutation = useMutation({
+    mutationFn: (id: string) => api.put(`/admin/orders/${id}/verify`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-orders-pending"] });
+      qc.invalidateQueries({ queryKey: ["orders-pending"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      qc.invalidateQueries({ queryKey: ["payments"] });
+      toast({ title: "✅ Orden verificada y membresía activada" });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al verificar", variant: "destructive" }),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: string) => api.put(`/admin/orders/${id}/reject`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-orders-pending"] });
+      qc.invalidateQueries({ queryKey: ["orders-pending"] });
+      qc.invalidateQueries({ queryKey: ["admin-stats"] });
+      toast({ title: "Orden rechazada" });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al rechazar", variant: "destructive" }),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-[#94867a]/60">
+        <Loader2 className="animate-spin mr-2" size={16} /> Cargando…
+      </div>
+    );
+  }
+
+  if (!orders.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <CheckCircle2 size={32} className="text-[#b5bf9c]/40 mb-3" />
+        <p className="text-[#2d2d2d]/40 text-sm font-medium">No hay órdenes pendientes</p>
+        <p className="text-[#2d2d2d]/25 text-xs mt-1">Todas las órdenes han sido procesadas</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-3">
+        {orders.map((o: any) => (
+          <div key={o.id} className="rounded-xl border border-amber-600/20 bg-amber-50/50 p-4 space-y-3">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#94867a]/30 to-[#b5bf9c]/20 border border-[#94867a]/30 flex items-center justify-center text-sm font-bold text-[#94867a] shrink-0">
+                  {(o.userName ?? "?")[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-[#2d2d2d]/90">{o.userName ?? "—"}</p>
+                  <p className="text-xs text-[#2d2d2d]/40">{o.planName ?? "Plan"}</p>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-bold text-sm text-[#2d2d2d]/90">
+                  ${Number(o.totalAmount ?? o.total_amount ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN
+                </p>
+                <p className="text-[10px] text-[#2d2d2d]/35">
+                  {o.createdAt ? new Date(o.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                </p>
+              </div>
+            </div>
+
+            {/* Payment method + proof */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline" className="text-[10px] text-[#2d2d2d]/50 border-[#94867a]/20">
+                {o.payment_method === "transfer" ? "Transferencia" : o.payment_method === "cash" ? "Efectivo" : o.payment_method === "card" ? "Tarjeta" : o.payment_method ?? "—"}
+              </Badge>
+              <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-600/30 bg-amber-50">
+                <Clock size={9} className="mr-1" /> Por verificar
+              </Badge>
+              {o.proofUrl && (
+                <button
+                  onClick={() => setPreviewUrl(o.proofUrl)}
+                  className="flex items-center gap-1 text-[10px] font-semibold text-[#94867a] hover:text-[#2d2d2d] transition-colors"
+                >
+                  <Eye size={11} /> Ver comprobante
+                </button>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-1">
+              <Button
+                size="sm"
+                className="flex-1 bg-gradient-to-r from-[#4a7a38] to-[#6b9a52] hover:opacity-90 text-white font-semibold text-xs h-9"
+                onClick={() => verifyMutation.mutate(o.id)}
+                disabled={verifyMutation.isPending}
+              >
+                {verifyMutation.isPending ? <Loader2 className="animate-spin" size={13} /> : <><CheckCircle2 size={13} className="mr-1" /> Verificar y activar</>}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-400/30 text-red-600 hover:bg-red-50 hover:border-red-400/50 font-semibold text-xs h-9"
+                onClick={() => rejectMutation.mutate(o.id)}
+                disabled={rejectMutation.isPending}
+              >
+                {rejectMutation.isPending ? <Loader2 className="animate-spin" size={13} /> : <><XCircle size={13} className="mr-1" /> Rechazar</>}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Proof preview modal */}
+      {previewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPreviewUrl(null)}>
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[80vh] overflow-auto p-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-3 pb-2">
+              <p className="text-sm font-semibold text-[#2d2d2d]/80">Comprobante de pago</p>
+              <button onClick={() => setPreviewUrl(null)} className="text-[#2d2d2d]/40 hover:text-[#2d2d2d] text-lg">✕</button>
+            </div>
+            {previewUrl.endsWith(".pdf") ? (
+              <iframe src={previewUrl} className="w-full h-[60vh] rounded-lg" />
+            ) : (
+              <img src={previewUrl} alt="Comprobante" className="w-full rounded-lg" />
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 // ── Payments History ──────────────────────────────────────
 const PaymentsHistory = () => {
   const { data } = useQuery<{ data: any[] }>({
@@ -349,9 +491,9 @@ const PaymentsHistory = () => {
   const payments = Array.isArray(data?.data) ? data.data : [];
 
   const methodStyles: Record<string, string> = {
-    cash: "text-[#ebede5] border-[#ebede5]/30 bg-[#ebede5]/5",
-    card: "text-[#b5bf9c] border-[#b5bf9c]/30 bg-[#b5bf9c]/5",
-    transfer: "text-[#94867a] border-[#94867a]/30 bg-[#94867a]/5",
+    cash: "text-[#5a4f46] border-[#94867a]/30 bg-[#94867a]/10",
+    card: "text-[#4a5638] border-[#b5bf9c]/30 bg-[#b5bf9c]/10",
+    transfer: "text-[#5a4f46] border-[#94867a]/30 bg-[#94867a]/10",
   };
   const methodLabels: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
 
@@ -389,7 +531,9 @@ const PaymentsHistory = () => {
 
 // ── Main Payments Page ────────────────────────────────────
 const PaymentsPage = () => {
-  const [activeTab, setActiveTab] = useState<"cash" | "history">("cash");
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") === "pending" ? "pending" : "cash";
+  const [activeTab, setActiveTab] = useState<"cash" | "pending" | "history">(initialTab);
 
   return (
     <AuthGuard>
@@ -398,12 +542,12 @@ const PaymentsPage = () => {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-[#2d2d2d] mb-1">Pagos</h1>
-            <p className="text-sm text-[#2d2d2d]/35">Asigna membresías en efectivo y consulta el historial</p>
+            <p className="text-sm text-[#2d2d2d]/35">Asigna membresías en efectivo, verifica pagos pendientes y consulta el historial</p>
           </div>
 
           {/* Tab switcher */}
           <div className="flex gap-1 p-1 rounded-xl bg-[#94867a]/[0.06] border border-[#94867a]/15 w-fit mb-8">
-            {([["cash", "Asignación efectivo"], ["history", "Historial"]] as const).map(([val, label]) => (
+            {([["cash", "Asignación efectivo"], ["pending", "Pendientes"], ["history", "Historial"]] as const).map(([val, label]) => (
               <button
                 key={val}
                 onClick={() => setActiveTab(val)}
@@ -420,6 +564,7 @@ const PaymentsPage = () => {
           </div>
 
           {activeTab === "cash" && <CashAssignment />}
+          {activeTab === "pending" && <PendingOrders />}
           {activeTab === "history" && <PaymentsHistory />}
         </div>
       </AdminLayout>

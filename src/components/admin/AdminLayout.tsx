@@ -120,7 +120,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           )}
         >
           {!isCompact && (
-            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-14 w-auto object-contain" />
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-20 w-auto object-contain" />
           )}
 
           <button
