@@ -512,8 +512,7 @@ async function ensureSchema() {
           ('4 Clases',      '4',  400,  'pilates', 30, true, 1),
           ('8 Clases',      '8',  680,  'pilates', 30, true, 2),
           ('12 Clases',     '12', 900,  'pilates', 30, true, 3),
-          ('16 Clases',     '16', 1100, 'pilates', 30, true, 4),
-          ('Clase Muestra', '1',  110,  'pilates', 7,  true, 5)
+          ('16 Clases',     '16', 1100, 'pilates', 30, true, 4)
         ON CONFLICT DO NOTHING;
       `);
       console.log("✅ Seeded Punto Neutro packages");
@@ -621,7 +620,6 @@ async function ensureSchema() {
     if (parseInt(plCount.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order) VALUES
-          ('Clase Muestra', 'Clase de prueba para nuevos clientes', 65, 'MXN', 7, 1, 'all', '["1 clase de muestra","No transferible","No repetible"]'::jsonb, true, 0),
           ('Clase Suelta', 'Una clase individual', 120, 'MXN', 7, 1, 'all', '["1 clase","Vigencia 7 días","Precio con descuento: $110"]'::jsonb, true, 1),
           ('4 Clases', 'Paquete de 4 clases al mes', 400, 'MXN', 30, 4, 'all', '["4 clases","Vigencia 30 días","Precio con descuento: $380"]'::jsonb, true, 2),
           ('8 Clases', 'Paquete de 8 clases al mes', 680, 'MXN', 30, 8, 'all', '["8 clases","Vigencia 30 días","Precio con descuento: $640"]'::jsonb, true, 3),
@@ -635,51 +633,6 @@ async function ensureSchema() {
     }
     // ── Backfill class_category on existing plans ──
     await pool.query(`UPDATE plans SET class_category = 'all' WHERE class_category IS NULL`).catch(() => { });
-    // ── Ensure sample single-session plans exist (MXN 65, non-transferable, non-repeatable) ──
-    const samplePlans = [
-      {
-        name: "Clase Muestra",
-        classCategory: "all",
-        repeatKey: "trial_single_session",
-        sortOrder: 5,
-      },
-    ];
-    for (const sp of samplePlans) {
-      const features = JSON.stringify(["1 clase de muestra", "No transferible", "No repetible"]);
-      const updateRes = await pool.query(
-        `UPDATE plans
-           SET price = 65,
-               currency = 'MXN',
-               duration_days = 7,
-               class_limit = 1,
-               class_category = $2,
-               features = $3::jsonb,
-               is_active = true,
-               is_non_transferable = true,
-               is_non_repeatable = true,
-               repeat_key = $4,
-               sort_order = $5,
-               updated_at = NOW()
-         WHERE name = $1`,
-        [sp.name, sp.classCategory, features, sp.repeatKey, sp.sortOrder]
-      );
-      if (updateRes.rowCount === 0) {
-        await pool.query(
-          `INSERT INTO plans
-            (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
-           VALUES
-            ($1, $2, 65, 'MXN', 7, 1, $3, $4::jsonb, true, $5, true, true, $6)`,
-          [
-            sp.name,
-            "Sesión de muestra individual. No transferible y no repetible.",
-            sp.classCategory,
-            features,
-            sp.sortOrder,
-            sp.repeatKey,
-          ]
-        );
-      }
-    }
     // ── Products table ─────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
@@ -3486,8 +3439,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   if (hasEventPass) {
     passHeader = "PASE DE EVENTO";
   } else if (hasMembership) {
-    if (isTrialSingleSession) passHeader = "CLASE MUESTRA";
-    else if (isUnlimited) passHeader = "MEMBRESÍA";
+    if (isUnlimited) passHeader = "MEMBRESÍA";
     else if (isPackage) passHeader = "PAQUETE";
     else if (isSingleClass) passHeader = "CLASE INDIVIDUAL";
   }
@@ -4578,9 +4530,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     : 0;
   const stripStampState = resolveWalletStripStampState(classLimit, classesRemaining);
   const hasIconStampMode = hasMembership && !isUnlimited && stripStampState.total > 0;
-  const membershipHeadline = isTrialSingleSession
-    ? "Clase Muestra"
-    : (isUnlimited ? "Membresía" : membershipCategoryLabel);
+  const membershipHeadline = isUnlimited ? "Membresía" : membershipCategoryLabel;
   const memberDisplayName = truncateWalletField(userName, 22);
   const planDisplayName = truncateWalletField(
     hasMembership ? (membership.plan_name || `${membershipCategoryLabel} ${isUnlimited ? "Ilimitado" : ""}`.trim()) : "",
