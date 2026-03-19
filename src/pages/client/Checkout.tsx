@@ -40,13 +40,14 @@ const PlanCard = ({
   const nonTransferable = flag(plan.isNonTransferable ?? plan.is_non_transferable);
   const nonRepeatable = flag(plan.isNonRepeatable ?? plan.is_non_repeatable);
   const category = detectPlanCategory(plan);
-  const categoryLabel =
-    category === "pilates" ? "Pilates" :
-    category === "bienestar" ? "Bienestar" : "General";
   const accent =
     category === "pilates" ? "#b5bf9c" :
     category === "bienestar" ? "#94867a" : "#b5bf9c";
   const iconSrc = imgPilates;
+
+  const description = plan.description ?? "";
+  const features: string[] = Array.isArray(plan.features) ? plan.features : [];
+  const isCombo = plan.name?.toLowerCase().includes("paquete +");
 
   return (
     <button
@@ -74,33 +75,56 @@ const PlanCard = ({
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-[#2d2d2d]/85 leading-snug">{plan.name}</p>
-          <div className="mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold" style={{ borderColor: `${accent}55`, color: accent }}>
-            <Sparkles size={10} /> {categoryLabel}
-          </div>
+          {description && (
+            <p className="text-[11px] text-[#2d2d2d]/45 mt-0.5 leading-snug">{description}</p>
+          )}
         </div>
       </div>
       <div className="flex items-baseline gap-1 mt-2">
         <span className="text-2xl font-bold text-[#2d2d2d]">${Number(plan.price ?? 0).toLocaleString("es-MX")}</span>
         <span className="text-xs text-[#2d2d2d]/35">{plan.currency ?? "MXN"}</span>
       </div>
+      {/* Features list */}
+      {features.length > 0 && (
+        <ul className="mt-2 space-y-0.5">
+          {features.map((f, i) => (
+            <li key={i} className={cn(
+              "text-[10px] flex items-start gap-1.5",
+              f.startsWith("Precio con descuento")
+                ? "text-[#4a7a38] font-semibold"
+                : "text-[#2d2d2d]/45"
+            )}>
+              <span className="mt-0.5 shrink-0">
+                {f.startsWith("Precio con descuento") ? "💰" : "•"}
+              </span>
+              {f}
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="flex flex-wrap gap-2 mt-2">
         {durationDays > 0 && (
-          <span className="text-[10px] text-[#b5bf9c]/70 bg-[#b5bf9c]/8 border border-[#b5bf9c]/15 rounded-full px-2 py-0.5">
+          <span className="text-[10px] text-[#4a5638] bg-[#b5bf9c]/15 border border-[#b5bf9c]/25 rounded-full px-2 py-0.5">
             {durationDays} días
           </span>
         )}
         {Number(classLimit) > 0 && (
-          <span className="text-[10px] text-[#ebede5]/70 bg-[#ebede5]/8 border border-[#ebede5]/15 rounded-full px-2 py-0.5">
+          <span className="text-[10px] text-[#5a4f46] bg-[#94867a]/12 border border-[#94867a]/20 rounded-full px-2 py-0.5">
             {classLimit} clases
           </span>
         )}
+        {isCombo && (
+          <span className="text-[10px] text-[#7a6d62] bg-[#94867a]/10 border border-[#94867a]/25 rounded-full px-2 py-0.5 font-semibold">
+            ✨ Paquete completo
+          </span>
+        )}
         {nonTransferable && (
-          <span className="text-[10px] text-amber-300/80 bg-amber-300/10 border border-amber-300/20 rounded-full px-2 py-0.5">
+          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
             No transferible
           </span>
         )}
         {nonRepeatable && (
-          <span className="text-[10px] text-rose-300/80 bg-rose-300/10 border border-rose-300/20 rounded-full px-2 py-0.5">
+          <span className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5">
             No repetible
           </span>
         )}
@@ -171,29 +195,13 @@ const Checkout = () => {
     queryFn: async () => (await api.get("/plans")).data,
   });
   const rawPlans: any[] = Array.isArray(plansData?.data) ? plansData.data : Array.isArray(plansData) ? plansData : [];
-  const plans = rawPlans.filter((p) => (p.isActive ?? p.is_active) !== false);
+  const plans = rawPlans
+    .filter((p) => (p.isActive ?? p.is_active) !== false)
+    .sort((a, b) => (a.sortOrder ?? a.sort_order ?? 99) - (b.sortOrder ?? b.sort_order ?? 99));
 
-  // Group plans by category
-  const grouped = plans.reduce((acc: Record<string, any[]>, p) => {
-    const cat = String(p.classCategory ?? p.class_category ?? "all").toLowerCase();
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(p);
-    return acc;
-  }, {});
-
-  const categoryOrder = ["pilates", "bienestar", "all", "otro"];
-  const sortedCategories = [
-    ...categoryOrder.filter((c) => grouped[c]),
-    ...Object.keys(grouped).filter((c) => !categoryOrder.includes(c)),
-  ];
-
-  const categoryLabel = (cat: string) => {
-    if (cat === "pilates") return "Pilates";
-    if (cat === "bienestar") return "Bienestar";
-    if (cat === "mixto") return "General";
-    if (cat === "all") return "General";
-    return "Otro";
-  };
+  // Group: basic plans vs combo plans ("Paquete + ...")
+  const basicPlans = plans.filter((p) => !(p.name ?? "").toLowerCase().includes("paquete +"));
+  const comboPlans = plans.filter((p) => (p.name ?? "").toLowerCase().includes("paquete +"));
 
   const validateCodeMutation = useMutation({
     mutationFn: () => api.post("/discount-codes/validate", { code: discountCode, planId: selectedPlan?.id }),
@@ -252,14 +260,15 @@ const Checkout = () => {
                   ))}
                 </div>
               ) : (
-                <div className="space-y-5">
-                  {sortedCategories.map((cat) => (
-                    <div key={cat}>
-                      <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#b5bf9c]/60">
-                        {categoryLabel(cat)}
+                <div className="space-y-6">
+                  {/* Basic plans */}
+                  {basicPlans.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#94867a]/70">
+                        Paquetes de clases
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {grouped[cat].map((plan) => (
+                        {basicPlans.map((plan) => (
                           <PlanCard
                             key={plan.id}
                             plan={plan}
@@ -269,7 +278,29 @@ const Checkout = () => {
                         ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Combo / complement plans */}
+                  {comboPlans.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#94867a]/70">
+                        Paquetes complementarios
+                      </p>
+                      <p className="text-[10px] text-[#94867a]/50 -mt-1 mb-2">
+                        Incluyen clases + servicio de bienestar
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {comboPlans.map((plan) => (
+                          <PlanCard
+                            key={plan.id}
+                            plan={plan}
+                            selected={selectedPlan?.id === plan.id}
+                            onSelect={() => setSelectedPlan(plan)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -278,7 +309,7 @@ const Checkout = () => {
                   {/* Discount code */}
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Tag size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#ebede5]/50" />
+                      <Tag size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94867a]/50" />
                       <Input
                         className="pl-8 bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d] placeholder:text-[#94867a]/40 uppercase"
                         placeholder="Código de descuento"
@@ -289,13 +320,13 @@ const Checkout = () => {
                     <button
                       onClick={() => validateCodeMutation.mutate()}
                       disabled={!discountCode || validateCodeMutation.isPending}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#ebede5]/30 text-[#ebede5] bg-[#ebede5]/5 hover:bg-[#ebede5]/10 transition-all disabled:opacity-40"
+                      className="px-4 py-2 rounded-xl text-xs font-semibold border border-[#94867a]/30 text-[#94867a] bg-[#94867a]/5 hover:bg-[#94867a]/10 transition-all disabled:opacity-40"
                     >
                       Aplicar
                     </button>
                   </div>
                   {discountResult && (
-                    <div className="flex items-center gap-2 text-xs text-[#4ade80]">
+                    <div className="flex items-center gap-2 text-xs text-emerald-600">
                       <Check size={12} />
                       Descuento aplicado: -${discountResult.discount_amount} MXN
                     </div>
@@ -341,7 +372,7 @@ const Checkout = () => {
                   className={cn(
                     "flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all",
                     paymentMethod === "transfer"
-                      ? "border-[#b5bf9c]/50 bg-[#b5bf9c]/10 shadow-[0_0_16px_rgba(202,113,225,0.15)]"
+                      ? "border-[#b5bf9c]/50 bg-[#b5bf9c]/10 shadow-[0_0_16px_rgba(181,191,156,0.15)]"
                       : "border-[#94867a]/15 bg-[#94867a]/[0.04] hover:border-[#94867a]/25"
                   )}
                 >
@@ -371,25 +402,25 @@ const Checkout = () => {
                   className={cn(
                     "flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all",
                     paymentMethod === "cash"
-                      ? "border-[#ebede5]/50 bg-[#ebede5]/10 shadow-[0_0_16px_rgba(231,235,110,0.12)]"
+                      ? "border-[#94867a]/50 bg-[#94867a]/10 shadow-[0_0_16px_rgba(148,134,122,0.15)]"
                       : "border-[#94867a]/15 bg-[#94867a]/[0.04] hover:border-[#94867a]/25"
                   )}
                 >
                   <div className={cn(
                     "w-12 h-12 rounded-xl flex items-center justify-center",
-                    paymentMethod === "cash" ? "bg-[#ebede5]/20 text-[#ebede5]" : "bg-[#94867a]/[0.06] text-[#2d2d2d]/40"
+                    paymentMethod === "cash" ? "bg-[#94867a]/20 text-[#94867a]" : "bg-[#94867a]/[0.06] text-[#2d2d2d]/40"
                   )}>
                     <Banknote size={22} />
                   </div>
                   <div className="text-center">
-                    <p className={cn("text-sm font-semibold", paymentMethod === "cash" ? "text-[#ebede5]" : "text-[#2d2d2d]/60")}>
+                    <p className={cn("text-sm font-semibold", paymentMethod === "cash" ? "text-[#94867a]" : "text-[#2d2d2d]/60")}>
                       Efectivo
                     </p>
                     <p className="text-[10px] text-[#2d2d2d]/30 mt-0.5">Pagar en estudio</p>
                   </div>
                   {paymentMethod === "cash" && (
-                    <span className="w-5 h-5 rounded-full bg-[#ebede5] flex items-center justify-center">
-                      <Check size={10} className="text-[#080808]" />
+                    <span className="w-5 h-5 rounded-full bg-gradient-to-br from-[#94867a] to-[#b5bf9c] flex items-center justify-center">
+                      <Check size={10} className="text-white" />
                     </span>
                   )}
                 </button>
@@ -447,11 +478,11 @@ const Checkout = () => {
           {/* ── Step 3b: Cash in studio ── */}
           {step === "cash" && (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-[#ebede5]/20 bg-[#ebede5]/5 p-6 text-center space-y-3">
-                <div className="w-14 h-14 rounded-2xl bg-[#ebede5]/15 flex items-center justify-center mx-auto">
-                  <Banknote size={26} className="text-[#ebede5]" />
+              <div className="rounded-2xl border border-[#94867a]/20 bg-[#94867a]/5 p-6 text-center space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-[#94867a]/15 flex items-center justify-center mx-auto">
+                  <Banknote size={26} className="text-[#94867a]" />
                 </div>
-                <p className="font-semibold text-[#ebede5]">Pago en el estudio</p>
+                <p className="font-semibold text-[#2d2d2d]">Pago en el estudio</p>
                 <p className="text-sm text-[#2d2d2d]/50">
                   Acércate a la recepción con el número de orden para completar tu pago en efectivo.
                 </p>
