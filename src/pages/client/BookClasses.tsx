@@ -22,9 +22,9 @@ const DAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 type ClassCat = "pilates" | "bienestar" | "all";
 
 const CAT_COLORS: Record<ClassCat, { bg: string; text: string; border: string; dot: string }> = {
-  pilates:   { bg: "bg-[#b5bf9c]/15", text: "text-[#b5bf9c]",  border: "border-[#b5bf9c]/40", dot: "bg-[#b5bf9c]"  },
-  bienestar: { bg: "bg-[#94867a]/15", text: "text-[#94867a]",  border: "border-[#94867a]/40", dot: "bg-[#94867a]"  },
-  all:       { bg: "bg-[#94867a]/[0.06]",      text: "text-[#2d2d2d]/60",   border: "border-[#94867a]/20",     dot: "bg-[#94867a]/20"   },
+  pilates:   { bg: "bg-[#b5bf9c]/15", text: "text-[#4a5638]",  border: "border-[#b5bf9c]/40", dot: "bg-[#6b7a52]"  },
+  bienestar: { bg: "bg-[#94867a]/15", text: "text-[#5a4f46]",  border: "border-[#94867a]/40", dot: "bg-[#7a6d62]"  },
+  all:       { bg: "bg-[#94867a]/[0.06]",      text: "text-[#2d2d2d]/70",   border: "border-[#94867a]/20",     dot: "bg-[#94867a]/40"   },
 };
 
 const CAT_LABELS: Record<ClassCat, string> = {
@@ -64,7 +64,7 @@ const MembershipBanner = ({ membership }: { membership: any }) => {
         {!isUnlimited && (
           <div className="text-right">
             <div className={cn("text-base font-bold leading-none", colors.text)}>{remaining}</div>
-            <div className="text-[10px] text-[#2d2d2d]/40">clases</div>
+            <div className="text-[10px] text-[#2d2d2d]/50">clases</div>
           </div>
         )}
         {isUnlimited && <span className={cn("text-xs font-bold", colors.text)}>∞ Ilimitado</span>}
@@ -73,7 +73,7 @@ const MembershipBanner = ({ membership }: { membership: any }) => {
             <div className="text-xs font-medium text-[#2d2d2d]/70">
               {new Date(endDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
             </div>
-            <div className="text-[10px] text-[#2d2d2d]/40">vencimiento</div>
+            <div className="text-[10px] text-[#2d2d2d]/50">vencimiento</div>
           </div>
         )}
       </div>
@@ -157,11 +157,11 @@ const BookClasses = () => {
           {hasActive ? (
             <MembershipBanner membership={membership} />
           ) : (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-amber-500/30 bg-amber-500/8 text-sm">
-              <AlertCircle size={15} className="text-amber-400 shrink-0" />
-              <span className="text-amber-300/90">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-amber-600/30 bg-amber-50 text-sm">
+              <AlertCircle size={15} className="text-amber-600 shrink-0" />
+              <span className="text-amber-800">
                 No tienes membresía activa.{" "}
-                <a href="/app/checkout" className="underline font-semibold">Adquiere un plan</a> para reservar.
+                <a href="/app/checkout" className="underline font-semibold text-amber-900">Adquiere un plan</a> para reservar.
               </span>
             </div>
           )}
@@ -170,7 +170,7 @@ const BookClasses = () => {
           {membershipCat && membershipCat !== "all" && (
             <div className="flex items-center gap-1.5 text-xs px-1">
               <CheckCircle2 size={11} className={CAT_COLORS[membershipCat].text} />
-              <span className="text-[#2d2d2d]/40">
+              <span className="text-[#2d2d2d]/55">
                 Tu membresía <span className={cn("font-semibold", CAT_COLORS[membershipCat].text)}>{CAT_LABELS[membershipCat]}</span> solo permite reservar clases de esa categoría.
               </span>
             </div>
@@ -203,10 +203,10 @@ const BookClasses = () => {
                             onClick={() => navigate(`/app/classes/${cls.id}`)}
                             className={cn(
                               "w-full text-left rounded-lg border p-1.5 text-xs transition-all relative",
-                              isBooked  && "border-green-500/40 bg-green-500/10",
+                              isBooked  && "border-green-600/40 bg-green-50",
                               !isBooked && !disabled && cn(c.border, "hover:opacity-90 cursor-pointer", c.bg),
-                              !isBooked && isPast  && "opacity-30 cursor-not-allowed border-[#94867a]/12 bg-transparent",
-                              !isBooked && locked  && "opacity-25 cursor-not-allowed border-[#94867a]/10 bg-transparent",
+                              !isBooked && isPast  && "opacity-40 cursor-not-allowed border-[#94867a]/12 bg-transparent",
+                              !isBooked && locked  && "opacity-30 cursor-not-allowed border-[#94867a]/10 bg-transparent",
                             )}
                           >
                             <div className="flex items-center gap-1 mb-0.5">
@@ -215,17 +215,17 @@ const BookClasses = () => {
                                 {cls.class_type_name}
                               </p>
                             </div>
-                            <p className="text-[#2d2d2d]/40 text-[10px]">
+                            <p className="text-[#2d2d2d]/55 text-[10px]">
                               {cls.start_time ? format(safeParse(cls.start_time), "HH:mm") : "—"}
                             </p>
                             {isBooked && (
                               <span className="absolute top-1 right-1">
-                                <CheckCircle2 size={10} className="text-green-400" />
+                                <CheckCircle2 size={10} className="text-green-600" />
                               </span>
                             )}
                             {locked && (
                               <span className="absolute top-1 right-1">
-                                <Lock size={8} className="text-[#2d2d2d]/20" />
+                                <Lock size={8} className="text-[#2d2d2d]/30" />
                               </span>
                             )}
                           </button>
@@ -246,10 +246,10 @@ const BookClasses = () => {
                 {CAT_LABELS[cat]}
               </div>
             ))}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#94867a]/15 bg-[#94867a]/[0.06] text-[11px] font-medium text-[#2d2d2d]/30">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#94867a]/15 bg-[#94867a]/[0.06] text-[11px] font-medium text-[#2d2d2d]/50">
               <Lock size={9} /> Requiere otra membresía
             </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-green-500/30 bg-green-500/8 text-[11px] font-medium text-green-400">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-green-600/30 bg-green-50 text-[11px] font-medium text-green-700">
               <CheckCircle2 size={9} /> Reservada
             </div>
           </div>
