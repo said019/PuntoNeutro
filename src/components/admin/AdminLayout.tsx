@@ -6,7 +6,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
-  BookOpen, DollarSign, BarChart3, Clock,
+  BookOpen, DollarSign, BarChart3, Clock, ClipboardList,
   Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, X,
 } from "lucide-react";
 
@@ -29,6 +29,7 @@ const NAV_GROUPS = [
     items: [
       { path: "/admin/plans", label: "Planes", icon: Package },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
+      { path: "/admin/consultations", label: "Consultas", icon: ClipboardList },
       { path: "/admin/classes", label: "Clases", icon: CalendarDays },
       { path: "/admin/schedules", label: "Horarios", icon: Clock },
       { path: "/admin/reports", label: "Reportes", icon: BarChart3 },

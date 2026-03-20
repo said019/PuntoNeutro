@@ -183,6 +183,8 @@ const Checkout = () => {
 
   const [step, setStep] = useState<Step>("select");
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const [selectedComplement, setSelectedComplement] = useState<any>(null);
+  const [comboMode, setComboMode] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer");
   const [discountCode, setDiscountCode] = useState("");
   const [discountResult, setDiscountResult] = useState<any>(null);
@@ -194,14 +196,38 @@ const Checkout = () => {
     queryKey: ["plans"],
     queryFn: async () => (await api.get("/plans")).data,
   });
+  const { data: complementsData } = useQuery({
+    queryKey: ["complements"],
+    queryFn: async () => (await api.get("/complements")).data,
+  });
+  const { data: comboPricingData } = useQuery({
+    queryKey: ["combo-pricing"],
+    queryFn: async () => (await api.get("/combo-pricing")).data,
+  });
+
+  const complements: any[] = Array.isArray(complementsData?.data) ? complementsData.data : [];
+  const comboPricing: any[] = Array.isArray(comboPricingData?.data) ? comboPricingData.data : [];
+
   const rawPlans: any[] = Array.isArray(plansData?.data) ? plansData.data : Array.isArray(plansData) ? plansData : [];
   const plans = rawPlans
     .filter((p) => (p.isActive ?? p.is_active) !== false)
     .sort((a, b) => (a.sortOrder ?? a.sort_order ?? 99) - (b.sortOrder ?? b.sort_order ?? 99));
 
-  // Group: basic plans vs combo plans ("Paquete + ...")
+  // Only basic plans (no old "Paquete +" entries)
   const basicPlans = plans.filter((p) => !(p.name ?? "").toLowerCase().includes("paquete +"));
-  const comboPlans = plans.filter((p) => (p.name ?? "").toLowerCase().includes("paquete +"));
+
+  // Plans eligible for combo (8, 12, 16 classes)
+  const comboEligibleCounts = comboPricing.map((cp: any) => cp.classCount ?? cp.class_count);
+  const isComboEligible = (plan: any) => {
+    const cl = plan.classLimit ?? plan.class_limit;
+    return cl && comboEligibleCounts.includes(cl);
+  };
+
+  // Get combo price for current selection
+  const getComboPrice = (plan: any) => {
+    const cl = plan?.classLimit ?? plan?.class_limit;
+    return comboPricing.find((cp: any) => (cp.classCount ?? cp.class_count) === cl);
+  };
 
   const validateCodeMutation = useMutation({
     mutationFn: () => api.post("/discount-codes/validate", { code: discountCode, planId: selectedPlan?.id }),
@@ -215,6 +241,7 @@ const Checkout = () => {
         planId: selectedPlan.id,
         discountCode: discountResult?.code,
         paymentMethod,
+        complementId: selectedComplement?.id ?? null,
       }),
     onSuccess: (res) => {
       const data = res.data?.data ?? res.data;
@@ -238,9 +265,13 @@ const Checkout = () => {
       toast({ title: "Error al subir comprobante", description: err.response?.data?.message, variant: "destructive" }),
   });
 
+  // Compute display price: combo pricing if complement selected, else plan price
+  const comboTier = selectedComplement ? getComboPrice(selectedPlan) : null;
+  const basePrice = comboTier ? parseFloat(comboTier.price ?? comboTier.price) : (selectedPlan?.price ?? 0);
+  const comboDiscountPrice = comboTier ? parseFloat(comboTier.discountPrice ?? comboTier.discount_price ?? comboTier.price) : null;
   const finalAmount = discountResult
-    ? (selectedPlan?.price ?? 0) - (discountResult.discount_amount ?? 0)
-    : selectedPlan?.price ?? 0;
+    ? basePrice - (discountResult.discount_amount ?? 0)
+    : basePrice;
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
@@ -272,40 +303,123 @@ const Checkout = () => {
                           <PlanCard
                             key={plan.id}
                             plan={plan}
-                            selected={selectedPlan?.id === plan.id}
-                            onSelect={() => setSelectedPlan(plan)}
+                            selected={selectedPlan?.id === plan.id && !comboMode}
+                            onSelect={() => { setSelectedPlan(plan); setComboMode(false); setSelectedComplement(null); }}
                           />
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Combo / complement plans */}
-                  {comboPlans.length > 0 && (
+                  {/* ── Paquetes Completos (combo: plan + complemento) ── */}
+                  {complements.length > 0 && comboPricing.length > 0 && (
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#94867a]/70">
-                        Paquetes complementarios
+                        Paquetes completos
                       </p>
                       <p className="text-[10px] text-[#94867a]/50 -mt-1 mb-2">
-                        Incluyen clases + servicio de bienestar
+                        Elige un paquete de clases + un complemento de bienestar
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {comboPlans.map((plan) => (
-                          <PlanCard
-                            key={plan.id}
-                            plan={plan}
-                            selected={selectedPlan?.id === plan.id}
-                            onSelect={() => setSelectedPlan(plan)}
-                          />
-                        ))}
+
+                      {/* Combo tier cards (8, 12, 16 classes) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                        {comboPricing.map((tier: any) => {
+                          const cc = tier.classCount ?? tier.class_count;
+                          const price = parseFloat(tier.price);
+                          const dp = tier.discountPrice ?? tier.discount_price;
+                          const discountP = dp ? parseFloat(dp) : null;
+                          const isSelected = comboMode && (selectedPlan?.classLimit ?? selectedPlan?.class_limit) === cc;
+                          return (
+                            <button
+                              key={cc}
+                              type="button"
+                              onClick={() => {
+                                // Find a basic plan matching this class count
+                                const match = basicPlans.find((p: any) => (p.classLimit ?? p.class_limit) === cc);
+                                if (match) {
+                                  setSelectedPlan(match);
+                                  setComboMode(true);
+                                  // Keep complement if already selected, otherwise clear
+                                }
+                              }}
+                              className={cn(
+                                "relative text-left rounded-2xl border p-4 transition-all duration-200",
+                                isSelected
+                                  ? "border-[#b5bf9c]/60 bg-gradient-to-br from-[#b5bf9c]/15 to-[#94867a]/5 shadow-[0_0_20px_rgba(181,191,156,0.2)]"
+                                  : "border-[#94867a]/15 bg-[#94867a]/[0.04] hover:border-[#94867a]/25"
+                              )}
+                            >
+                              {isSelected && (
+                                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-gradient-to-br from-[#b5bf9c] to-[#94867a] flex items-center justify-center">
+                                  <Check size={10} className="text-white" />
+                                </span>
+                              )}
+                              <p className="text-[0.68rem] tracking-[0.12em] uppercase text-[#b5bf9c] font-medium mb-1">Paquete completo</p>
+                              <p className="font-bold text-[#2d2d2d] text-sm">{cc} Clases + Complemento</p>
+                              <p className="font-bold text-[#2d2d2d] text-lg mt-1">${price.toLocaleString("es-MX")} <span className="text-xs font-normal text-[#2d2d2d]/40">MXN</span></p>
+                              {discountP && discountP < price && (
+                                <p className="text-[0.72rem] text-[#b5bf9c] mt-0.5">Efectivo/transf: <strong>${discountP.toLocaleString("es-MX")}</strong></p>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
+
+                      {/* Complement selector (shown when combo mode active) */}
+                      {comboMode && selectedPlan && (
+                        <div className="rounded-2xl border border-[#b5bf9c]/20 bg-[#b5bf9c]/[0.04] p-3 space-y-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#b5bf9c]/70">
+                            Elige tu complemento
+                          </p>
+                          <div className="grid grid-cols-1 gap-2">
+                            {complements.map((comp: any) => {
+                              const isSel = selectedComplement?.id === comp.id;
+                              return (
+                                <button
+                                  key={comp.id}
+                                  type="button"
+                                  onClick={() => setSelectedComplement(comp)}
+                                  className={cn(
+                                    "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
+                                    isSel
+                                      ? "border-[#b5bf9c]/50 bg-[#b5bf9c]/10"
+                                      : "border-[#94867a]/10 bg-white/50 hover:border-[#94867a]/20"
+                                  )}
+                                >
+                                  {isSel && (
+                                    <span className="w-5 h-5 rounded-full bg-gradient-to-br from-[#b5bf9c] to-[#94867a] flex items-center justify-center shrink-0">
+                                      <Check size={10} className="text-white" />
+                                    </span>
+                                  )}
+                                  {!isSel && <span className="w-5 h-5 rounded-full border border-[#94867a]/20 shrink-0" />}
+                                  <div>
+                                    <p className="text-sm font-semibold text-[#2d2d2d]">{comp.name}</p>
+                                    <p className="text-xs text-[#94867a]/60">{comp.specialist}</p>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {selectedPlan && (
+              {selectedPlan && (!comboMode || selectedComplement) && (
                 <div className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-4 space-y-4">
+                  {/* Summary */}
+                  <div className="text-xs text-[#2d2d2d]/60 space-y-1">
+                    <p><strong className="text-[#2d2d2d]/80">{selectedPlan.name}</strong></p>
+                    {selectedComplement && (
+                      <p className="text-[#b5bf9c]">+ {selectedComplement.name} ({selectedComplement.specialist})</p>
+                    )}
+                    {comboDiscountPrice && comboDiscountPrice < basePrice && (
+                      <p className="text-[#b5bf9c] text-[0.72rem]">Paga con efectivo/transferencia y obtén precio de ${comboDiscountPrice.toLocaleString("es-MX")}</p>
+                    )}
+                  </div>
+
                   {/* Discount code */}
                   <div className="flex gap-2">
                     <div className="relative flex-1">
@@ -357,9 +471,14 @@ const Checkout = () => {
               </button>
 
               {/* Selected plan summary */}
-              <div className="rounded-2xl border border-[#94867a]/20 bg-[#94867a]/5 px-4 py-3 flex justify-between items-center">
-                <span className="text-sm text-[#2d2d2d]/70">{selectedPlan?.name}</span>
-                <span className="text-lg font-bold text-[#2d2d2d]">${finalAmount.toLocaleString("es-MX")} MXN</span>
+              <div className="rounded-2xl border border-[#94867a]/20 bg-[#94867a]/5 px-4 py-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-[#2d2d2d]/70">{selectedPlan?.name}</span>
+                  <span className="text-lg font-bold text-[#2d2d2d]">${finalAmount.toLocaleString("es-MX")} MXN</span>
+                </div>
+                {selectedComplement && (
+                  <p className="text-xs text-[#b5bf9c] mt-1">+ {selectedComplement.name} ({selectedComplement.specialist})</p>
+                )}
               </div>
 
               <p className="text-sm font-semibold text-[#2d2d2d]/80">¿Cómo quieres pagar?</p>

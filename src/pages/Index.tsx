@@ -189,7 +189,7 @@ const Index = () => {
           : "bg-gradient-to-b from-background/95 to-transparent"
           }`}
       >
-        <a href="#" className="flex items-center">
+        <a href="#" className="flex items-center" aria-label="Punto Neutro - Inicio">
           <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-20 sm:h-24 lg:h-32 w-auto object-contain" />
         </a>
         <ul className="hidden lg:flex gap-8 list-none">
@@ -459,7 +459,7 @@ const Index = () => {
           <div className="rounded-3xl border border-[#b5bf9c]/40 bg-background mb-8 p-5 sm:p-7">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 mb-5">
               <div>
-                <p className="text-[0.68rem] tracking-[0.15em] uppercase text-primary font-medium">Clase muestra</p>
+                <p className="text-[0.68rem] tracking-[0.15em] uppercase text-[#6b7a4e] font-medium">Clase muestra</p>
                 <h3 className="font-syne font-bold text-[1.4rem] text-foreground mt-1">Conoce nuestro estudio</h3>
               </div>
               <p className="text-[0.8rem] text-muted-foreground lg:text-right max-w-md">
@@ -472,7 +472,7 @@ const Index = () => {
                   <img src={imgPilates} alt="" className="h-8 w-8 object-contain" />
                 </div>
                 <div>
-                  <p className="text-[0.7rem] tracking-[0.15em] uppercase text-[#94867a]">Punto Neutro</p>
+                  <p className="text-[0.7rem] tracking-[0.15em] uppercase text-[#7a6f65]">Punto Neutro</p>
                   <h4 className="font-syne font-bold text-[1rem] text-foreground">Clase muestra</h4>
                 </div>
               </div>
@@ -508,30 +508,30 @@ const Index = () => {
                         : "bg-background border border-border hover:border-[#b5bf9c]/50"
                   )}>
                   {isPopular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#b5bf9c] text-white text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium whitespace-nowrap">Más popular</div>
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#b5bf9c] text-[#2d2d2d] text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium whitespace-nowrap">Más popular</div>
                   )}
                   {isBest && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#ebede5] text-[#94867a] text-[0.6rem] tracking-[0.15em] uppercase px-3 py-1 rounded-full font-medium whitespace-nowrap">Mejor valor</div>
                   )}
-                  <div className={"text-[0.7rem] tracking-[0.15em] uppercase font-medium " + (isBest ? "text-[#ebede5]/70" : "text-muted-foreground")}>
-                    {p.validity_days ?? 30} días de vigencia
+                  <div className={"text-[0.7rem] tracking-[0.15em] uppercase font-medium " + (isBest ? "text-[#ebede5]" : "text-muted-foreground")}>
+                    {p.validity_days ?? 30} dias de vigencia
                   </div>
-                  <div className={"font-bebas text-[0.95rem] tracking-wide " + (isBest ? "text-[#ebede5]" : "text-foreground")}>
+                  <div className={"font-bebas text-[0.95rem] tracking-wide " + (isBest ? "text-white" : "text-foreground")}>
                     {p.num_classes === "1" ? "CLASE SUELTA" : p.num_classes + " CLASES"}
                   </div>
                   <div className="flex items-baseline gap-1">
-                    <span className={"font-bebas text-[3.5rem] leading-none " + (isBest ? "text-[#ebede5]" : "text-primary")}>
+                    <span className={"font-bebas text-[3.5rem] leading-none " + (isBest ? "text-white" : "text-primary")}>
                       ${Number(p.price).toLocaleString()}
                     </span>
-                    <span className={"text-[0.75rem] " + (isBest ? "text-[#ebede5]/60" : "text-muted-foreground")}>MXN</span>
+                    <span className={"text-[0.75rem] " + (isBest ? "text-[#ebede5]" : "text-muted-foreground")}>MXN</span>
                   </div>
                   {p.discount_price && (
-                    <div className={"text-[0.78rem] " + (isBest ? "text-[#ebede5]/80" : "text-[#b5bf9c]")}>
-                      💰 Efectivo/transferencia: <strong>${p.discount_price.toLocaleString()}</strong>
+                    <div className={"text-[0.78rem] " + (isBest ? "text-[#d4dbc4]" : "text-[#6b7a4e]")}>
+                      Efectivo/transferencia: <strong>${p.discount_price.toLocaleString()}</strong>
                     </div>
                   )}
                   {Number(p.num_classes) > 1 && (
-                    <div className={"text-[0.78rem] " + (isBest ? "text-[#ebede5]/70" : "text-muted-foreground")}>
+                    <div className={"text-[0.78rem] " + (isBest ? "text-[#ebede5]" : "text-muted-foreground")}>
                       ${(Number(p.price) / Number(p.num_classes)).toFixed(0)}/clase
                     </div>
                   )}
@@ -550,44 +550,63 @@ const Index = () => {
             })}
           </div>
 
-          {/* Complementos */}
+          {/* Paquetes Completos */}
           <h3 className="font-syne font-bold text-[1.2rem] text-foreground mb-2">Paquetes completos</h3>
-          <p className="text-[0.85rem] text-muted-foreground mb-6">Elige un paquete básico + agrega un complemento:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {COMPLEMENTOS.map((comp) => (
-              <div key={comp.id} className="rounded-3xl p-7 bg-background border border-border hover:border-[#b5bf9c]/50 hover:-translate-y-1 transition-all flex flex-col gap-3">
-                <div className="text-[0.68rem] tracking-[0.15em] uppercase text-[#b5bf9c] font-medium">Complemento</div>
-                <h4 className="font-syne font-bold text-[1rem] text-foreground leading-tight">{comp.name}</h4>
-                <p className="text-[0.8rem] text-muted-foreground">{comp.specialist}</p>
-                <div className="flex items-baseline gap-2 mt-2">
-                  <span className="font-bebas text-[2.5rem] leading-none text-primary">${comp.price.toLocaleString()}</span>
+          <p className="text-[0.85rem] text-muted-foreground mb-6">
+            Elige un paquete básico + agrega un complemento. El precio incluye tus clases + 1 sesión con especialista.
+          </p>
+
+          {/* Pricing tiers */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+            {[
+              { classes: 8, price: 1030, discount: 990 },
+              { classes: 12, price: 1250, discount: 1190 },
+              { classes: 16, price: 1450, discount: 1340 },
+            ].map((tier) => (
+              <div key={tier.classes} className="rounded-3xl p-7 bg-background border border-[#b5bf9c]/30 hover:border-[#b5bf9c]/60 hover:-translate-y-1 transition-all flex flex-col gap-3">
+                <div className="text-[0.68rem] tracking-[0.15em] uppercase text-[#6b7a4e] font-medium">Paquete completo</div>
+                <h4 className="font-syne font-bold text-[1.1rem] text-foreground">{tier.classes} Clases + Complemento</h4>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="font-bebas text-[3rem] leading-none text-primary">${tier.price.toLocaleString()}</span>
                   <span className="text-[0.75rem] text-muted-foreground">MXN</span>
                 </div>
-                {comp.discount_price && (
-                  <p className="text-[0.78rem] text-[#b5bf9c]">
-                    💰 Efectivo/transferencia: <strong>${comp.discount_price.toLocaleString()}</strong>
-                  </p>
-                )}
+                <p className="text-[0.78rem] text-[#6b7a4e]">
+                  Efectivo/transferencia: <strong>${tier.discount.toLocaleString()}</strong>
+                </p>
                 <button onClick={() => navigate(membershipCtaPath)}
                   className="mt-auto w-full py-3 rounded-full text-[0.76rem] font-medium tracking-wider uppercase border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all">
-                  Agregar complemento
+                  Elegir paquete
                 </button>
               </div>
             ))}
           </div>
 
+          {/* Complementos disponibles */}
+          <p className="text-[0.78rem] font-semibold text-foreground mb-3">Agrega un complemento:</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {COMPLEMENTOS.map((comp) => (
+              <div key={comp.id} className="rounded-2xl p-5 bg-background border border-border flex flex-col gap-2">
+                <h4 className="font-syne font-bold text-[0.9rem] text-foreground leading-tight">{comp.name}</h4>
+                <p className="text-[0.78rem] text-muted-foreground">{comp.specialist}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[0.72rem] text-muted-foreground mt-3">
+            *El costo con descuento aplica pagando con efectivo o transferencia. El precio es el mismo sin importar que complemento elijas.
+          </p>
+
           <div className="mt-8 rounded-2xl border border-border bg-background/50 p-5 text-center">
             <p className="text-[0.82rem] text-muted-foreground leading-relaxed">
-              <strong className="text-foreground">Métodos de pago:</strong> Efectivo, transferencia o depósito.<br />
+              <strong className="text-foreground">Metodos de pago:</strong> Efectivo, transferencia o deposito.<br />
               <strong className="text-foreground">BBVA</strong> · Beneficiario: Angelina Salas Huante · Tarjeta: 4152 3139 4571 6699 · Cuenta: 151 128 2689 · CLABE: 012 680 01511282689 2
             </p>
-            <p className="text-xs text-muted-foreground/60 mt-3">
-              *El costo con descuento únicamente es si el pago es en efectivo o con transferencia.
+            <p className="text-xs text-muted-foreground mt-3">
+              *El costo con descuento unicamente es si el pago es en efectivo o con transferencia.
             </p>
           </div>
 
           <p className="text-xs text-muted-foreground mt-6 text-center">
-            Vigencia desde la primera clase · Aplican términos y condiciones · Precios en MXN
+            Vigencia desde la primera clase · Aplican terminos y condiciones · Precios en MXN
           </p>
         </div>
       </section>
@@ -691,7 +710,7 @@ const Index = () => {
               { num: "08", title: "Descuentos", text: "El costo con descuento aplica únicamente si el pago es en efectivo o con transferencia bancaria." },
             ].map((p) => (
               <div key={p.num} className="rounded-2xl border border-border bg-secondary p-5 hover:border-[#b5bf9c]/40 transition-all">
-                <div className="font-bebas text-[2.5rem] text-foreground/[0.07] leading-none -mb-1">{p.num}</div>
+                <div className="font-bebas text-[2.5rem] text-foreground/[0.12] leading-none -mb-1">{p.num}</div>
                 <h4 className="font-syne font-bold text-[0.92rem] text-foreground mb-2">{p.title}</h4>
                 <p className="text-[0.8rem] text-muted-foreground leading-[1.65]">{p.text}</p>
               </div>
@@ -720,8 +739,9 @@ const Index = () => {
                 <span className="w-[22px] h-[22px] bg-primary-foreground/20 rounded-full flex items-center justify-center text-[0.7rem]">↗</span>
               </button>
               <a href="https://wa.me/524421234567?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Punto%20Neutro%20Studio"
-                target="_blank" rel="noopener noreferrer"
-                className="border border-border text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-3 px-8 py-[18px] rounded-full opacity-70 hover:opacity-100 hover:border-primary transition-all no-underline">
+                target="_blank" rel="noopener noreferrer" aria-label="Contactar por WhatsApp"
+                className="border border-border text-foreground text-[0.85rem] font-normal tracking-wider uppercase flex items-center gap-3 px-8 py-[18px] rounded-full hover:border-primary hover:text-primary transition-all no-underline">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" /><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 0 1-4.243-1.214l-.257-.154-2.88.856.856-2.88-.154-.257A8 8 0 1 1 12 20z" /></svg>
                 WhatsApp
               </a>
             </div>
@@ -751,21 +771,29 @@ const Index = () => {
                   ))}
                 </div>
               </div>
-              <div className="relative z-10 flex gap-3 pt-6 border-t border-[#b5bf9c]/15">
-                {[
-                  { label: "Instagram", href: "https://www.instagram.com/punto_neutro/", short: "ig" },
-                  { label: "Facebook", href: "https://www.facebook.com/puntoneutromx/", short: "fb" },
-                ].map((s) => (
-                  <a key={s.short} href={s.href} target="_blank" rel="noopener noreferrer"
-                    className="w-10 h-10 rounded-full border border-[#ebede5]/30 flex items-center justify-center text-[0.8rem] text-[#ebede5]/70 hover:bg-[#ebede5]/15 hover:text-[#ebede5] transition-all no-underline">{s.short}</a>
-                ))}
+              <div className="relative z-10 flex flex-col gap-4 pt-6 border-t border-[#b5bf9c]/15">
+                <a href="https://maps.app.goo.gl/K3eSrZuj474z4kSS6" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#ebede5] text-[#5a524a] text-[0.82rem] font-semibold tracking-wider uppercase hover:bg-[#ebede5]/90 transition-all no-underline w-fit">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" /><circle cx="12" cy="9" r="2.5" /></svg>
+                  Cómo llegar
+                </a>
+                <div className="flex gap-3">
+                  <a href="https://www.instagram.com/punto_neutro/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"
+                    className="w-10 h-10 rounded-full border border-[#ebede5]/30 flex items-center justify-center text-[#ebede5]/70 hover:bg-[#ebede5]/15 hover:text-[#ebede5] transition-all no-underline">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" x2="17.51" y1="6.5" y2="6.5" /></svg>
+                  </a>
+                  <a href="https://www.facebook.com/puntoneutromx/" target="_blank" rel="noopener noreferrer" aria-label="Facebook"
+                    className="w-10 h-10 rounded-full border border-[#ebede5]/30 flex items-center justify-center text-[#ebede5]/70 hover:bg-[#ebede5]/15 hover:text-[#ebede5] transition-all no-underline">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
+                  </a>
+                </div>
               </div>
             </div>
             <div className="rounded-3xl overflow-hidden border border-border min-h-[480px] lg:min-h-0">
               <iframe
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3739.577714731379!2d-99.99482528857814!3d20.40029408101758!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d30d002e88643b%3A0xb7eed5074cefa672!2sPunto%20Neutro%20Studio!5e0!3m2!1ses-419!2smx!4v1772066339529!5m2!1ses-419!2smx"
-                width="100%" height="100%" style={{ border: 0, display: "block", minHeight: "480px" }}
-                allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="Punto Neutro ubicación" />
+                width="100%" height="480" style={{ border: 0, display: "block", minHeight: "480px" }}
+                allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="Ubicacion de Punto Neutro Studio en Google Maps" />
             </div>
           </div>
         </div>
@@ -780,8 +808,12 @@ const Index = () => {
               Aquí se vive la disciplina, el cuidado del cuerpo y la celebración de cada logro.
             </p>
             <div className="flex gap-3 mt-6">
-              <a href="https://www.instagram.com/punto_neutro/" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">ig</a>
-              <a href="https://www.facebook.com/puntoneutromx/" target="_blank" rel="noopener noreferrer" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground text-[0.85rem] hover:border-primary hover:text-primary transition-colors no-underline">fb</a>
+              <a href="https://www.instagram.com/punto_neutro/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors no-underline">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" x2="17.51" y1="6.5" y2="6.5" /></svg>
+              </a>
+              <a href="https://www.facebook.com/puntoneutromx/" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="w-[38px] h-[38px] rounded-full border border-border flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors no-underline">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
+              </a>
             </div>
           </div>
           <div>

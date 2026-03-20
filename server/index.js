@@ -2191,6 +2191,34 @@ app.get("/api/plans", async (req, res) => {
   }
 });
 
+// ─── Routes: /api/complements & combo-pricing ──────────────────────────────
+
+// GET /api/complements — public, returns active complements
+app.get("/api/complements", async (req, res) => {
+  try {
+    const r = await pool.query(
+      "SELECT * FROM complements WHERE is_active = true ORDER BY sort_order ASC"
+    );
+    return res.json({ data: camelRows(r.rows) });
+  } catch (err) {
+    console.error("Complements error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/combo-pricing — public, returns combo price tiers
+app.get("/api/combo-pricing", async (req, res) => {
+  try {
+    const r = await pool.query(
+      "SELECT * FROM combo_pricing WHERE is_active = true ORDER BY class_count ASC"
+    );
+    return res.json({ data: camelRows(r.rows) });
+  } catch (err) {
+    console.error("Combo pricing error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
 // ─── Routes: /api/memberships ───────────────────────────────────────────────
 
 // GET /api/memberships/my
@@ -2861,7 +2889,7 @@ app.get("/api/orders/:id", authMiddleware, async (req, res) => {
 
 // POST /api/orders
 app.post("/api/orders", authMiddleware, async (req, res) => {
-  const { planId, discountCode, paymentMethod = "transfer" } = req.body;
+  const { planId, discountCode, paymentMethod = "transfer", complementId } = req.body;
   if (!planId) return res.status(400).json({ message: "planId requerido" });
   const client = await pool.connect();
   try {
@@ -2879,7 +2907,37 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
 
-    const subtotal = parseFloat(plan.price);
+    // ── Combo pricing: if complementId is provided, use combo price ──
+    let subtotal = parseFloat(plan.price);
+    let validComplementId = null;
+
+    if (complementId) {
+      // Validate complement exists
+      const compRes = await client.query("SELECT * FROM complements WHERE id = $1 AND is_active = true", [complementId]);
+      if (compRes.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Complemento no encontrado" });
+      }
+      // Look up combo pricing by plan's class_limit
+      const classCount = plan.class_limit;
+      const comboRes = await client.query(
+        "SELECT * FROM combo_pricing WHERE class_count = $1 AND is_active = true",
+        [classCount]
+      );
+      if (comboRes.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ message: "No hay precio combo disponible para este plan" });
+      }
+      const combo = comboRes.rows[0];
+      // Use discount_price for cash/transfer, normal price otherwise
+      if ((paymentMethod === "cash" || paymentMethod === "transfer") && combo.discount_price) {
+        subtotal = parseFloat(combo.discount_price);
+      } else {
+        subtotal = parseFloat(combo.price);
+      }
+      validComplementId = complementId;
+    }
+
     let discount = 0;
     let appliedDiscountCode = null;
 
@@ -2910,8 +2968,8 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     const bankInfo = await getConfiguredBankInfo(client);
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
     const orderRes = await client.query(
-      `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount, discount_code_id, bank_info, expires_at)
-       VALUES ($1, $2, 'pending_payment', $3, $4, 0, $5, $6, $7, $8, $9)
+      `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount, discount_code_id, bank_info, expires_at, complement_id)
+       VALUES ($1, $2, 'pending_payment', $3, $4, 0, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         req.userId,
@@ -2923,6 +2981,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
         appliedDiscountCode?.id ?? null,
         JSON.stringify(bankInfo),
         expires,
+        validComplementId,
       ]
     );
 
@@ -8525,11 +8584,13 @@ app.get("/api/admin/orders", adminMiddleware, async (req, res) => {
   try {
     const { status, limit = 100 } = req.query;
     let q = `SELECT o.*, u.display_name AS user_name, p.name AS plan_name,
-                    pp.file_url AS proof_url, pp.status AS proof_status, pp.uploaded_at AS proof_uploaded_at
+                    pp.file_url AS proof_url, pp.status AS proof_status, pp.uploaded_at AS proof_uploaded_at,
+                    comp.name AS complement_name, comp.specialist AS complement_specialist
              FROM orders o
              LEFT JOIN users u ON o.user_id = u.id
              LEFT JOIN plans p ON o.plan_id = p.id
              LEFT JOIN payment_proofs pp ON pp.order_id = o.id
+             LEFT JOIN complements comp ON o.complement_id = comp.id
              WHERE 1=1`;
     const params = [];
     if (status) { params.push(status); q += ` AND o.status = $${params.length}`; }
@@ -8546,6 +8607,9 @@ app.get("/api/admin/orders", adminMiddleware, async (req, res) => {
         proofUploadedAt: o.proof_uploaded_at,
         totalAmount: o.total_amount,
         createdAt: o.created_at,
+        complementId: o.complement_id,
+        complementName: o.complement_name,
+        complementSpecialist: o.complement_specialist,
       })),
     });
   } catch (err) {
@@ -8602,6 +8666,16 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
            VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)
            ON CONFLICT (order_id) DO UPDATE SET status='active'`,
           [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
+        );
+      }
+
+      // ── Create consultation record if order has a complement ──
+      if (order.complement_id) {
+        await client.query(
+          `INSERT INTO consultations (order_id, user_id, complement_id, status)
+           VALUES ($1, $2, $3, 'pending')
+           ON CONFLICT DO NOTHING`,
+          [order.id, order.user_id, order.complement_id]
         );
       }
 
@@ -8679,6 +8753,98 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
     return res.status(status).json({ message: err?.message || "Error interno" });
   } finally {
     client.release();
+  }
+});
+
+// ─── Routes: /api/admin/consultations ────────────────────────────────────────
+
+// GET /api/admin/consultations — list consultations with filters
+app.get("/api/admin/consultations", adminMiddleware, async (req, res) => {
+  try {
+    const { status, complementId } = req.query;
+    let where = "WHERE 1=1";
+    const params = [];
+    if (status) {
+      params.push(status);
+      where += ` AND c.status = $${params.length}`;
+    }
+    if (complementId) {
+      params.push(complementId);
+      where += ` AND c.complement_id = $${params.length}`;
+    }
+    const r = await pool.query(
+      `SELECT c.*, u.display_name AS client_name, u.email AS client_email, u.phone AS client_phone,
+              comp.name AS complement_name, comp.specialist, comp.instagram,
+              o.order_number, o.total_amount, o.payment_method AS order_payment_method
+       FROM consultations c
+       JOIN users u ON c.user_id = u.id
+       JOIN complements comp ON c.complement_id = comp.id
+       LEFT JOIN orders o ON c.order_id = o.id
+       ${where}
+       ORDER BY c.created_at DESC`,
+      params
+    );
+    return res.json({ data: camelRows(r.rows) });
+  } catch (err) {
+    console.error("GET admin/consultations error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/consultations/:id — update consultation status/date/notes
+app.put("/api/admin/consultations/:id", adminMiddleware, async (req, res) => {
+  try {
+    const { status, scheduledDate, notes } = req.body;
+    const sets = [];
+    const params = [];
+
+    if (status) {
+      params.push(status);
+      sets.push(`status = $${params.length}`);
+      if (status === "completed") {
+        sets.push("completed_at = NOW()");
+      }
+    }
+    if (scheduledDate !== undefined) {
+      params.push(scheduledDate);
+      sets.push(`scheduled_date = $${params.length}`);
+    }
+    if (notes !== undefined) {
+      params.push(notes);
+      sets.push(`notes = $${params.length}`);
+    }
+
+    if (sets.length === 0) {
+      return res.status(400).json({ message: "Nada que actualizar" });
+    }
+
+    sets.push("updated_at = NOW()");
+    params.push(req.params.id);
+
+    const r = await pool.query(
+      `UPDATE consultations SET ${sets.join(", ")} WHERE id = $${params.length} RETURNING *`,
+      params
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Consulta no encontrada" });
+    return res.json({ data: camelRows(r.rows)[0] });
+  } catch (err) {
+    console.error("PUT admin/consultations error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/admin/consultations/stats — count by status
+app.get("/api/admin/consultations/stats", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT status, COUNT(*)::int AS count FROM consultations GROUP BY status`
+    );
+    const stats = { pending: 0, scheduled: 0, completed: 0, cancelled: 0 };
+    r.rows.forEach((row) => { stats[row.status] = row.count; });
+    return res.json({ data: stats });
+  } catch (err) {
+    console.error("GET admin/consultations/stats error:", err);
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
