@@ -514,14 +514,15 @@ function CalendarTab({
                       <div
                         key={c.id}
                         onClick={() => { setSelectedClass(c); setSheetOpen(true); }}
-                        className="cursor-pointer rounded-lg px-2 py-1.5 text-xs transition-opacity hover:opacity-80"
+                        className="cursor-pointer rounded-lg px-2 py-1.5 text-xs transition-all hover:scale-[1.02] hover:shadow-md"
                         style={{
-                          backgroundColor: c.classTypeColor ? c.classTypeColor + "33" : "hsl(var(--primary)/0.2)",
-                          borderLeft: "3px solid " + (c.classTypeColor ?? "hsl(var(--primary))"),
+                          backgroundColor: c.classTypeColor ? c.classTypeColor + "55" : "hsl(var(--primary)/0.35)",
+                          borderLeft: "4px solid " + (c.classTypeColor ?? "hsl(var(--primary))"),
+                          boxShadow: `0 1px 4px ${(c.classTypeColor ?? "#94867a")}30`,
                         }}
                       >
-                        <div className="truncate font-medium">{c.classTypeName ?? "Clase"}</div>
-                        <div className="text-muted-foreground">{c.startTime ? format(parseISO(c.startTime), "HH:mm") : ""}</div>
+                        <div className="truncate font-semibold text-[#2d2d2d]">{c.classTypeName ?? "Clase"}</div>
+                        <div className="font-medium text-[#2d2d2d]/70">{c.startTime ? format(parseISO(c.startTime), "HH:mm") : ""}</div>
                         <div className="mt-1 flex items-center gap-1">
                           {c.instructorPhoto ? (
                             <img
@@ -537,9 +538,9 @@ function CalendarTab({
                               {(c.instructorName ?? "?")[0].toUpperCase()}
                             </span>
                           )}
-                          <span className="truncate text-[0.65rem] text-muted-foreground">{c.instructorName ?? "—"}</span>
+                          <span className="truncate text-[0.65rem] text-[#2d2d2d]/60">{c.instructorName ?? "—"}</span>
                         </div>
-                        <div className="mt-0.5 text-muted-foreground">
+                        <div className="mt-0.5 text-[#2d2d2d]/55 font-medium">
                           {(c.bookedCount ?? c.currentBookings ?? 0)}/{c.maxCapacity ?? c.capacity ?? "?"}
                         </div>
                         {c.isCancelled && <Badge variant="destructive" className="mt-1 px-1 text-[0.6rem]">Cancelada</Badge>}
