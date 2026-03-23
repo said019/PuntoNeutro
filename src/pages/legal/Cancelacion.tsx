@@ -175,7 +175,7 @@ const Cancelacion = () => {
             <ul className="list-none space-y-1">
               <li><strong className="text-foreground">Email:</strong> contacto@puntoneutro.mx</li>
               <li><strong className="text-foreground">Teléfono:</strong> +52 442 123 4567</li>
-              <li><strong className="text-foreground">Dirección:</strong> San Juan del Río, Querétaro, México</li>
+              <li><strong className="text-foreground">Dirección:</strong> Tequisquiapan, Querétaro, México</li>
             </ul>
           </div>
         )}

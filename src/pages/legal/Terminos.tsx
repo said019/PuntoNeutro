@@ -60,7 +60,7 @@ const Terminos = () => {
 
             <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">1. Definiciones</h2>
             <ul className="list-disc pl-6 space-y-2">
-              <li><strong className="text-foreground">"Estudio"</strong> se refiere a Punto Neutro y sus instalaciones en San Juan del Río, Querétaro.</li>
+              <li><strong className="text-foreground">"Estudio"</strong> se refiere a Punto Neutro y sus instalaciones en Tequisquiapan, Querétaro.</li>
               <li><strong className="text-foreground">"Alumna/o"</strong> se refiere a cualquier persona registrada en la plataforma que asiste a clases.</li>
               <li><strong className="text-foreground">"Paquete"</strong> se refiere a los planes de clases adquiridos (pilates, bienestar o complementos).</li>
               <li><strong className="text-foreground">"Clase"</strong> se refiere a cada sesión de ejercicio programada en el estudio.</li>
@@ -149,7 +149,7 @@ const Terminos = () => {
             <ul className="list-none space-y-1">
               <li><strong className="text-foreground">Email:</strong> contacto@puntoneutro.mx</li>
               <li><strong className="text-foreground">Teléfono:</strong> +52 442 123 4567</li>
-              <li><strong className="text-foreground">Dirección:</strong> San Juan del Río, Querétaro, México</li>
+              <li><strong className="text-foreground">Dirección:</strong> Tequisquiapan, Querétaro, México</li>
             </ul>
           </div>
         )}

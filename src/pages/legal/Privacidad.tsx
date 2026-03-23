@@ -56,7 +56,7 @@ const Privacidad = () => {
 
             <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">1. Responsable del tratamiento</h2>
             <p>
-              <strong className="text-foreground">Punto Neutro</strong>, con domicilio en San Juan del Río, Querétaro, México, es responsable del tratamiento de los datos personales que recabamos de usted, en los términos de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).
+              <strong className="text-foreground">Punto Neutro</strong>, con domicilio en Tequisquiapan, Querétaro, México, es responsable del tratamiento de los datos personales que recabamos de usted, en los términos de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).
             </p>
 
             <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">2. Datos personales que recabamos</h2>
@@ -126,7 +126,7 @@ const Privacidad = () => {
             <ul className="list-none space-y-1">
               <li><strong className="text-foreground">Email:</strong> contacto@puntoneutro.mx</li>
               <li><strong className="text-foreground">Teléfono:</strong> +52 442 123 4567</li>
-              <li><strong className="text-foreground">Dirección:</strong> San Juan del Río, Querétaro, México</li>
+              <li><strong className="text-foreground">Dirección:</strong> Tequisquiapan, Querétaro, México</li>
             </ul>
           </div>
         )}

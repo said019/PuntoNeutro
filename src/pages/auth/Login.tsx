@@ -79,7 +79,7 @@ const Login = () => {
           <div>
             <div className="inline-flex items-center gap-2 border border-primary/40 px-4 py-[7px] rounded-full text-xs tracking-[0.12em] uppercase text-primary mb-6">
               <span className="w-[6px] h-[6px] rounded-full bg-primary animate-pulse" />
-              San Juan del Río · Querétaro
+              Tequisquiapan · Querétaro
             </div>
             <h2 className="font-bebas text-[clamp(3rem,5vw,5.5rem)] leading-[0.92] text-foreground mb-4">
               MOVIMIENTO<br />
@@ -209,7 +209,7 @@ const Login = () => {
           </Link>
 
           <p className="text-center text-xs text-muted-foreground/50 mt-8">
-            © {new Date().getFullYear()} Punto Neutro · San Juan del Río, Qro.
+            © {new Date().getFullYear()} Punto Neutro · Tequisquiapan, Qro.
           </p>
         </div>
       </div>

@@ -341,7 +341,7 @@ const Index = () => {
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white/90 text-[0.72rem] uppercase tracking-[0.15em] font-medium mb-8 animate-fade-up">
               <span className="w-1.5 h-1.5 rounded-full bg-[#b5bf9c] animate-pulse" />
-              San Juan del Río, Querétaro
+              Tequisquiapan, Querétaro
             </div>
 
             <h1 className="font-bebas text-[clamp(3.5rem,9vw,7.5rem)] leading-[0.88] tracking-tight text-white mb-6 animate-fade-up delay-200">
@@ -983,7 +983,7 @@ const Index = () => {
                 </h3>
                 <div className="flex flex-col gap-5">
                   {[
-                    { icon: <MapPin size={20} />, label: "Ubicación", value: "San Juan del Río, Querétaro", accent: "white" },
+                    { icon: <MapPin size={20} />, label: "Ubicación", value: "Tequisquiapan, Querétaro", accent: "white" },
                     { icon: <Phone size={20} />, label: "Teléfono", value: "+52 442 123 4567", accent: "#b5bf9c" },
                     { icon: <Mail size={20} />, label: "Email", value: "contacto@puntoneutro.mx", accent: "white" },
                     { icon: <Clock size={20} />, label: "Horarios", value: "Lun–Vie 7am–8:30pm · Sáb 8am–10am", accent: "#b5bf9c" },
@@ -1126,7 +1126,7 @@ const Index = () => {
             <div>
               <div className="text-[0.7rem] tracking-[0.15em] uppercase text-white/30 font-semibold mb-5">Contacto</div>
               <ul className="flex flex-col gap-2.5 list-none">
-                <li><span className="text-[0.85rem] text-white/45 font-alilato">San Juan del Río, Qro.</span></li>
+                <li><span className="text-[0.85rem] text-white/45 font-alilato">Tequisquiapan, Qro.</span></li>
                 <li>
                   <a href="mailto:contacto@puntoneutro.mx" className="text-[0.85rem] text-white/45 hover:text-[#b5bf9c] transition-colors no-underline font-alilato">
                     contacto@puntoneutro.mx
@@ -1148,7 +1148,7 @@ const Index = () => {
 
           <div className="pt-6 flex flex-col sm:flex-row justify-between items-center gap-2">
             <p className="text-[0.72rem] text-white/25 font-alilato">&copy; 2026 Punto Neutro. Todos los derechos reservados.</p>
-            <p className="text-[0.72rem] text-white/25 font-alilato">Hecho con pasión en San Juan del Río</p>
+            <p className="text-[0.72rem] text-white/25 font-alilato">Hecho con pasión en Tequisquiapan</p>
           </div>
         </div>
       </footer>

@@ -327,7 +327,7 @@ const Register = () => {
           </Link>
 
           <p className="text-center text-xs text-muted-foreground/50 mt-6">
-            © {new Date().getFullYear()} Punto Neutro · San Juan del Río, Qro.
+            © {new Date().getFullYear()} Punto Neutro · Tequisquiapan, Qro.
           </p>
         </div>
       </div>
