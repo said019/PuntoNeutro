@@ -347,16 +347,25 @@ const PendingOrders = () => {
   const qc = useQueryClient();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery<{ data: any[] }>({
-    queryKey: ["admin-orders-pending"],
+  const { data: dataVerify, isLoading: loadingVerify } = useQuery<{ data: any[] }>({
+    queryKey: ["admin-orders-pending-verification"],
     queryFn: async () => (await api.get("/admin/orders?status=pending_verification")).data,
   });
-  const orders = Array.isArray(data?.data) ? data.data : [];
+  const { data: dataPending, isLoading: loadingPending } = useQuery<{ data: any[] }>({
+    queryKey: ["admin-orders-pending-payment"],
+    queryFn: async () => (await api.get("/admin/orders?status=pending_payment")).data,
+  });
+  const isLoading = loadingVerify || loadingPending;
+  const orders = [
+    ...(Array.isArray(dataVerify?.data) ? dataVerify.data : []),
+    ...(Array.isArray(dataPending?.data) ? dataPending.data.filter((o: any) => o.payment_method === "cash") : []),
+  ].sort((a: any, b: any) => new Date(b.createdAt ?? b.created_at).getTime() - new Date(a.createdAt ?? a.created_at).getTime());
 
   const verifyMutation = useMutation({
     mutationFn: (id: string) => api.put(`/admin/orders/${id}/verify`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-orders-pending"] });
+      qc.invalidateQueries({ queryKey: ["admin-orders-pending-verification"] });
+      qc.invalidateQueries({ queryKey: ["admin-orders-pending-payment"] });
       qc.invalidateQueries({ queryKey: ["orders-pending"] });
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
       qc.invalidateQueries({ queryKey: ["payments"] });
@@ -368,7 +377,8 @@ const PendingOrders = () => {
   const rejectMutation = useMutation({
     mutationFn: (id: string) => api.put(`/admin/orders/${id}/reject`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-orders-pending"] });
+      qc.invalidateQueries({ queryKey: ["admin-orders-pending-verification"] });
+      qc.invalidateQueries({ queryKey: ["admin-orders-pending-payment"] });
       qc.invalidateQueries({ queryKey: ["orders-pending"] });
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
       toast({ title: "Orden rechazada" });
@@ -425,8 +435,14 @@ const PendingOrders = () => {
               <Badge variant="outline" className="text-[10px] text-[#2d2d2d]/50 border-[#94867a]/20">
                 {o.payment_method === "transfer" ? "Transferencia" : o.payment_method === "cash" ? "Efectivo" : o.payment_method === "card" ? "Tarjeta" : o.payment_method ?? "—"}
               </Badge>
-              <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-600/30 bg-amber-50">
-                <Clock size={9} className="mr-1" /> Por verificar
+              <Badge variant="outline" className={cn(
+                "text-[10px]",
+                o.payment_method === "cash" && o.status === "pending_payment"
+                  ? "text-blue-700 border-blue-600/30 bg-blue-50"
+                  : "text-amber-700 border-amber-600/30 bg-amber-50"
+              )}>
+                <Clock size={9} className="mr-1" />
+                {o.payment_method === "cash" && o.status === "pending_payment" ? "Pago en estudio" : "Por verificar"}
               </Badge>
               {o.proofUrl && (
                 <button

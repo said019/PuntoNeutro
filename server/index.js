@@ -2967,13 +2967,16 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     const total = subtotal - discount;
     const bankInfo = await getConfiguredBankInfo(client);
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
+    // Cash orders skip proof upload → go straight to pending_verification so admin can approve
+    const initialStatus = paymentMethod === "cash" ? "pending_verification" : "pending_payment";
     const orderRes = await client.query(
       `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount, discount_code_id, bank_info, expires_at, complement_id)
-       VALUES ($1, $2, 'pending_payment', $3, $4, 0, $5, $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         req.userId,
         planId,
+        initialStatus,
         paymentMethod,
         subtotal,
         total,
