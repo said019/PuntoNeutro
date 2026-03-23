@@ -452,11 +452,12 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 md:grid-rows-3 gap-3 sm:gap-4 h-auto md:h-[750px]">
-            {/* Large feature — Recepción con logo */}
-            <div className="col-span-2 row-span-2 rounded-2xl overflow-hidden relative group min-h-[250px]">
+          {/* ── Row 1: 3 columns ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            {/* Recepción — hero */}
+            <div className="lg:col-span-2 rounded-2xl overflow-hidden relative group aspect-[16/10]">
               <img src={pnCafe1} alt="Recepción Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/55 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/50 via-transparent to-transparent" />
               <div className="absolute bottom-5 left-5 right-5">
                 <span className="bg-[#b5bf9c]/30 backdrop-blur-md text-white text-[0.62rem] uppercase tracking-[0.15em] px-3 py-1.5 rounded-full mb-2 inline-block font-medium">
                   Hybrid Studio & Coffee
@@ -464,38 +465,82 @@ const Index = () => {
                 <h3 className="text-white font-bebas text-2xl tracking-wide">Nuestro Espacio</h3>
               </div>
             </div>
-
-            {/* Top right — Planks con pelota (acción) */}
-            <div className="col-span-2 row-span-1 rounded-2xl overflow-hidden relative group hidden md:block">
-              <img src={pnImg10} alt="Clase de Body Strong" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 30%" }} />
+            {/* Side plank instructora */}
+            <div className="rounded-2xl overflow-hidden relative group aspect-[3/4] sm:aspect-[16/10] lg:aspect-[3/4]">
+              <img src={angiePhoto} alt="Instructora Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/35 to-transparent" />
+              <div className="absolute bottom-4 left-4">
+                <span className="text-white/90 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Fuerza & Equilibrio</span>
+              </div>
             </div>
+          </div>
 
-            {/* Clase grupal con pesas */}
-            <div className="rounded-2xl overflow-hidden relative group min-h-[160px]">
-              <img src={pnImg8} alt="Clase grupal" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
+          {/* ── Row 2: 4 equal columns ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-3 sm:mt-4">
+            {/* Sala amplia */}
+            <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
+              <img src={pnImg2} alt="Sala de práctica" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
-
-            {/* Rack de mats — detalle del estudio */}
-            <div className="rounded-2xl overflow-hidden relative group min-h-[160px]">
-              <img src={pnImg5} alt="Equipo del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+            {/* Clase con pesas */}
+            <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
+              <img src={pnImg8} alt="Clase con pesas" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
             </div>
+            {/* Rack de mats */}
+            <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
+              <img src={pnImg5} alt="Mats del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+            </div>
+            {/* Rincón con planta */}
+            <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
+              <img src={pnImg4} alt="Ambiente del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+            </div>
+          </div>
 
-            {/* Bottom wide — Sala amplia con luz natural */}
-            <div className="col-span-2 rounded-2xl overflow-hidden relative group min-h-[180px]">
-              <img src={pnImg9} alt="Pilates mat" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 35%" }} />
+          {/* ── Row 3: 3 columns ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
+            {/* Alumnas pilates mat */}
+            <div className="rounded-2xl overflow-hidden relative group aspect-[3/4] sm:aspect-[16/10] lg:aspect-[3/4]">
+              <img src={pnImg9} alt="Clase de pilates" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 30%" }} />
               <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/30 to-transparent" />
-              <div className="absolute bottom-4 left-5">
-                <span className="text-white/80 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Clases grupales</span>
+              <div className="absolute bottom-4 left-4">
+                <span className="text-white/90 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Clases grupales</span>
               </div>
             </div>
-
-            {/* Bottom right — Side plank instructora */}
-            <div className="col-span-2 rounded-2xl overflow-hidden relative group min-h-[180px]">
-              <img src={angiePhoto} alt="Instructora Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 25%" }} />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/40 to-transparent" />
-              <div className="absolute bottom-4 left-5">
-                <span className="text-white/80 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Fuerza & Equilibrio</span>
+            {/* Lobby Body Motion Mind */}
+            <div className="lg:col-span-2 rounded-2xl overflow-hidden relative group aspect-[16/10]">
+              <img src={pnCafe2} alt="Lobby Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/40 via-transparent to-transparent" />
+              <div className="absolute bottom-5 left-5">
+                <span className="text-white/90 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Body · Motion · Mind in Peace</span>
               </div>
+            </div>
+          </div>
+
+          {/* ── Row 4: 3 columns ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
+            {/* Planks en pelotas */}
+            <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
+              <img src={pnImg10} alt="Body Strong" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 30%" }} />
+            </div>
+            {/* Equipo organizado */}
+            <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
+              <img src={pnImg1} alt="Equipo del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+            </div>
+            {/* Matcha / café */}
+            <div className="col-span-2 lg:col-span-1 rounded-2xl overflow-hidden relative group aspect-[16/10] lg:aspect-[4/5]">
+              <img src={pnImg7} alt="Punto Neutro Coffee" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 40%" }} />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/40 to-transparent" />
+              <div className="absolute bottom-4 left-4">
+                <span className="text-white/90 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Studio & Coffee</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Row 5: wide panoramic ── */}
+          <div className="mt-3 sm:mt-4 rounded-2xl overflow-hidden relative group aspect-[21/9]">
+            <img src={pnImg3} alt="Vista panorámica del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 40%" }} />
+            <div className="absolute inset-0 bg-[#2d2d2d]/20 group-hover:bg-[#2d2d2d]/10 transition-colors duration-500" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-white font-bebas text-3xl sm:text-4xl lg:text-5xl tracking-widest opacity-90">MOVIMIENTO CON PROPÓSITO</p>
             </div>
           </div>
         </div>
