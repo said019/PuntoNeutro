@@ -453,38 +453,48 @@ const Index = () => {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 md:grid-rows-3 gap-3 sm:gap-4 h-auto md:h-[750px]">
-            {/* Large feature */}
+            {/* Large feature — Recepción con logo */}
             <div className="col-span-2 row-span-2 rounded-2xl overflow-hidden relative group min-h-[250px]">
-              <img src={pnImg7} alt="Punto Neutro Studio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/60 to-transparent" />
+              <img src={pnCafe1} alt="Recepción Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/55 via-transparent to-transparent" />
               <div className="absolute bottom-5 left-5 right-5">
                 <span className="bg-[#b5bf9c]/30 backdrop-blur-md text-white text-[0.62rem] uppercase tracking-[0.15em] px-3 py-1.5 rounded-full mb-2 inline-block font-medium">
-                  Punto Neutro
+                  Hybrid Studio & Coffee
                 </span>
-                <h3 className="text-white font-bebas text-2xl tracking-wide">Fuerza & Bienestar</h3>
+                <h3 className="text-white font-bebas text-2xl tracking-wide">Nuestro Espacio</h3>
               </div>
             </div>
 
-            {/* Top right wide */}
+            {/* Top right — Planks con pelota (acción) */}
             <div className="col-span-2 row-span-1 rounded-2xl overflow-hidden relative group hidden md:block">
-              <img src={pnImg10} alt="Pilates" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/25 to-transparent" />
+              <img src={pnImg10} alt="Clase de Body Strong" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 30%" }} />
             </div>
 
-            {/* Two small squares */}
+            {/* Clase grupal con pesas */}
             <div className="rounded-2xl overflow-hidden relative group min-h-[160px]">
-              <img src={pnImg8} alt="Detalles" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-            </div>
-            <div className="rounded-2xl overflow-hidden relative group min-h-[160px]">
-              <img src={pnImg5} alt="Comunidad" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <img src={pnImg8} alt="Clase grupal" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
             </div>
 
-            {/* Bottom wide */}
-            <div className="col-span-2 md:col-span-4 row-span-1 rounded-2xl overflow-hidden relative group min-h-[180px]">
-              <img src={pnImg3} alt="Entrenamiento" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
-              <div className="absolute inset-0 bg-[#2d2d2d]/25 group-hover:bg-[#2d2d2d]/15 transition-colors duration-500" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-white font-bebas text-3xl sm:text-4xl tracking-widest opacity-90">MOVIMIENTO CON PROPÓSITO</p>
+            {/* Rack de mats — detalle del estudio */}
+            <div className="rounded-2xl overflow-hidden relative group min-h-[160px]">
+              <img src={pnImg5} alt="Equipo del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+            </div>
+
+            {/* Bottom wide — Sala amplia con luz natural */}
+            <div className="col-span-2 rounded-2xl overflow-hidden relative group min-h-[180px]">
+              <img src={pnImg9} alt="Pilates mat" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 35%" }} />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/30 to-transparent" />
+              <div className="absolute bottom-4 left-5">
+                <span className="text-white/80 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Clases grupales</span>
+              </div>
+            </div>
+
+            {/* Bottom right — Side plank instructora */}
+            <div className="col-span-2 rounded-2xl overflow-hidden relative group min-h-[180px]">
+              <img src={angiePhoto} alt="Instructora Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 25%" }} />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/40 to-transparent" />
+              <div className="absolute bottom-4 left-5">
+                <span className="text-white/80 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Fuerza & Equilibrio</span>
               </div>
             </div>
           </div>
