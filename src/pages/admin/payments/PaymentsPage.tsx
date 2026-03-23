@@ -407,9 +407,50 @@ const PendingOrders = () => {
   return (
     <>
       <div className="space-y-3">
-        {orders.map((o: any) => (
-          <div key={o.id} className="rounded-xl border border-amber-600/20 bg-amber-50/50 p-4 space-y-3">
-            {/* Header */}
+        {orders.map((o: any) => {
+          const isCash = o.payment_method === "cash";
+          const isTransfer = o.payment_method === "transfer";
+          return (
+          <div
+            key={o.id}
+            className={cn(
+              "rounded-xl border p-4 space-y-3",
+              isCash
+                ? "border-blue-500/25 bg-blue-50/40"
+                : "border-amber-600/20 bg-amber-50/50"
+            )}
+          >
+            {/* Payment method banner */}
+            <div className={cn(
+              "flex items-center gap-2.5 rounded-lg px-3 py-2.5 -mx-0.5",
+              isCash
+                ? "bg-blue-100/70 border border-blue-200/50"
+                : "bg-amber-100/70 border border-amber-200/50"
+            )}>
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                isCash ? "bg-blue-500 text-white" : "bg-amber-500 text-white"
+              )}>
+                {isCash ? <Banknote size={15} /> : <CreditCard size={15} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn("text-xs font-bold", isCash ? "text-blue-800" : "text-amber-800")}>
+                  {isCash ? "PAGO EN EFECTIVO — EN ESTUDIO" : isTransfer ? "TRANSFERENCIA / SPEI" : "TARJETA"}
+                </p>
+                <p className={cn("text-[10px]", isCash ? "text-blue-600/70" : "text-amber-600/70")}>
+                  {isCash ? "La clienta pagará directamente en recepción" : "Comprobante enviado, verificar pago"}
+                </p>
+              </div>
+              <Badge variant="outline" className={cn(
+                "text-[10px] shrink-0",
+                isCash ? "text-blue-700 border-blue-400/40 bg-blue-50" : "text-amber-700 border-amber-400/40 bg-amber-50"
+              )}>
+                <Clock size={9} className="mr-1" />
+                {isCash ? "Por cobrar" : "Por verificar"}
+              </Badge>
+            </div>
+
+            {/* Client info + amount */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#94867a]/30 to-[#b5bf9c]/20 border border-[#94867a]/30 flex items-center justify-center text-sm font-bold text-[#94867a] shrink-0">
@@ -430,39 +471,33 @@ const PendingOrders = () => {
               </div>
             </div>
 
-            {/* Payment method + proof */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="text-[10px] text-[#2d2d2d]/50 border-[#94867a]/20">
-                {o.payment_method === "transfer" ? "Transferencia" : o.payment_method === "cash" ? "Efectivo" : o.payment_method === "card" ? "Tarjeta" : o.payment_method ?? "—"}
-              </Badge>
-              <Badge variant="outline" className={cn(
-                "text-[10px]",
-                o.payment_method === "cash" && o.status === "pending_payment"
-                  ? "text-blue-700 border-blue-600/30 bg-blue-50"
-                  : "text-amber-700 border-amber-600/30 bg-amber-50"
-              )}>
-                <Clock size={9} className="mr-1" />
-                {o.payment_method === "cash" && o.status === "pending_payment" ? "Pago en estudio" : "Por verificar"}
-              </Badge>
-              {o.proofUrl && (
-                <button
-                  onClick={() => setPreviewUrl(o.proofUrl)}
-                  className="flex items-center gap-1 text-[10px] font-semibold text-[#94867a] hover:text-[#2d2d2d] transition-colors"
-                >
-                  <Eye size={11} /> Ver comprobante
-                </button>
-              )}
-            </div>
+            {/* Proof link (only for transfers) */}
+            {o.proofUrl && (
+              <button
+                onClick={() => setPreviewUrl(o.proofUrl)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#94867a] hover:text-[#2d2d2d] transition-colors px-1"
+              >
+                <Eye size={13} /> Ver comprobante de pago
+              </button>
+            )}
 
             {/* Actions */}
             <div className="flex gap-2 pt-1">
               <Button
                 size="sm"
-                className="flex-1 bg-gradient-to-r from-[#4a7a38] to-[#6b9a52] hover:opacity-90 text-white font-semibold text-xs h-9"
+                className={cn(
+                  "flex-1 font-semibold text-xs h-9 text-white hover:opacity-90",
+                  isCash
+                    ? "bg-gradient-to-r from-blue-600 to-blue-500 shadow-blue-500/20 shadow-sm"
+                    : "bg-gradient-to-r from-[#4a7a38] to-[#6b9a52]"
+                )}
                 onClick={() => verifyMutation.mutate(o.id)}
                 disabled={verifyMutation.isPending}
               >
-                {verifyMutation.isPending ? <Loader2 className="animate-spin" size={13} /> : <><CheckCircle2 size={13} className="mr-1" /> Verificar y activar</>}
+                {verifyMutation.isPending
+                  ? <Loader2 className="animate-spin" size={13} />
+                  : <><CheckCircle2 size={13} className="mr-1" /> {isCash ? "Confirmar pago y activar" : "Verificar y activar"}</>
+                }
               </Button>
               <Button
                 size="sm"
@@ -475,7 +510,8 @@ const PendingOrders = () => {
               </Button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Proof preview modal */}
