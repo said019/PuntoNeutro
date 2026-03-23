@@ -3,10 +3,9 @@ import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { DollarSign, TrendingUp, Receipt, Users } from "lucide-react";
 
 const ReportsPage = () => {
   const { data: overview, isLoading } = useQuery({
@@ -17,26 +16,6 @@ const ReportsPage = () => {
   const { data: revenue } = useQuery({
     queryKey: ["reports-revenue"],
     queryFn: async () => (await api.get("/reports/revenue")).data,
-  });
-
-  const { data: classes } = useQuery({
-    queryKey: ["reports-classes"],
-    queryFn: async () => (await api.get("/reports/classes")).data,
-  });
-
-  const { data: retention } = useQuery({
-    queryKey: ["reports-retention"],
-    queryFn: async () => (await api.get("/reports/retention")).data,
-  });
-
-  const { data: instructors } = useQuery({
-    queryKey: ["reports-instructors"],
-    queryFn: async () => (await api.get("/reports/instructors")).data,
-  });
-
-  const { data: reviewsData } = useQuery({
-    queryKey: ["reports-evaluations"],
-    queryFn: async () => (await api.get("/admin/reviews")).data,
   });
 
   const o = overview?.data ?? overview ?? {};
@@ -63,46 +42,55 @@ const ReportsPage = () => {
         return { month: fmtMonth(d), amount: 0, count: 0 };
       });
 
-  const classesData = safeArray(classes?.data ?? classes).map((row: any) => ({
-    label: row.name ?? row.week ?? "—",
-    bookings: Number(row.bookings ?? row.count ?? 0),
-    attended: Number(row.attended ?? 0),
-  }));
-  const retentionRaw = retention?.data ?? retention;
-  const retentionData = Array.isArray(retentionRaw)
-    ? retentionRaw
-    : retentionRaw
-      ? [
-          { month: "Total", rate: Number(retentionRaw.total ?? 0) },
-          { month: "Nuevos", rate: Number(retentionRaw.new_this_month ?? retentionRaw.newThisMonth ?? 0) },
-        ]
-      : [];
-  const instructorsData = safeArray(instructors?.data ?? instructors).map((ins: any, idx: number) => ({
-    id: String(ins.id ?? `ins-${idx}`),
-    name: String(ins.name ?? ins.display_name ?? "Instructor"),
-    classCount: Number(ins.classCount ?? ins.classes_taught ?? 0),
-    totalStudents: Number(ins.totalStudents ?? ins.total_students ?? 0),
-  }));
-  const reviews = safeArray(reviewsData?.data ?? reviewsData)
-    .slice(0, 8)
-    .map((row: any, idx: number) => ({
-      id: String(row.id ?? `review-${idx}`),
-      userName: String(row.user_name ?? row.userName ?? "Clienta"),
-      classTypeName: String(row.class_type_name ?? row.classTypeName ?? "Clase"),
-      rating: Number(row.rating ?? 0),
-      comment: String(row.comment ?? "").trim(),
-      isApproved: Boolean(row.is_approved ?? row.isApproved),
-      createdAt: row.created_at ?? row.createdAt ?? null,
-    }));
+  // Calculate totals from chart data
+  const totalRevenue = revenueData.reduce((sum, r) => sum + r.amount, 0);
+  const totalOrders = revenueData.reduce((sum, r) => sum + r.count, 0);
+  const currentMonth = revenueData[revenueData.length - 1];
+  const prevMonth = revenueData.length >= 2 ? revenueData[revenueData.length - 2] : null;
+  const growth = prevMonth && prevMonth.amount > 0
+    ? (((currentMonth.amount - prevMonth.amount) / prevMonth.amount) * 100).toFixed(1)
+    : null;
 
-  const metric = (label: string, value: string | number | undefined, suffix = "") => (
-    <Card>
-      <CardHeader><CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle></CardHeader>
+  const metric = (
+    label: string,
+    value: string | number | undefined,
+    icon: React.ReactNode,
+    accent: string,
+    subtitle?: string,
+  ) => (
+    <Card className="border-t-2" style={{ borderTopColor: accent }}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+        <span style={{ color: accent }}>{icon}</span>
+      </CardHeader>
       <CardContent>
-        {isLoading ? <Skeleton className="h-8 w-24" /> : <p className="text-2xl font-bold">{value ?? "—"}{suffix}</p>}
+        {isLoading ? (
+          <Skeleton className="h-8 w-24" />
+        ) : (
+          <>
+            <p className="text-2xl font-bold text-[#2d2d2d]">{value ?? "—"}</p>
+            {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
+          </>
+        )}
       </CardContent>
     </Card>
   );
+
+  const formatCurrency = (n: number) =>
+    `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="rounded-xl border border-[#94867a]/20 bg-white px-4 py-3 shadow-lg">
+        <p className="text-xs font-semibold text-[#2d2d2d]/60 uppercase tracking-wide mb-1">{label}</p>
+        <p className="text-sm font-bold text-[#2d2d2d]">{formatCurrency(payload[0].value)}</p>
+        {payload[0]?.payload?.count > 0 && (
+          <p className="text-xs text-[#2d2d2d]/50 mt-0.5">{payload[0].payload.count} orden{payload[0].payload.count !== 1 ? "es" : ""}</p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <AuthGuard>
@@ -110,131 +98,68 @@ const ReportsPage = () => {
         <div className="admin-page max-w-6xl">
           <h1 className="text-2xl font-bold mb-6">Reportes</h1>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {metric("Miembros activos", o.activeMembers)}
-            {metric("Ingresos del mes", o.monthlyRevenue ? `$${o.monthlyRevenue}` : undefined)}
-            {metric("Reservas del mes", o.monthlyBookings)}
-            {metric("Ocupación clases", o.classOccupancyRate, "%")}
-            {metric("Nuevos miembros", o.newMembersThisMonth)}
-            {metric("Churn rate", o.churnRate, "%")}
-            {metric("Reseñas del mes", o.reviewsTotal)}
-            {metric("Reseñas pendientes", o.reviewsPending)}
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {metric(
+              "Ingresos del mes",
+              o.monthlyRevenue ? formatCurrency(Number(o.monthlyRevenue)) : "$0.00",
+              <DollarSign size={18} />,
+              "#b5bf9c",
+              growth ? `${Number(growth) >= 0 ? "+" : ""}${growth}% vs mes anterior` : undefined,
+            )}
+            {metric(
+              "Ingresos totales (12m)",
+              formatCurrency(totalRevenue),
+              <TrendingUp size={18} />,
+              "#94867a",
+              "Últimos 12 meses",
+            )}
+            {metric(
+              "Órdenes aprobadas",
+              totalOrders,
+              <Receipt size={18} />,
+              "#C4A882",
+              "Últimos 12 meses",
+            )}
+            {metric(
+              "Miembros activos",
+              o.activeMembers ?? 0,
+              <Users size={18} />,
+              "#6366F1",
+            )}
           </div>
 
-          <Tabs defaultValue="revenue">
-            <TabsList>
-              <TabsTrigger value="revenue">Ingresos</TabsTrigger>
-              <TabsTrigger value="classes">Clases</TabsTrigger>
-              <TabsTrigger value="retention">Retención</TabsTrigger>
-              <TabsTrigger value="instructors">Instructores</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="revenue" className="mt-4">
-              <Card>
-                <CardHeader><CardTitle>Ingresos mensuales</CardTitle></CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Ingresos" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="classes" className="mt-4">
-              <Card>
-                <CardHeader><CardTitle>Clases por semana</CardTitle></CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={classesData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="bookings" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="attended" fill="#b5bf9c" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="retention" className="mt-4">
-              <Card>
-                <CardHeader><CardTitle>Retención de miembros</CardTitle></CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={retentionData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="rate" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="instructors" className="mt-4">
-              <Card>
-                <CardHeader><CardTitle>Clases por instructor</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {instructorsData.map((ins) => (
-                      <div key={ins.id} className="flex items-center justify-between text-sm">
-                        <span>{ins.name}</span>
-                        <div className="flex items-center gap-3">
-                          <div className="w-40 h-2 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, (ins.classCount / 30) * 100)}%` }} />
-                          </div>
-                          <span className="font-medium w-8 text-right">{ins.classCount}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-
-          <Card className="mt-6">
+          {/* Revenue Chart */}
+          <Card>
             <CardHeader>
-              <CardTitle>Evaluaciones recientes</CardTitle>
+              <CardTitle>Ingresos mensuales</CardTitle>
             </CardHeader>
             <CardContent>
-              {reviews.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aún no hay evaluaciones registradas.</p>
-              ) : (
-                <div className="space-y-3">
-                  {reviews.map((review) => (
-                    <div key={review.id} className="flex flex-col gap-2 rounded-xl border border-border/70 p-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">
-                          {review.userName} · {review.classTypeName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {review.createdAt ? new Date(review.createdAt).toLocaleString("es-MX") : "Fecha no disponible"}
-                        </p>
-                        <p className="mt-1 text-sm text-foreground/90">
-                          {review.comment || "Sin comentario"}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{review.rating}/5</Badge>
-                        <Badge variant={review.isApproved ? "default" : "secondary"}>
-                          {review.isApproved ? "Aprobada" : "Pendiente"}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={revenueData} barCategoryGap="20%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94867a20" />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: "#2d2d2d", fontSize: 12 }}
+                    axisLine={{ stroke: "#94867a30" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "#2d2d2d99", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `$${(v / 1000).toFixed(v >= 1000 ? 1 : 0)}${v >= 1000 ? "k" : ""}`}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "#94867a10" }} />
+                  <Bar
+                    dataKey="amount"
+                    fill="#b5bf9c"
+                    radius={[6, 6, 0, 0]}
+                    name="Ingresos"
+                    maxBarSize={48}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
