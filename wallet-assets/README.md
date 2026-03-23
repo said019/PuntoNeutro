@@ -20,7 +20,7 @@ Coloca estos archivos en `wallet-assets/apple-pass/`:
 
 1. Ve a https://developer.apple.com/account
 2. Certificates, Identifiers & Profiles → Pass Type IDs
-3. Crea un Pass Type ID (ej: `pass.com.opheliastudio.club`)
+3. Crea un Pass Type ID (ej: `pass.com.puntoneutro.club`)
 4. Crea un certificado para ese Pass Type ID
 5. Descarga el `.cer` y haz doble clic para instalarlo en Keychain
 
@@ -48,7 +48,7 @@ openssl x509 -inform DER -in /tmp/wwdr.cer -out wallet-assets/apple-pass/wwdr.pe
 
 ```
 APPLE_TEAM_ID=TU_TEAM_ID
-APPLE_PASS_TYPE_ID=pass.com.opheliastudio.club
+APPLE_PASS_TYPE_ID=pass.com.puntoneutro.club
 APPLE_CERT_PASSWORD=     (vacío si usaste -nodes al exportar la key)
 ```
 

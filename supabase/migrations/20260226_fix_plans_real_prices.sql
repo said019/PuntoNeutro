@@ -1,6 +1,6 @@
 -- ─── Fix planes: reemplazar con precios y estructura reales ──────────────────
--- Basado en los flyers oficiales de Ophelia Jumping Studio
--- Categorías: Jumping / Pilates / Mixtos + planes sueltos (inscripción, sesión individual, extra)
+-- Basado en los precios oficiales de Punto Neutro
+-- Categorías: Pilates + planes sueltos (inscripción, sesión individual, extra)
 
 -- 1. Eliminar todos los planes existentes (cascada solo si no tienen membresías activas)
 --    Usamos UPDATE en lugar de DELETE para conservar referencias en membresías/órdenes

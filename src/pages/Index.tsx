@@ -949,7 +949,7 @@ const Index = () => {
               </div>
               <div className="relative z-10 flex flex-col gap-4 pt-6 border-t border-white/15">
                 <a
-                  href="https://maps.app.goo.gl/K3eSrZuj474z4kSS6"
+                  href="https://maps.app.goo.gl/qXd1DpwJdTpPeiSP8"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-white text-[#5a524a] text-[0.82rem] font-semibold tracking-wider uppercase hover:bg-[#f4f5ef] transition-all no-underline w-fit cursor-pointer"
@@ -983,7 +983,7 @@ const Index = () => {
             {/* Map */}
             <div className="rounded-2xl overflow-hidden border border-[#e8e9e3] min-h-[450px] lg:min-h-0">
               <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3739.577714731379!2d-99.99482528857814!3d20.40029408101758!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d30d002e88643b%3A0xb7eed5074cefa672!2sPunto%20Neutro%20Studio!5e0!3m2!1ses-419!2smx!4v1772066339529!5m2!1ses-419!2smx"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3735.8!2d-99.892498!3d20.5256602!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x85d39db3c59befdf%3A0x38024941d899fa4d!2sPunto%20Neutro%20Hybrid%20Studio%20%26%20Co.!5e0!3m2!1ses-419!2smx!4v1772066339529!5m2!1ses-419!2smx"
                 width="100%"
                 height="100%"
                 style={{ border: 0, display: "block", minHeight: "450px" }}

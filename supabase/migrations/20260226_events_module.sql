@@ -1,5 +1,5 @@
 -- ============================================================
---  MÓDULO DE EVENTOS — Ophelia Jump Studio
+--  MÓDULO DE EVENTOS — Punto Neutro
 --  Migración: 20260226_events_module.sql
 -- ============================================================
 

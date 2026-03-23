@@ -148,7 +148,7 @@ def make_wallet_icons() -> None:
 
 
 def make_wallet_logo() -> None:
-    logo_raw = load_rgba("ophelia-logo-full.png")
+    logo_raw = load_rgba("punto-neutro-logo-full.png")
     logo = trim_transparent(logo_raw)
     logo = ImageEnhance.Contrast(logo).enhance(1.08)
     logo = ImageEnhance.Sharpness(logo).enhance(1.15)
@@ -163,7 +163,7 @@ def make_wallet_logo() -> None:
 
 
 def make_apple_touch_icon() -> None:
-    logo = trim_transparent(load_rgba("ophelia-logo.png"))
+    logo = trim_transparent(load_rgba("punto-neutro-logo.png"))
     size = 180
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 255))
     mark = ImageOps.contain(logo, (132, 132), Image.Resampling.LANCZOS)

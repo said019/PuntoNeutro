@@ -6,7 +6,7 @@
 BEGIN;
 
 -- ============================================================
--- 1. LIMPIAR DATOS VIEJOS (Catarsis/Ophelia)
+-- 1. LIMPIAR DATOS VIEJOS
 -- ============================================================
 DELETE FROM classes;
 DELETE FROM schedules;
