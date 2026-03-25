@@ -2871,6 +2871,111 @@ app.get("/api/orders", authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/notifications — real notifications from orders, bookings, memberships
+app.get("/api/notifications", authMiddleware, async (req, res) => {
+  try {
+    const notifications = [];
+
+    // 1) Orders — approved, rejected, pending
+    const orders = await pool.query(
+      `SELECT o.id, o.status, o.total, o.created_at, o.updated_at, o.order_number,
+              p.name AS plan_name
+       FROM orders o
+       JOIN plans p ON o.plan_id = p.id
+       WHERE o.user_id = $1
+       ORDER BY o.updated_at DESC
+       LIMIT 20`,
+      [req.userId]
+    );
+    for (const o of orders.rows) {
+      if (o.status === "paid") {
+        notifications.push({
+          id: `order-paid-${o.id}`,
+          title: "Pago aprobado",
+          body: `Tu pago de $${o.total} para ${o.plan_name} fue aprobado. ¡Tu membresía está activa!`,
+          time: o.updated_at,
+          unread: (Date.now() - new Date(o.updated_at).getTime()) < 7 * 86400000,
+          type: "success",
+        });
+      } else if (o.status === "rejected") {
+        notifications.push({
+          id: `order-rej-${o.id}`,
+          title: "Pago rechazado",
+          body: `Tu pago para ${o.plan_name} (${o.order_number || ""}) fue rechazado. Contacta al estudio para más información.`,
+          time: o.updated_at,
+          unread: (Date.now() - new Date(o.updated_at).getTime()) < 7 * 86400000,
+          type: "error",
+        });
+      } else if (o.status === "pending_verification") {
+        notifications.push({
+          id: `order-pend-${o.id}`,
+          title: "Pago en revisión",
+          body: `Tu orden ${o.order_number || ""} para ${o.plan_name} está siendo revisada.`,
+          time: o.created_at,
+          unread: true,
+          type: "info",
+        });
+      }
+    }
+
+    // 2) Upcoming bookings (next 48h)
+    const bookings = await pool.query(
+      `SELECT b.id, b.status, c.date, c.start_time, ct.name AS class_name
+       FROM bookings b
+       JOIN classes c ON b.class_id = c.id
+       JOIN class_types ct ON c.class_type_id = ct.id
+       WHERE b.user_id = $1 AND b.status = 'confirmed'
+         AND (c.date || 'T' || c.start_time)::timestamp >= NOW()
+         AND (c.date || 'T' || c.start_time)::timestamp <= NOW() + INTERVAL '48 hours'
+       ORDER BY c.date, c.start_time
+       LIMIT 10`,
+      [req.userId]
+    );
+    for (const b of bookings.rows) {
+      notifications.push({
+        id: `booking-${b.id}`,
+        title: "Clase próxima",
+        body: `Tu clase de ${b.class_name} es el ${b.date} a las ${b.start_time}.`,
+        time: new Date().toISOString(),
+        unread: true,
+        type: "reminder",
+      });
+    }
+
+    // 3) Active memberships
+    const memberships = await pool.query(
+      `SELECT m.id, m.status, m.classes_remaining, m.start_date, m.created_at,
+              COALESCE(m.plan_name_override, p.name) AS plan_name
+       FROM memberships m
+       LEFT JOIN plans p ON m.plan_id = p.id
+       WHERE m.user_id = $1 AND m.status = 'active'
+       ORDER BY m.created_at DESC
+       LIMIT 5`,
+      [req.userId]
+    );
+    for (const m of memberships.rows) {
+      if (m.classes_remaining !== null && m.classes_remaining <= 2 && m.classes_remaining > 0) {
+        notifications.push({
+          id: `mem-low-${m.id}`,
+          title: "Créditos por agotarse",
+          body: `Tu membresía ${m.plan_name} tiene solo ${m.classes_remaining} clase(s) restante(s).`,
+          time: new Date().toISOString(),
+          unread: true,
+          type: "warning",
+        });
+      }
+    }
+
+    // Sort by time descending
+    notifications.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+    return res.json({ data: notifications });
+  } catch (err) {
+    console.error("GET notifications error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
 // GET /api/orders/:id
 app.get("/api/orders/:id", authMiddleware, async (req, res) => {
   try {
@@ -8822,6 +8927,7 @@ app.get("/api/admin/consultations", adminMiddleware, async (req, res) => {
     );
     return res.json({ data: camelRows(r.rows) });
   } catch (err) {
+    if (err.code === "42P01") return res.json({ data: [] });
     console.error("GET admin/consultations error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
@@ -8864,6 +8970,7 @@ app.put("/api/admin/consultations/:id", adminMiddleware, async (req, res) => {
     if (!r.rows.length) return res.status(404).json({ message: "Consulta no encontrada" });
     return res.json({ data: camelRows(r.rows)[0] });
   } catch (err) {
+    if (err.code === "42P01") return res.status(404).json({ message: "Tabla consultations no existe" });
     console.error("PUT admin/consultations error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
@@ -8879,6 +8986,7 @@ app.get("/api/admin/consultations/stats", adminMiddleware, async (req, res) => {
     r.rows.forEach((row) => { stats[row.status] = row.count; });
     return res.json({ data: stats });
   } catch (err) {
+    if (err.code === "42P01") return res.json({ data: { pending: 0, scheduled: 0, completed: 0, cancelled: 0 } });
     console.error("GET admin/consultations/stats error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
