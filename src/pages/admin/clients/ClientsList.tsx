@@ -36,7 +36,7 @@ const editSchema = z.object({
 
 const manualSchema = z.object({
   displayName: z.string().min(1, "Nombre requerido"),
-  email: z.string().email("Email inválido"),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
   phone: z.string().optional(),
   dateOfBirth: z.string().optional(),
   emergencyContactName: z.string().optional(),
@@ -303,7 +303,7 @@ const ClientsList = () => {
                 <UserPlus size={18} className="text-[#94867a]" />
                 Nueva clienta
               </DialogTitle>
-              <p className="text-xs text-[#2d2d2d]/35 mt-0.5">Registro manual · La clienta recibe su contraseña por email</p>
+              <p className="text-xs text-[#2d2d2d]/35 mt-0.5">Registro manual · Si se proporciona email, la clienta podrá iniciar sesión</p>
             </DialogHeader>
 
             <form onSubmit={manualForm.handleSubmit(onManualSubmit)} className="space-y-5 pt-1">
@@ -323,7 +323,7 @@ const ClientsList = () => {
                     )}
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[#2d2d2d]/60 text-xs">Email *</Label>
+                    <Label className="text-[#2d2d2d]/60 text-xs">Email <span className="text-[#94867a]/40">(opcional)</span></Label>
                     <Input
                       type="email"
                       className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d] placeholder:text-[#94867a]/40"

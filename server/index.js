@@ -8517,11 +8517,15 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
       planId, paymentMethod = "cash", startDate,
       notes,
     } = req.body;
-    if (!displayName || !email) return res.status(400).json({ message: "Nombre y email son requeridos" });
+    if (!displayName) return res.status(400).json({ message: "Nombre es requerido" });
 
     await client.query("BEGIN");
 
     // 1. Create user (random password — they can reset later)
+    // If no email provided, generate a placeholder so the unique constraint is satisfied
+    const finalEmail = email
+      ? email.toLowerCase().trim()
+      : `sin-correo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@puntoneutro.local`;
     const tempPassword = Math.random().toString(36).slice(2, 10) + "Op1!";
     const hash = await bcrypt.hash(tempPassword, 10);
     const userRes = await client.query(
@@ -8533,7 +8537,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
          phone = EXCLUDED.phone,
          updated_at = NOW()
        RETURNING id, display_name, email`,
-      [displayName, email.toLowerCase().trim(), phone || null, dateOfBirth || null,
+      [displayName, finalEmail, phone || null, dateOfBirth || null,
         emergencyContactName || null, emergencyContactPhone || null, healthNotes || null, hash]
     );
     const user = userRes.rows[0];
