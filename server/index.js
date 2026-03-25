@@ -8688,12 +8688,19 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
       if (order.plan_id && plan && order.user_id) {
         const end = new Date();
         end.setDate(end.getDate() + (plan.duration_days || 30));
-        await client.query(
-          `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
-           VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)
-           ON CONFLICT (order_id) DO UPDATE SET status='active'`,
-          [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
+        // Check if membership already exists for this order
+        const existingMem = await client.query(
+          "SELECT id FROM memberships WHERE order_id = $1", [order.id]
         );
+        if (existingMem.rows.length) {
+          await client.query("UPDATE memberships SET status = 'active' WHERE order_id = $1", [order.id]);
+        } else {
+          await client.query(
+            `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
+             VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)`,
+            [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
+          );
+        }
       }
 
       // ── Create consultation record if order has a complement ──
