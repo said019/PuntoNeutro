@@ -189,6 +189,7 @@ const Checkout = () => {
   const [discountCode, setDiscountCode] = useState("");
   const [discountResult, setDiscountResult] = useState<any>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderUuid, setOrderUuid] = useState<string | null>(null);
   const [bankDetails, setBankDetails] = useState<any>(null);
   const [file, setFile] = useState<File | null>(null);
 
@@ -245,7 +246,8 @@ const Checkout = () => {
       }),
     onSuccess: (res) => {
       const data = res.data?.data ?? res.data;
-      setOrderId(data.orderId ?? data.id);
+      setOrderUuid(data.id);
+      setOrderId(data.order_number ?? data.orderNumber ?? data.orderId ?? data.id);
       setBankDetails(data.bankDetails ?? data.bank_details);
       if (paymentMethod === "transfer") setStep("bank");
       else setStep("cash");
@@ -258,7 +260,7 @@ const Checkout = () => {
     mutationFn: () => {
       const fd = new FormData();
       fd.append("file", file!);
-      return api.post(`/orders/${orderId}/proof`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      return api.post(`/orders/${orderUuid}/proof`, fd, { headers: { "Content-Type": "multipart/form-data" } });
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["my-orders"] }); setStep("done"); },
     onError: (err: any) =>
