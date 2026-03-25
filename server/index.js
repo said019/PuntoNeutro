@@ -2201,6 +2201,8 @@ app.get("/api/complements", async (req, res) => {
     );
     return res.json({ data: camelRows(r.rows) });
   } catch (err) {
+    // Table may not exist yet — return empty array instead of 500
+    if (err.code === "42P01") return res.json({ data: [] });
     console.error("Complements error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
@@ -2214,6 +2216,8 @@ app.get("/api/combo-pricing", async (req, res) => {
     );
     return res.json({ data: camelRows(r.rows) });
   } catch (err) {
+    // Table may not exist yet — return empty array instead of 500
+    if (err.code === "42P01") return res.json({ data: [] });
     console.error("Combo pricing error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
@@ -2969,24 +2973,34 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
     // Cash orders skip proof upload → go straight to pending_verification so admin can approve
     const initialStatus = paymentMethod === "cash" ? "pending_verification" : "pending_payment";
-    const orderRes = await client.query(
-      `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount, discount_code_id, bank_info, expires_at, complement_id)
-       VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10, $11)
-       RETURNING *`,
-      [
-        req.userId,
-        planId,
-        initialStatus,
-        paymentMethod,
-        subtotal,
-        total,
-        discount,
-        appliedDiscountCode?.id ?? null,
-        JSON.stringify(bankInfo),
-        expires,
-        validComplementId,
-      ]
-    );
+    // Build INSERT dynamically — complement_id column may not exist yet
+    const cols = ["user_id", "plan_id", "status", "payment_method", "subtotal", "tax_amount", "total_amount", "discount_amount", "discount_code_id", "bank_info", "expires_at"];
+    const vals = [req.userId, planId, initialStatus, paymentMethod, subtotal, 0, total, discount, appliedDiscountCode?.id ?? null, JSON.stringify(bankInfo), expires];
+    if (validComplementId) {
+      cols.push("complement_id");
+      vals.push(validComplementId);
+    }
+    const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
+    let orderRes;
+    try {
+      orderRes = await client.query(
+        `INSERT INTO orders (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`,
+        vals
+      );
+    } catch (insertErr) {
+      // If complement_id column doesn't exist, retry without it
+      if (insertErr.code === "42703" && validComplementId) {
+        const colsBase = cols.filter(c => c !== "complement_id");
+        const valsBase = vals.slice(0, -1);
+        const ph = valsBase.map((_, i) => `$${i + 1}`).join(", ");
+        orderRes = await client.query(
+          `INSERT INTO orders (${colsBase.join(", ")}) VALUES (${ph}) RETURNING *`,
+          valsBase
+        );
+      } else {
+        throw insertErr;
+      }
+    }
 
     await client.query("COMMIT");
 
@@ -8590,14 +8604,20 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
 app.get("/api/admin/orders", adminMiddleware, async (req, res) => {
   try {
     const { status, limit = 100 } = req.query;
+    // Check if complements table exists to avoid JOIN errors
+    let hasComplements = false;
+    try {
+      await pool.query("SELECT 1 FROM complements LIMIT 0");
+      hasComplements = true;
+    } catch (_) {}
     let q = `SELECT o.*, u.display_name AS user_name, p.name AS plan_name,
-                    pp.file_url AS proof_url, pp.status AS proof_status, pp.uploaded_at AS proof_uploaded_at,
-                    comp.name AS complement_name, comp.specialist AS complement_specialist
+                    pp.file_url AS proof_url, pp.status AS proof_status, pp.uploaded_at AS proof_uploaded_at
+                    ${hasComplements ? ", comp.name AS complement_name, comp.specialist AS complement_specialist" : ""}
              FROM orders o
              LEFT JOIN users u ON o.user_id = u.id
              LEFT JOIN plans p ON o.plan_id = p.id
              LEFT JOIN payment_proofs pp ON pp.order_id = o.id
-             LEFT JOIN complements comp ON o.complement_id = comp.id
+             ${hasComplements ? "LEFT JOIN complements comp ON o.complement_id = comp.id" : ""}
              WHERE 1=1`;
     const params = [];
     if (status) { params.push(status); q += ` AND o.status = $${params.length}`; }
@@ -8678,12 +8698,14 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
 
       // ── Create consultation record if order has a complement ──
       if (order.complement_id) {
-        await client.query(
-          `INSERT INTO consultations (order_id, user_id, complement_id, status)
-           VALUES ($1, $2, $3, 'pending')
-           ON CONFLICT DO NOTHING`,
-          [order.id, order.user_id, order.complement_id]
-        );
+        try {
+          await client.query(
+            `INSERT INTO consultations (order_id, user_id, complement_id, status)
+             VALUES ($1, $2, $3, 'pending')
+             ON CONFLICT DO NOTHING`,
+            [order.id, order.user_id, order.complement_id]
+          );
+        } catch (_compErr) { /* consultations table may not exist yet */ }
       }
 
       if (order.discount_code_id) {
