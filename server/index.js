@@ -63,6 +63,12 @@ const DEFAULT_BANK_INFO = Object.freeze({
   card_number: "4152 3139 4571 6699",
 });
 
+// Map Spanish payment method labels to DB enum values
+function normalizePaymentMethod(v) {
+  const map = { efectivo: "cash", transferencia: "transfer", tarjeta: "card" };
+  return map[String(v || "").toLowerCase()] || v || "cash";
+}
+
 function digitsOnly(value) {
   return String(value || "").replace(/\D/g, "");
 }
@@ -2999,7 +3005,8 @@ app.get("/api/orders/:id", authMiddleware, async (req, res) => {
 
 // POST /api/orders
 app.post("/api/orders", authMiddleware, async (req, res) => {
-  const { planId, discountCode, paymentMethod = "transfer", complementId } = req.body;
+  const { planId, discountCode, paymentMethod: rawPM = "transfer", complementId } = req.body;
+  const paymentMethod = normalizePaymentMethod(rawPM);
   if (!planId) return res.status(400).json({ message: "planId requerido" });
   const client = await pool.connect();
   try {
@@ -8052,7 +8059,8 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
 // POST /api/memberships — admin assigns membership to a user
 app.post("/api/memberships", adminMiddleware, async (req, res) => {
   try {
-    const { userId, planId, paymentMethod = "efectivo", startDate } = req.body;
+    const { userId, planId, paymentMethod: rawPM = "cash", startDate } = req.body;
+    const paymentMethod = normalizePaymentMethod(rawPM);
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
     const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
     if (!planRes.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
@@ -8634,9 +8642,10 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
     const {
       displayName, email, phone, dateOfBirth,
       emergencyContactName, emergencyContactPhone, healthNotes,
-      planId, paymentMethod = "cash", startDate,
+      planId, paymentMethod: rawPM = "cash", startDate,
       notes,
     } = req.body;
+    const paymentMethod = normalizePaymentMethod(rawPM);
     if (!displayName) return res.status(400).json({ message: "Nombre es requerido" });
 
     await client.query("BEGIN");
