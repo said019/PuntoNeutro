@@ -2189,7 +2189,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
 app.get("/api/plans", async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT * FROM plans ORDER BY sort_order ASC, price ASC"
+      "SELECT * FROM plans WHERE is_active = true ORDER BY sort_order ASC, price ASC"
     );
     return res.json({ data: camelRows(r.rows) });
   } catch (err) {
