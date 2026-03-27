@@ -69,6 +69,13 @@ function normalizePaymentMethod(v) {
   return map[String(v || "").toLowerCase()] || v || "cash";
 }
 
+// Complement type lookup
+const COMPLEMENT_MAP = {
+  "nutricion-hormonal": { name: "Nutrición — Salud Hormonal", specialist: "LN. Clara Pérez" },
+  "nutricion-rendimiento": { name: "Nutrición — Rendimiento Físico", specialist: "LN. Majo Zamorano" },
+  "descarga-muscular": { name: "Descarga Muscular", specialist: "LTF. Angelina Huante" },
+};
+
 function digitsOnly(value) {
   return String(value || "").replace(/\D/g, "");
 }
@@ -848,6 +855,23 @@ async function ensureSchema() {
       UPDATE memberships SET classes_remaining = NULL WHERE classes_remaining >= 9999;
     `).catch(() => { });
     await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS notes TEXT`).catch(() => { });
+    // ── consultations table: track complement consultations ──────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS consultations (
+        id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        membership_id   UUID REFERENCES memberships(id) ON DELETE SET NULL,
+        user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
+        complement_type VARCHAR(100) NOT NULL,
+        complement_name VARCHAR(255),
+        specialist      VARCHAR(255),
+        status          VARCHAR(30) DEFAULT 'pending',
+        scheduled_date  TIMESTAMP WITH TIME ZONE,
+        notes           TEXT,
+        completed_at    TIMESTAMP WITH TIME ZONE,
+        created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => { });
     // ── memberships: track how many times a user has cancelled ────────────
     await pool.query(`
       ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0;
@@ -8044,12 +8068,26 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const start = startDate ? new Date(startDate) : new Date();
     const end = new Date(start);
     end.setDate(end.getDate() + (plan.duration_days || 30));
-    const complementNote = complementType ? `Complemento: ${complementType}` : null;
+    const compInfo = complementType ? COMPLEMENT_MAP[complementType] : null;
+    const complementNote = compInfo ? `Complemento: ${compInfo.name} — ${compInfo.specialist}` : null;
     const r = await pool.query(
       `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes)
        VALUES ($1,$2,'active',$3,$4,$5,$6,$7) RETURNING *`,
       [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null, complementNote]
     );
+
+    // ── Create consultation if complement was selected ────────────────
+    if (compInfo && r.rows[0]) {
+      try {
+        await pool.query(
+          `INSERT INTO consultations (membership_id, user_id, complement_type, complement_name, specialist, status)
+           VALUES ($1, $2, $3, $4, $5, 'pending')`,
+          [r.rows[0].id, userId, complementType, compInfo.name, compInfo.specialist]
+        );
+      } catch (consultErr) {
+        console.error("[consultations] insert error:", consultErr.message);
+      }
+    }
 
     // ── Email: membership activated ──────────────────────────────────────
     try {
@@ -8668,6 +8706,16 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         (complementType ? `${notes || "Alta manual por admin"} | Complemento: ${complementType}` : notes || `Alta manual por admin`)]
       );
       membership = camelRow(memRes.rows[0]);
+
+      // Create consultation if complement was selected
+      const compInfo = complementType ? COMPLEMENT_MAP[complementType] : null;
+      if (compInfo && memRes.rows[0]) {
+        await client.query(
+          `INSERT INTO consultations (membership_id, user_id, complement_type, complement_name, specialist, status)
+           VALUES ($1, $2, $3, $4, $5, 'pending')`,
+          [memRes.rows[0].id, user.id, complementType, compInfo.name, compInfo.specialist]
+        ).catch((e) => console.error("[consultations] insert error:", e.message));
+      }
     }
 
     await client.query("COMMIT");
@@ -8885,25 +8933,21 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
 // GET /api/admin/consultations — list consultations with filters
 app.get("/api/admin/consultations", adminMiddleware, async (req, res) => {
   try {
-    const { status, complementId } = req.query;
+    const { status, complementType: qCompType } = req.query;
     let where = "WHERE 1=1";
     const params = [];
     if (status) {
       params.push(status);
       where += ` AND c.status = $${params.length}`;
     }
-    if (complementId) {
-      params.push(complementId);
-      where += ` AND c.complement_id = $${params.length}`;
+    if (qCompType) {
+      params.push(qCompType);
+      where += ` AND c.complement_type = $${params.length}`;
     }
     const r = await pool.query(
-      `SELECT c.*, u.display_name AS client_name, u.email AS client_email, u.phone AS client_phone,
-              comp.name AS complement_name, comp.specialist, comp.instagram,
-              o.order_number, o.total_amount, o.payment_method AS order_payment_method
+      `SELECT c.*, u.display_name AS client_name, u.email AS client_email, u.phone AS client_phone
        FROM consultations c
        JOIN users u ON c.user_id = u.id
-       JOIN complements comp ON c.complement_id = comp.id
-       LEFT JOIN orders o ON c.order_id = o.id
        ${where}
        ORDER BY c.created_at DESC`,
       params
