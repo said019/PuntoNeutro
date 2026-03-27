@@ -9,16 +9,27 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { Pencil, Save, X } from "lucide-react";
+
+const methodLabel: Record<string, string> = {
+  cash: "Efectivo",
+  efectivo: "Efectivo",
+  transfer: "Transferencia",
+  transferencia: "Transferencia",
+  card: "Tarjeta",
+  tarjeta: "Tarjeta",
+};
 
 const ClientDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [adjPoints, setAdjPoints] = useState("");
-  const [adjReason, setAdjReason] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<Record<string, string>>({});
 
   const { data: user, isLoading } = useQuery({
     queryKey: ["client", id],
@@ -44,37 +55,35 @@ const ClientDetail = () => {
     enabled: !!id,
   });
 
-  const { data: loyalty, refetch: refetchLoyalty } = useQuery({
-    queryKey: ["client-loyalty", id],
-    queryFn: async () => (await api.get(`/loyalty/points/${id}`)).data,
-    enabled: !!id,
-  });
-
-  const adjustMutation = useMutation({
-    mutationFn: ({ points, reason, type }: { points: number; reason: string; type: "earn" | "redeem" }) =>
-      api.post("/admin/loyalty/adjust", { userId: id, points, reason, type }),
+  const updateMutation = useMutation({
+    mutationFn: (body: Record<string, string>) => api.put(`/users/${id}`, body),
     onSuccess: () => {
-      refetchLoyalty();
-      qc.invalidateQueries({ queryKey: ["client-loyalty", id] });
-      toast({ title: "✅ Puntos ajustados" });
-      setAdjPoints("");
-      setAdjReason("");
+      qc.invalidateQueries({ queryKey: ["client", id] });
+      toast({ title: "Perfil actualizado" });
+      setEditing(false);
     },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al ajustar puntos", variant: "destructive" }),
-  });
-
-  const recalcMutation = useMutation({
-    mutationFn: () => api.post(`/admin/loyalty/recalculate/${id}`),
-    onSuccess: (res: any) => {
-      refetchLoyalty();
-      qc.invalidateQueries({ queryKey: ["client-loyalty", id] });
-      const msg = res?.data?.data?.message ?? "Recalculado";
-      toast({ title: `✅ ${msg}` });
-    },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al recalcular", variant: "destructive" }),
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al guardar", variant: "destructive" }),
   });
 
   const u = user?.data ?? user;
+
+  const startEditing = () => {
+    setForm({
+      displayName: u?.displayName ?? "",
+      phone: u?.phone ?? "",
+      dateOfBirth: u?.dateOfBirth ?? "",
+      emergencyContactName: u?.emergencyContactName ?? "",
+      emergencyContactPhone: u?.emergencyContactPhone ?? "",
+      healthNotes: u?.healthNotes ?? "",
+    });
+    setEditing(true);
+  };
+
+  const handleSave = () => {
+    updateMutation.mutate(form);
+  };
+
+  const paymentsArr = Array.isArray(payments?.data) ? payments.data : [];
 
   return (
     <AuthGuard>
@@ -95,19 +104,65 @@ const ClientDetail = () => {
               <TabsTrigger value="memberships">Membresías</TabsTrigger>
               <TabsTrigger value="bookings">Reservas</TabsTrigger>
               <TabsTrigger value="payments">Pagos</TabsTrigger>
-              <TabsTrigger value="loyalty">Lealtad</TabsTrigger>
             </TabsList>
 
+            {/* ── Perfil ── */}
             <TabsContent value="profile" className="mt-4">
-              {isLoading ? <Skeleton className="h-40 w-full" /> : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                  <div><span className="font-medium">Fecha de nacimiento:</span> {u?.dateOfBirth ?? "—"}</div>
-                  <div><span className="font-medium">Emergencia:</span> {u?.emergencyContactName ?? "—"} {u?.emergencyContactPhone ?? ""}</div>
-                  <div className="col-span-2"><span className="font-medium">Notas de salud:</span> {u?.healthNotes ?? "—"}</div>
+              {isLoading ? <Skeleton className="h-40 w-full" /> : editing ? (
+                <div className="space-y-4 max-w-lg">
+                  <div className="space-y-1">
+                    <Label>Nombre</Label>
+                    <Input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Teléfono</Label>
+                    <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Fecha de nacimiento</Label>
+                    <Input type="date" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Contacto de emergencia</Label>
+                      <Input placeholder="Nombre" value={form.emergencyContactName} onChange={(e) => setForm({ ...form, emergencyContactName: e.target.value })} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Tel. emergencia</Label>
+                      <Input placeholder="Teléfono" value={form.emergencyContactPhone} onChange={(e) => setForm({ ...form, emergencyContactPhone: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Notas de salud</Label>
+                    <Textarea rows={3} value={form.healthNotes} onChange={(e) => setForm({ ...form, healthNotes: e.target.value })} />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
+                      <Save size={14} className="mr-1" /> Guardar
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
+                      <X size={14} className="mr-1" /> Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div><span className="font-medium">Nombre:</span> {u?.displayName ?? "—"}</div>
+                    <div><span className="font-medium">Email:</span> {u?.email ?? "—"}</div>
+                    <div><span className="font-medium">Teléfono:</span> {u?.phone ?? "—"}</div>
+                    <div><span className="font-medium">Fecha de nacimiento:</span> {u?.dateOfBirth ? new Date(u.dateOfBirth).toLocaleDateString("es-MX") : "—"}</div>
+                    <div><span className="font-medium">Contacto de emergencia:</span> {u?.emergencyContactName ?? "—"} {u?.emergencyContactPhone ?? ""}</div>
+                    <div className="col-span-2"><span className="font-medium">Notas de salud:</span> {u?.healthNotes ?? "—"}</div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={startEditing}>
+                    <Pencil size={14} className="mr-1" /> Editar perfil
+                  </Button>
                 </div>
               )}
             </TabsContent>
 
+            {/* ── Membresías ── */}
             <TabsContent value="memberships" className="mt-4">
               <Table>
                 <TableHeader><TableRow><TableHead>Plan</TableHead><TableHead>Estado</TableHead><TableHead>Vence</TableHead><TableHead>Clases</TableHead></TableRow></TableHeader>
@@ -115,7 +170,7 @@ const ClientDetail = () => {
                   {(Array.isArray(memberships?.data) ? memberships.data : []).map((m: any) => (
                     <TableRow key={m.id}>
                       <TableCell>{m.planName ?? m.planId}</TableCell>
-                      <TableCell><Badge>{m.status}</Badge></TableCell>
+                      <TableCell><Badge>{m.status === "active" ? "Activa" : m.status === "expired" ? "Expirada" : m.status}</Badge></TableCell>
                       <TableCell>{m.endDate ? new Date(m.endDate).toLocaleDateString("es-MX") : "—"}</TableCell>
                       <TableCell>{m.classesRemaining}</TableCell>
                     </TableRow>
@@ -124,6 +179,7 @@ const ClientDetail = () => {
               </Table>
             </TabsContent>
 
+            {/* ── Reservas ── */}
             <TabsContent value="bookings" className="mt-4">
               <Table>
                 <TableHeader><TableRow><TableHead>Clase</TableHead><TableHead>Fecha</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
@@ -132,81 +188,31 @@ const ClientDetail = () => {
                     <TableRow key={b.id}>
                       <TableCell>{b.className ?? b.classId}</TableCell>
                       <TableCell>{b.startTime ? new Date(b.startTime).toLocaleString("es-MX", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>
-                      <TableCell><Badge variant="outline">{b.status}</Badge></TableCell>
+                      <TableCell><Badge variant="outline">{b.status === "confirmed" ? "Confirmada" : b.status === "cancelled" ? "Cancelada" : b.status}</Badge></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TabsContent>
 
+            {/* ── Pagos ── */}
             <TabsContent value="payments" className="mt-4">
               <Table>
                 <TableHeader><TableRow><TableHead>Monto</TableHead><TableHead>Método</TableHead><TableHead>Fecha</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {(Array.isArray(payments?.data) ? payments.data : []).map((p: any) => (
-                    <TableRow key={p.id}>
-                      <TableCell>${p.total_amount ?? p.amount}</TableCell>
-                      <TableCell>{p.method}</TableCell>
-                      <TableCell>{p.createdAt ? new Date(p.createdAt).toLocaleDateString("es-MX") : "—"}</TableCell>
-                    </TableRow>
-                  ))}
+                  {paymentsArr.map((p: any) => {
+                    const date = p.createdAt || p.created_at;
+                    const method = p.method || p.payment_method || "";
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell>${parseFloat(p.total_amount ?? p.totalAmount ?? p.amount ?? 0).toFixed(2)}</TableCell>
+                        <TableCell>{methodLabel[method.toLowerCase()] ?? method}</TableCell>
+                        <TableCell>{date ? new Date(date).toLocaleDateString("es-MX") : "—"}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
-            </TabsContent>
-
-            <TabsContent value="loyalty" className="mt-4 space-y-6">
-              <div className="flex items-end gap-4">
-                <div>
-                  <div className="text-4xl font-bold">{(loyalty as any)?.data?.balance ?? (loyalty as any)?.balance ?? (loyalty as any)?.points ?? 0}</div>
-                  <p className="text-muted-foreground text-sm">puntos acumulados</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={recalcMutation.isPending}
-                  onClick={() => recalcMutation.mutate()}
-                >
-                  {recalcMutation.isPending ? "Recalculando…" : "🔄 Recalcular desde membresías"}
-                </Button>
-              </div>
-              <div className="rounded-xl border p-4 space-y-3 max-w-sm">
-                <p className="text-sm font-semibold">Ajustar puntos manualmente</p>
-                <div className="space-y-1">
-                  <Label>Puntos (número positivo)</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    placeholder="Ej: 150"
-                    value={adjPoints}
-                    onChange={(e) => setAdjPoints(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Motivo</Label>
-                  <Input
-                    placeholder="Ej: Membresía no contabilizada"
-                    value={adjReason}
-                    onChange={(e) => setAdjReason(e.target.value)}
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    disabled={!adjPoints || adjustMutation.isPending}
-                    onClick={() => adjustMutation.mutate({ points: Math.abs(Number(adjPoints)), reason: adjReason || "Ajuste manual", type: "earn" })}
-                  >
-                    + Agregar puntos
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!adjPoints || adjustMutation.isPending}
-                    onClick={() => adjustMutation.mutate({ points: Math.abs(Number(adjPoints)), reason: adjReason || "Ajuste manual", type: "redeem" })}
-                  >
-                    − Deducir puntos
-                  </Button>
-                </div>
-              </div>
             </TabsContent>
           </Tabs>
         </div>

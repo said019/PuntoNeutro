@@ -840,6 +840,7 @@ async function ensureSchema() {
     await pool.query(`
       UPDATE memberships SET classes_remaining = NULL WHERE classes_remaining >= 9999;
     `).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS notes TEXT`).catch(() => { });
     // ── memberships: track how many times a user has cancelled ────────────
     await pool.query(`
       ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0;
@@ -8119,7 +8120,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
     console.error("POST /memberships error:", err);
-    return res.status(500).json({ message: "Error interno" });
+    return res.status(500).json({ message: err.message || "Error interno" });
   }
 });
 
@@ -8697,9 +8698,9 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
     });
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[POST /admin/clients/manual]", err.message);
+    console.error("[POST /admin/clients/manual]", err.message, err.code);
     if (err.code === "23505") return res.status(409).json({ message: "Ya existe una clienta con ese email" });
-    return res.status(500).json({ message: "Error interno" });
+    return res.status(500).json({ message: err.message || "Error interno" });
   } finally {
     client.release();
   }
@@ -9056,12 +9057,14 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
 // GET /api/payments
 app.get("/api/payments", adminMiddleware, async (req, res) => {
   try {
-    const { startDate, endDate, limit = 200 } = req.query;
+    const { startDate, endDate, userId, limit = 200 } = req.query;
     const params = [];
     let startIdx = null;
     let endIdx = null;
+    let userIdx = null;
     if (startDate) { params.push(startDate); startIdx = params.length; }
     if (endDate) { params.push(endDate); endIdx = params.length; }
+    if (userId) { params.push(userId); userIdx = params.length; }
     // Include approved orders AND manually-assigned memberships
     let q = `
       SELECT
@@ -9077,9 +9080,10 @@ app.get("/api/payments", adminMiddleware, async (req, res) => {
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN plans p ON o.plan_id = p.id
-      WHERE o.status = 'approved'`;
+      WHERE o.status IN ('approved','paid')`;
     if (startIdx) q += ` AND o.created_at >= $${startIdx}`;
     if (endIdx) q += ` AND o.created_at <= $${endIdx}`;
+    if (userIdx) q += ` AND o.user_id = $${userIdx}`;
 
     // Also fetch memberships assigned directly (cash/card/transfer)
     let mq = `
@@ -9099,6 +9103,7 @@ app.get("/api/payments", adminMiddleware, async (req, res) => {
       WHERE m.status = 'active'`;
     if (startIdx) mq += ` AND m.created_at >= $${startIdx}`;
     if (endIdx) mq += ` AND m.created_at <= $${endIdx}`;
+    if (userIdx) mq += ` AND m.user_id = $${userIdx}`;
 
     const combined = `(${q}) UNION ALL (${mq}) ORDER BY created_at DESC LIMIT $${params.length + 1}`;
     params.push(parseInt(limit));
