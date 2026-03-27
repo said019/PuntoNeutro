@@ -3005,7 +3005,7 @@ app.get("/api/orders/:id", authMiddleware, async (req, res) => {
 
 // POST /api/orders
 app.post("/api/orders", authMiddleware, async (req, res) => {
-  const { planId, discountCode, paymentMethod: rawPM = "transfer", complementId } = req.body;
+  const { planId, discountCode, paymentMethod: rawPM = "transfer", complementId, complementType } = req.body;
   const paymentMethod = normalizePaymentMethod(rawPM);
   if (!planId) return res.status(400).json({ message: "planId requerido" });
   const client = await pool.connect();
@@ -3024,35 +3024,17 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
 
-    // ── Combo pricing: if complementId is provided, use combo price ──
+    // ── Combo pricing: complementType from frontend ──
+    const COMBO_PRICES = { 8: { price: 1030, discount: 990 }, 12: { price: 1250, discount: 1190 }, 16: { price: 1450, discount: 1340 } };
+    const activeComplement = complementType || complementId || null;
     let subtotal = parseFloat(plan.price);
-    let validComplementId = null;
 
-    if (complementId) {
-      // Validate complement exists
-      const compRes = await client.query("SELECT * FROM complements WHERE id = $1 AND is_active = true", [complementId]);
-      if (compRes.rows.length === 0) {
-        await client.query("ROLLBACK");
-        return res.status(404).json({ message: "Complemento no encontrado" });
+    if (activeComplement) {
+      const cl = plan.class_limit;
+      const combo = COMBO_PRICES[cl];
+      if (combo) {
+        subtotal = (paymentMethod === "cash" || paymentMethod === "transfer") ? combo.discount : combo.price;
       }
-      // Look up combo pricing by plan's class_limit
-      const classCount = plan.class_limit;
-      const comboRes = await client.query(
-        "SELECT * FROM combo_pricing WHERE class_count = $1 AND is_active = true",
-        [classCount]
-      );
-      if (comboRes.rows.length === 0) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({ message: "No hay precio combo disponible para este plan" });
-      }
-      const combo = comboRes.rows[0];
-      // Use discount_price for cash/transfer, normal price otherwise
-      if ((paymentMethod === "cash" || paymentMethod === "transfer") && combo.discount_price) {
-        subtotal = parseFloat(combo.discount_price);
-      } else {
-        subtotal = parseFloat(combo.price);
-      }
-      validComplementId = complementId;
     }
 
     let discount = 0;
@@ -3089,9 +3071,9 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     // Build INSERT dynamically — complement_id column may not exist yet
     const cols = ["user_id", "plan_id", "status", "payment_method", "subtotal", "tax_amount", "total_amount", "discount_amount", "discount_code_id", "bank_info", "expires_at"];
     const vals = [req.userId, planId, initialStatus, paymentMethod, subtotal, 0, total, discount, appliedDiscountCode?.id ?? null, JSON.stringify(bankInfo), expires];
-    if (validComplementId) {
-      cols.push("complement_id");
-      vals.push(validComplementId);
+    if (activeComplement) {
+      cols.push("notes");
+      vals.push(`Complemento: ${activeComplement}`);
     }
     const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
     let orderRes;
@@ -3101,18 +3083,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
         vals
       );
     } catch (insertErr) {
-      // If complement_id column doesn't exist, retry without it
-      if (insertErr.code === "42703" && validComplementId) {
-        const colsBase = cols.filter(c => c !== "complement_id");
-        const valsBase = vals.slice(0, -1);
-        const ph = valsBase.map((_, i) => `$${i + 1}`).join(", ");
-        orderRes = await client.query(
-          `INSERT INTO orders (${colsBase.join(", ")}) VALUES (${ph}) RETURNING *`,
-          valsBase
-        );
-      } else {
-        throw insertErr;
-      }
+      throw insertErr;
     }
 
     await client.query("COMMIT");
@@ -8059,7 +8030,7 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
 // POST /api/memberships — admin assigns membership to a user
 app.post("/api/memberships", adminMiddleware, async (req, res) => {
   try {
-    const { userId, planId, paymentMethod: rawPM = "cash", startDate } = req.body;
+    const { userId, planId, paymentMethod: rawPM = "cash", startDate, complementType } = req.body;
     const paymentMethod = normalizePaymentMethod(rawPM);
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
     const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
@@ -8072,10 +8043,11 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const start = startDate ? new Date(startDate) : new Date();
     const end = new Date(start);
     end.setDate(end.getDate() + (plan.duration_days || 30));
+    const complementNote = complementType ? `Complemento: ${complementType}` : null;
     const r = await pool.query(
-      `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining)
-       VALUES ($1,$2,'active',$3,$4,$5,$6) RETURNING *`,
-      [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null]
+      `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes)
+       VALUES ($1,$2,'active',$3,$4,$5,$6,$7) RETURNING *`,
+      [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null, complementNote]
     );
 
     // ── Email: membership activated ──────────────────────────────────────
@@ -8643,7 +8615,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
       displayName, email, phone, dateOfBirth,
       emergencyContactName, emergencyContactPhone, healthNotes,
       planId, paymentMethod: rawPM = "cash", startDate,
-      notes,
+      notes, complementType,
     } = req.body;
     const paymentMethod = normalizePaymentMethod(rawPM);
     if (!displayName) return res.status(400).json({ message: "Nombre es requerido" });
@@ -8692,7 +8664,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         [user.id, plan.id, paymentMethod, start.toISOString().split("T")[0],
         end.toISOString().split("T")[0],
         plan.class_limit === 0 ? null : plan.class_limit,
-        notes || `Alta manual por admin`]
+        (complementType ? `${notes || "Alta manual por admin"} | Complemento: ${complementType}` : notes || `Alta manual por admin`)]
       );
       membership = camelRow(memRes.rows[0]);
     }

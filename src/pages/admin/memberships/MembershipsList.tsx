@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Search, X } from "lucide-react";
+import { MoreHorizontal, Plus, Search, X, Heart } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -172,12 +172,20 @@ const MembershipTable = ({ status, title }: { status?: string; title: string }) 
   );
 };
 
+const COMPLEMENTS = [
+  { id: "nutricion-hormonal", name: "Nutrición — Salud Hormonal", specialist: "LN. Clara Pérez" },
+  { id: "nutricion-rendimiento", name: "Nutrición — Rendimiento Físico", specialist: "LN. Majo Zamorano" },
+  { id: "descarga-muscular", name: "Descarga Muscular", specialist: "LTF. Angelina Huante" },
+];
+const COMBO_ELIGIBLE = [8, 12, 16];
+
 const MembershipsList = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<ClientOption | null>(null);
+  const [complementType, setComplementType] = useState<string | null>(null);
   const debouncedUserSearch = useDebounce(userSearch, 250);
 
   const form = useForm<MembershipFormData>({
@@ -186,13 +194,14 @@ const MembershipsList = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: (d: MembershipFormData) => api.post("/memberships", d),
+    mutationFn: (d: MembershipFormData) => api.post("/memberships", { ...d, complementType: complementType ?? undefined }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["memberships"] });
       toast({ title: "Membresía asignada" });
       setOpen(false);
       setSelectedUser(null);
       setUserSearch("");
+      setComplementType(null);
       form.reset({ userId: "", startDate: new Date().toISOString().split("T")[0] });
     },
   });
@@ -315,6 +324,31 @@ const MembershipsList = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {/* Complement selector — shown when plan has 8/12/16 classes */}
+              {(() => {
+                const selPlanId = form.watch("planId");
+                const allPlans = Array.isArray(plansData?.data) ? plansData.data : [];
+                const selPlan = allPlans.find((p: any) => p.id === selPlanId);
+                const cl = (selPlan as any)?.classLimit ?? (selPlan as any)?.class_limit ?? 0;
+                if (!COMBO_ELIGIBLE.includes(cl)) return null;
+                return (
+                  <div className="space-y-1 rounded-lg border border-[#b5bf9c]/15 bg-[#b5bf9c]/[0.03] p-3">
+                    <div className="flex items-center gap-1.5">
+                      <Heart size={12} className="text-[#b5bf9c]" />
+                      <Label className="text-xs">Agregar complemento (opcional)</Label>
+                    </div>
+                    <Select value={complementType ?? "none"} onValueChange={(v) => setComplementType(v === "none" ? null : v)}>
+                      <SelectTrigger><SelectValue placeholder="Sin complemento" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin complemento</SelectItem>
+                        {COMPLEMENTS.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name} — {c.specialist}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })()}
               <div className="space-y-1">
                 <Label>Método de pago</Label>
                 <Select onValueChange={(v) => form.setValue("paymentMethod", v as "efectivo")}>
