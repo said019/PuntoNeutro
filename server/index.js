@@ -591,6 +591,10 @@ async function ensureSchema() {
         'Siete Sesiones (28 al Mes)'
       );
     `).catch(() => { });
+    // Deactivate old combo "Paquete +" plans — replaced by complement add-on selector
+    await pool.query(`
+      UPDATE plans SET is_active = false WHERE name ILIKE '%+%Nutri%' OR name ILIKE '%+%Descarga%' OR name ILIKE '%+%Hormonal%' OR name ILIKE 'Paquete +%' OR name ILIKE '%Clases +%';
+    `).catch(() => { });
     // Remove legacy plan "Sesión Extra (Socias o Inscritas)" and all related data.
     // This keeps admin clean and avoids accidental reuse of an obsolete plan.
     try {
@@ -630,10 +634,7 @@ async function ensureSchema() {
           ('4 Clases', 'Paquete de 4 clases al mes', 400, 'MXN', 30, 4, 'all', '["4 clases","Vigencia 30 días","Precio con descuento: $380"]'::jsonb, true, 2),
           ('8 Clases', 'Paquete de 8 clases al mes', 680, 'MXN', 30, 8, 'all', '["8 clases","Vigencia 30 días","Precio con descuento: $640"]'::jsonb, true, 3),
           ('12 Clases', 'Paquete de 12 clases al mes', 900, 'MXN', 30, 12, 'all', '["12 clases","Vigencia 30 días","Precio con descuento: $840"]'::jsonb, true, 4),
-          ('16 Clases', 'Paquete de 16 clases al mes', 1100, 'MXN', 30, 16, 'all', '["16 clases","Vigencia 30 días"]'::jsonb, true, 5),
-          ('Paquete + Nutrición Hormonal', 'Paquete básico + Consulta de nutrición "Salud hormonal" con LN. Clara Pérez', 1030, 'MXN', 30, 8, 'all', '["8 clases de pilates","Consulta de nutrición hormonal","LN. Clara Pérez","Vigencia 30 días","Precio con descuento: $990"]'::jsonb, true, 10),
-          ('Paquete + Nutrición Rendimiento', 'Paquete básico + Consulta de nutrición "Rendimiento Físico" con LN. Majo Zamorano', 1250, 'MXN', 30, 8, 'all', '["8 clases de pilates","Consulta de nutrición deportiva","LN. Majo Zamorano","Vigencia 30 días","Precio con descuento: $1,190"]'::jsonb, true, 11),
-          ('Paquete + Descarga Muscular', 'Paquete básico + Descarga muscular con LTF. Angelina Huante', 1450, 'MXN', 30, 8, 'all', '["8 clases de pilates","Sesión de descarga muscular","LTF. Angelina Huante","Vigencia 30 días","Precio con descuento: $1,340"]'::jsonb, true, 12)
+          ('16 Clases', 'Paquete de 16 clases al mes', 1100, 'MXN', 30, 16, 'all', '["16 clases","Vigencia 30 días"]'::jsonb, true, 5)
         ON CONFLICT DO NOTHING;
       `);
     }
