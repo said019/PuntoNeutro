@@ -178,6 +178,11 @@ const COMPLEMENTS = [
   { id: "descarga-muscular", name: "Descarga Muscular", specialist: "LTF. Angelina Huante" },
 ];
 const COMBO_ELIGIBLE = [8, 12, 16];
+const COMBO_PRICES: Record<number, { price: number; discount: number }> = {
+  8: { price: 1030, discount: 990 },
+  12: { price: 1250, discount: 1190 },
+  16: { price: 1450, discount: 1340 },
+};
 
 const MembershipsList = () => {
   const { toast } = useToast();
@@ -364,6 +369,56 @@ const MembershipsList = () => {
                 <Label>Fecha de inicio</Label>
                 <DatePicker value={form.watch("startDate")} onChange={(v) => form.setValue("startDate", v)} />
               </div>
+              {/* ── Price summary ── */}
+              {(() => {
+                const selPlanId = form.watch("planId");
+                const selPM = form.watch("paymentMethod");
+                const allPlans = Array.isArray(plansData?.data) ? plansData.data : [];
+                const selPlan = allPlans.find((p: any) => p.id === selPlanId) as any;
+                if (!selPlan) return null;
+                const cl = selPlan?.classLimit ?? selPlan?.class_limit ?? 0;
+                const basePrice = parseFloat(selPlan?.price ?? 0);
+                const hasCombo = complementType && COMBO_ELIGIBLE.includes(cl);
+                const combo = hasCombo ? COMBO_PRICES[cl] : null;
+                const isDiscount = selPM === "efectivo" || selPM === "transferencia";
+                let total = basePrice;
+                let discountTotal: number | null = null;
+                if (combo) {
+                  total = combo.price;
+                  if (isDiscount) discountTotal = combo.discount;
+                } else {
+                  // Parse discount from features if available
+                  const features = selPlan?.features ?? [];
+                  const discFeat = features.find((f: string) => f.includes("descuento"));
+                  if (discFeat && isDiscount) {
+                    const m = discFeat.match(/\$[\d,]+/);
+                    if (m) discountTotal = parseFloat(m[0].replace(/[$,]/g, ""));
+                  }
+                }
+                const finalPrice = discountTotal ?? total;
+                return (
+                  <div className="rounded-xl border border-[#94867a]/20 bg-[#f4f5ef]/60 p-3 space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#2d2d2d]/60">{selPlan?.name}{hasCombo ? " + Complemento" : ""}</span>
+                      {discountTotal ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[#94867a] line-through">${total.toLocaleString("es-MX")}</span>
+                          <span className="font-bold text-[#2d2d2d]">${discountTotal.toLocaleString("es-MX")}</span>
+                        </div>
+                      ) : (
+                        <span className="font-bold text-[#2d2d2d]">${total.toLocaleString("es-MX")}</span>
+                      )}
+                    </div>
+                    {isDiscount && (
+                      <p className="text-[10px] text-[#b5bf9c] font-medium">Precio con descuento (efectivo/transferencia)</p>
+                    )}
+                    <div className="flex items-center justify-between pt-1 border-t border-[#94867a]/10">
+                      <span className="text-sm font-semibold text-[#2d2d2d]">Total a cobrar</span>
+                      <span className="text-lg font-bold text-[#2d2d2d]">${finalPrice.toLocaleString("es-MX")} MXN</span>
+                    </div>
+                  </div>
+                );
+              })()}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                 <Button type="submit" disabled={createMutation.isPending}>Asignar</Button>

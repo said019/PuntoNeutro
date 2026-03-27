@@ -399,14 +399,45 @@ const ClientsList = () => {
                   {selectedPlan && (() => {
                     const cl = (selectedPlan as any).classLimit ?? (selectedPlan as any).class_limit ?? 0;
                     const combo = COMBO_PRICES[cl];
-                    const displayPrice = (complementType && combo) ? combo.price : selectedPlan.price;
+                    const hasCombo = complementType && combo;
+                    const basePrice = parseFloat(String(selectedPlan.price ?? 0));
+                    const normalPrice = hasCombo ? combo.price : basePrice;
+                    const isDiscount = paymentMethod === "efectivo" || paymentMethod === "transferencia";
+                    let discountPrice: number | null = null;
+                    if (hasCombo && isDiscount) {
+                      discountPrice = combo.discount;
+                    } else if (!hasCombo && isDiscount) {
+                      const features = (selectedPlan as any).features ?? [];
+                      const discFeat = features.find((f: string) => f.includes("descuento"));
+                      if (discFeat) {
+                        const m = discFeat.match(/\$[\d,]+/);
+                        if (m) discountPrice = parseFloat(m[0].replace(/[$,]/g, ""));
+                      }
+                    }
+                    const finalPrice = discountPrice ?? normalPrice;
                     return (
-                      <div className="flex items-center justify-between rounded-xl border border-[#b5bf9c]/20 bg-[#b5bf9c]/5 px-4 py-2.5">
-                        <span className="text-sm text-[#2d2d2d]/70">
-                          {selectedPlan.name}
-                          {complementType && <span className="text-[#b5bf9c]"> + complemento</span>}
-                        </span>
-                        <span className="text-lg font-bold text-[#b5bf9c]">${displayPrice.toLocaleString("es-MX")}</span>
+                      <div className="rounded-xl border border-[#94867a]/20 bg-[#f4f5ef]/60 p-3 space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#2d2d2d]/60">
+                            {selectedPlan.name}
+                            {hasCombo && <span className="text-[#b5bf9c]"> + complemento</span>}
+                          </span>
+                          {discountPrice ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-[#94867a] line-through">${normalPrice.toLocaleString("es-MX")}</span>
+                              <span className="font-bold text-[#2d2d2d]">${discountPrice.toLocaleString("es-MX")}</span>
+                            </div>
+                          ) : (
+                            <span className="font-bold text-[#2d2d2d]">${normalPrice.toLocaleString("es-MX")}</span>
+                          )}
+                        </div>
+                        {isDiscount && discountPrice && (
+                          <p className="text-[10px] text-[#b5bf9c] font-medium">Precio con descuento (efectivo/transferencia)</p>
+                        )}
+                        <div className="flex items-center justify-between pt-1 border-t border-[#94867a]/10">
+                          <span className="text-sm font-semibold text-[#2d2d2d]">Total a cobrar</span>
+                          <span className="text-lg font-bold text-[#2d2d2d]">${finalPrice.toLocaleString("es-MX")} MXN</span>
+                        </div>
                       </div>
                     );
                   })()}
