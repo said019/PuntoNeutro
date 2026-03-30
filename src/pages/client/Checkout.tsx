@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   Check, Loader2, CreditCard, Copy, Banknote, Building2,
-  Tag, ChevronRight, ArrowLeft, Upload, CheckCircle, Sparkles, Heart,
+  Tag, ChevronRight, ArrowLeft, Upload, CheckCircle, Heart,
 } from "lucide-react";
 import imgPilates from "@/assets/pilates_2320695.png";
 
@@ -44,7 +44,8 @@ const PlanCard = ({
   const durationDays = Number(plan.durationDays ?? plan.duration_days ?? 0);
   const nonTransferable = flag(plan.isNonTransferable ?? plan.is_non_transferable);
   const nonRepeatable = flag(plan.isNonRepeatable ?? plan.is_non_repeatable);
-  const features: string[] = Array.isArray(plan.features) ? plan.features : [];
+  const features: string[] = (Array.isArray(plan.features) ? plan.features : [])
+    .filter((f: string) => !f.toLowerCase().includes("descuento") && !f.toLowerCase().includes("costo con"));
 
   return (
     <button
@@ -81,12 +82,8 @@ const PlanCard = ({
       {features.length > 0 && (
         <ul className="mt-2 space-y-0.5">
           {features.map((f, i) => (
-            <li key={i} className={cn(
-              "flex items-start gap-1.5",
-              (f.toLowerCase().includes("descuento") || f.toLowerCase().includes("costo con"))
-                ? "text-[#1a6b0a] font-bold text-[11px]" : "text-[10px] text-[#2d2d2d]/45"
-            )}>
-              <span className="mt-0.5 shrink-0">{(f.toLowerCase().includes("descuento") || f.toLowerCase().includes("costo con")) ? "💰" : "•"}</span>
+            <li key={i} className="text-[10px] text-[#2d2d2d]/45 flex items-start gap-1.5">
+              <span className="mt-0.5 shrink-0">•</span>
               {f}
             </li>
           ))}
@@ -188,17 +185,8 @@ const Checkout = () => {
   const basePrice = (selectedComplement && comboTier) ? comboTier.price : (selectedPlan?.price ?? 0);
   const comboDiscountPrice = (selectedComplement && comboTier) ? comboTier.discount : null;
 
-  // Check if plan has a cash/transfer discount in its features
-  const planFeatures: string[] = Array.isArray(selectedPlan?.features) ? selectedPlan.features : [];
-  const planDiscountFeature = planFeatures.find((f: string) =>
-    f.toLowerCase().includes("descuento") || f.toLowerCase().includes("costo con")
-  );
-  const planCashDiscount = planDiscountFeature
-    ? Number(planDiscountFeature.replace(/[^0-9]/g, "")) || null
-    : null;
-
-  // Apply payment method discount: combo discount or plan feature discount
-  const cashTransferPrice = comboDiscountPrice ?? planCashDiscount ?? null;
+  // Apply combo discount when paying with cash/transfer
+  const cashTransferPrice = comboDiscountPrice ?? null;
   const effectivePrice = (paymentMethod === "transfer" || paymentMethod === "cash") && cashTransferPrice
     ? cashTransferPrice : basePrice;
   const finalAmount = discountResult ? effectivePrice - (discountResult.discount_amount ?? 0) : effectivePrice;

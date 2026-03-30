@@ -2313,6 +2313,7 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
        FROM memberships m
        LEFT JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1
+         AND m.status IN ('active', 'pending_activation', 'pending_payment')
        ORDER BY CASE m.status
          WHEN 'active'              THEN 1
          WHEN 'pending_activation'  THEN 2
