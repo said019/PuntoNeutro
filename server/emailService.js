@@ -1,6 +1,6 @@
 /**
  * Punto Neutro — Email Service (Resend)
- * Handles all transactional emails with branded HTML templates.
+ * Branded HTML templates matching the studio's visual identity.
  */
 
 let resend = null;
@@ -13,36 +13,34 @@ if (process.env.RESEND_API_KEY) {
   }
 }
 
-// IMPORTANT: Use onboarding@resend.dev until puntoneutro.com.mx is verified in Resend dashboard
-// Once verified, change this back to: process.env.EMAIL_FROM || "Punto Neutro <notificaciones@puntoneutro.com.mx>"
-const FROM_EMAIL = "Punto Neutro <onboarding@resend.dev>";
-const SITE_URL = process.env.SITE_URL || "https://puntoneutro.com.mx";
-const LOGO_URL = `${SITE_URL}/pn-logo-full.png`;
+const FROM_EMAIL = process.env.EMAIL_FROM || "Punto Neutro <onboarding@resend.dev>";
+const SITE_URL = String(process.env.SITE_URL || process.env.APP_URL || "https://puntoneutro.com.mx").replace(/\/+$/, "");
+const LOGO_URL = `${SITE_URL}/punto-neutro-logo.png`;
 
-// ─── Brand palette ────────────────────────────────────────────────────────────
+// ─── Brand palette (matches website) ─────────────────────────────────────────
 const B = {
-  bg: "#2c2c2c",       // dark neutral
-  card: "#3a3a3a",     // card background
-  border: "#5a5a5a",   // border
-  purple: "#94867a",   // warm brown accent
-  magenta: "#b5bf9c",  // punto verde
-  violet: "#94867a",   // punto marrón
-  lime: "#b5bf9c",     // punto verde
-  cream: "#ebede5",    // punto crema
-  lilac: "#d4d8c8",    // light sage
-  text: "#ebede5",     // cream / almost-white
-  muted: "#a8a89e",    // soft muted
+  bg:      "#f4f5ef",   // page background — warm cream
+  card:    "#ffffff",   // card background — white
+  border:  "#e8e9e3",   // subtle border
+  brown:   "#94867a",   // primary accent — warm taupe
+  green:   "#b5bf9c",   // secondary accent — sage green
+  dark:    "#2d2d2d",   // main text
+  body:    "#5a524a",   // body text
+  muted:   "#8a8278",   // muted/secondary text
+  cream:   "#ebede5",   // light cream
+  sage10:  "#f0f2ea",   // very light sage for backgrounds
+  amber:   "#b45309",   // warning/alert
 };
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
 function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } = {}) {
   const ctaBlock = ctaUrl
-    ? `<tr><td align="center" style="padding:24px 0 8px;">
+    ? `<tr><td align="center" style="padding:28px 0 12px;">
          <a href="${ctaUrl}"
-            style="display:inline-block;background:linear-gradient(135deg,${B.magenta},${B.violet});
-                   color:#fff;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
-                   font-size:15px;font-weight:700;letter-spacing:.5px;
-                   text-decoration:none;border-radius:50px;padding:14px 36px;">
+            style="display:inline-block;background:${B.brown};
+                   color:#ffffff;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+                   font-size:14px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;
+                   text-decoration:none;border-radius:50px;padding:14px 40px;">
            ${ctaText}
          </a>
        </td></tr>`
@@ -63,27 +61,37 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
   </div>
 
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-         style="background-color:${B.bg};min-height:100vh;">
-    <tr><td align="center" style="padding:32px 16px 48px;">
+         style="background-color:${B.bg};">
+    <tr><td align="center" style="padding:40px 16px 48px;">
 
       <!-- Card -->
       <table role="presentation" cellpadding="0" cellspacing="0" width="560"
              style="max-width:560px;width:100%;background-color:${B.card};
-                    border:1px solid ${B.border};border-radius:20px;
-                    box-shadow:0 0 60px rgba(225,92,184,.15);">
+                    border:1px solid ${B.border};border-radius:16px;
+                    box-shadow:0 4px 24px rgba(0,0,0,0.06);">
 
-        <!-- Header gradient bar -->
-        <tr><td style="height:5px;background:linear-gradient(90deg,${B.magenta},${B.violet},${B.lime});
-                        border-radius:20px 20px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+        <!-- Top accent bar -->
+        <tr><td style="height:4px;background:linear-gradient(90deg,${B.brown},${B.green});
+                        border-radius:16px 16px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
 
         <!-- Logo -->
-        <tr><td align="center" style="padding:32px 40px 8px;">
-          <img src="${LOGO_URL}" alt="Punto Neutro" width="160" height="auto"
-               style="display:block;max-width:160px;" />
+        <tr><td align="center" style="padding:32px 40px 4px;">
+          <a href="${SITE_URL}" style="text-decoration:none;">
+            <img src="${LOGO_URL}" alt="Punto Neutro" width="140" height="auto"
+                 style="display:block;max-width:140px;" />
+          </a>
+        </td></tr>
+
+        <!-- Tagline -->
+        <tr><td align="center" style="padding:0 40px 20px;">
+          <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;
+                    letter-spacing:2.5px;text-transform:uppercase;color:${B.muted};margin:0;">
+            Pilates &middot; Bienestar &middot; Equilibrio
+          </p>
         </td></tr>
 
         <!-- Content -->
-        <tr><td style="padding:8px 40px 8px;">
+        <tr><td style="padding:0 40px;">
           ${content}
         </td></tr>
 
@@ -91,16 +99,16 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
         ${ctaBlock}
 
         <!-- Divider -->
-        <tr><td style="padding:8px 40px 0;">
-          <hr style="border:none;border-top:1px solid ${B.border};margin:16px 0 0;" />
+        <tr><td style="padding:16px 40px 0;">
+          <hr style="border:none;border-top:1px solid ${B.border};margin:0;" />
         </td></tr>
 
         <!-- Footer -->
-        <tr><td align="center" style="padding:20px 40px 32px;">
-          <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;
-                    color:${B.muted};margin:0;line-height:1.6;">
-            © ${new Date().getFullYear()} Punto Neutro · Pilates & Bienestar<br>
-            <a href="${SITE_URL}" style="color:${B.magenta};text-decoration:none;">puntoneutro.com.mx</a>
+        <tr><td align="center" style="padding:20px 40px 28px;">
+          <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;
+                    color:${B.muted};margin:0;line-height:1.7;">
+            © ${new Date().getFullYear()} Punto Neutro · Tequisquiapan, Qro.<br>
+            <a href="${SITE_URL}" style="color:${B.brown};text-decoration:none;">puntoneutro.com.mx</a>
           </p>
         </td></tr>
 
@@ -113,16 +121,17 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function h1(text) {
-  return `<h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;
-                      font-weight:800;color:${B.cream};margin:16px 0 8px;line-height:1.25;">${text}</h1>`;
+  return `<h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:24px;
+                      font-weight:700;color:${B.dark};margin:16px 0 8px;line-height:1.3;">${text}</h1>`;
 }
 function h2(text) {
-  return `<h2 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:18px;
-                      font-weight:700;color:${B.violet};margin:20px 0 6px;">${text}</h2>`;
+  return `<h2 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:16px;
+                      font-weight:700;color:${B.brown};margin:20px 0 6px;text-transform:uppercase;
+                      letter-spacing:0.5px;">${text}</h2>`;
 }
 function p(text) {
   return `<p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;
-                     color:${B.text};line-height:1.7;margin:0 0 12px;">${text}</p>`;
+                     color:${B.body};line-height:1.7;margin:0 0 12px;">${text}</p>`;
 }
 function small(text) {
   return `<p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;
@@ -131,29 +140,36 @@ function small(text) {
 function infoRow(label, value) {
   return `<tr>
     <td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;
-               color:${B.muted};padding:6px 0;border-bottom:1px solid ${B.border};">${label}</td>
+               color:${B.muted};padding:10px 0;border-bottom:1px solid ${B.border};">${label}</td>
     <td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;
-               color:${B.cream};font-weight:600;padding:6px 0 6px 12px;
+               color:${B.dark};font-weight:600;padding:10px 0 10px 12px;
                border-bottom:1px solid ${B.border};text-align:right;">${value}</td>
   </tr>`;
 }
 function infoTable(rows) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-                  style="border-top:1px solid ${B.border};margin:16px 0 20px;">
+                  style="margin:16px 0 20px;">
     ${rows.join("")}
   </table>`;
 }
 function pill(text, color) {
-  return `<span style="display:inline-block;background:${color}22;border:1px solid ${color};
-                        color:${color};border-radius:50px;font-size:12px;font-weight:700;
-                        padding:3px 12px;letter-spacing:.5px;">${text}</span>`;
+  return `<span style="display:inline-block;background:${color}15;border:1px solid ${color}40;
+                        color:${color};border-radius:50px;font-size:11px;font-weight:700;
+                        padding:4px 14px;letter-spacing:0.5px;text-transform:uppercase;">${text}</span>`;
 }
-function alertBox(text, color = B.magenta) {
+function alertBox(text, type = "info") {
+  const colors = {
+    info:    { bg: `${B.green}15`, border: B.green, text: "#4a5e38" },
+    success: { bg: `${B.green}15`, border: B.green, text: "#4a5e38" },
+    warning: { bg: "#fef3c7",      border: "#f59e0b", text: "#92400e" },
+    error:   { bg: "#fef2f2",      border: "#ef4444", text: "#991b1b" },
+  };
+  const c = colors[type] || colors.info;
   return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-                  style="background:${color}15;border-left:4px solid ${color};
-                         border-radius:8px;margin:12px 0 20px;">
+                  style="background:${c.bg};border-left:4px solid ${c.border};
+                         border-radius:0 8px 8px 0;margin:12px 0 20px;">
     <tr><td style="padding:14px 16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
-                    font-size:14px;color:${B.cream};line-height:1.6;">${text}</td></tr>
+                    font-size:14px;color:${c.text};line-height:1.6;">${text}</td></tr>
   </table>`;
 }
 
@@ -182,7 +198,6 @@ async function sendEmail({ to, subject, html }) {
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: Array.isArray(to) ? to : [to],
-      bcc: ["saidromero19@gmail.com"], // Copy all notifications to admin
       subject,
       html,
     });
@@ -194,299 +209,228 @@ async function sendEmail({ to, subject, html }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── 1. MEMBRESÍA ACTIVADA / ASIGNADA ──────────────────────────────────────────
+// ── 1. MEMBRESÍA ACTIVADA ────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
-/**
- * @param {object} opts
- * @param {string} opts.to          — email del cliente
- * @param {string} opts.name        — nombre del cliente
- * @param {string} opts.planName    — nombre del plan
- * @param {string} opts.startDate   — fecha inicio
- * @param {string} opts.endDate     — fecha fin
- * @param {number|null} opts.classLimit — clases totales (null = ilimitado)
- */
 async function sendMembershipActivated(opts) {
   const { to, name, planName, startDate, endDate, classLimit } = opts;
-  const classesText = classLimit ? `${classLimit} clases` : "Clases ilimitadas ♾";
+  const classesText = classLimit ? `${classLimit} clases` : "Ilimitadas";
   const content = `
-    ${h1(`¡Tu membresía está activa, ${name.split(" ")[0]}! 🎉`)}
-    ${p("Tu acceso a Punto Neutro ha sido activado. ¡Es momento de moverte con propósito!")}
+    ${h1(`¡Bienvenida, ${name.split(" ")[0]}!`)}
+    ${p("Tu membresía en Punto Neutro ha sido activada. Es momento de moverte con propósito.")}
     ${infoTable([
-    infoRow("Plan", planName),
-    infoRow("Clases incluidas", classesText),
-    infoRow("Inicio", fmtDate(startDate)),
-    infoRow("Vencimiento", fmtDate(endDate)),
-  ])}
-    ${p("Entra a tu perfil para reservar tus primeras clases y ver el horario disponible.")}
+      infoRow("Plan", planName),
+      infoRow("Clases incluidas", classesText),
+      infoRow("Inicio", fmtDate(startDate)),
+      infoRow("Vencimiento", fmtDate(endDate)),
+    ])}
+    ${alertBox("Reserva tus clases desde tu perfil y empieza a disfrutar del estudio.", "success")}
   `;
   const html = baseLayout({
-    preheader: `¡Tu membresía ${planName} está activa! Reserva tus clases ahora.`,
+    preheader: `Tu membresía ${planName} está activa. ¡Reserva tus clases!`,
     content,
-    ctaUrl: `${SITE_URL}/app/classes`,
+    ctaUrl: `${SITE_URL}/app/book`,
     ctaText: "Reservar clases",
   });
-  await sendEmail({ to, subject: `✨ Tu membresía en Punto Neutro está activa`, html });
+  await sendEmail({ to, subject: `Tu membresía está activa — Punto Neutro`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── 2. RESERVA CONFIRMADA ─────────────────────────────────────────────────────
+// ── 2. RESERVA CONFIRMADA ────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
-/**
- * @param {object} opts
- * @param {string} opts.to
- * @param {string} opts.name
- * @param {string} opts.className       — tipo de clase (Pilates Matt Clásico, etc.)
- * @param {string} opts.date            — fecha de la clase (DATE)
- * @param {string} opts.startTime       — hora inicio (TIME "HH:MM")
- * @param {string} opts.instructor      — nombre instructor
- * @param {number|null} opts.classesLeft — clases restantes después de reservar (null = ilimitado)
- * @param {boolean} opts.isWaitlist     — true si es lista de espera
- */
 async function sendBookingConfirmed(opts) {
   const { to, name, className, date, startTime, instructor, classesLeft, isWaitlist } = opts;
 
   const statusPill = isWaitlist
-    ? pill("Lista de espera", B.lime)
-    : pill("Confirmada ✓", B.magenta);
+    ? pill("Lista de espera", B.amber)
+    : pill("Confirmada", B.green);
 
   const classesLeftText = classesLeft === null
-    ? "Ilimitadas ♾"
+    ? "Ilimitadas"
     : classesLeft !== undefined
       ? `${classesLeft} clases restantes`
       : null;
 
   const waitlistNote = isWaitlist
-    ? alertBox("Estás en la <strong>lista de espera</strong>. Te notificaremos si se libera un lugar. Si quieres asegurar tu spot, reserva otra sesión.", B.lime)
+    ? alertBox("Estás en la <strong>lista de espera</strong>. Te notificaremos si se libera un lugar.", "warning")
     : "";
 
   const content = `
-    ${h1(isWaitlist ? `En lista de espera, ${name.split(" ")[0]}` : `¡Reserva confirmada, ${name.split(" ")[0]}! 🏋️`)}
+    ${h1(isWaitlist ? `En lista de espera, ${name.split(" ")[0]}` : `Reserva confirmada, ${name.split(" ")[0]}`)}
     ${p(isWaitlist
-    ? "Te hemos añadido a la lista de espera para la siguiente clase:"
-    : "Tu clase ha sido reservada con éxito. ¡Te esperamos!"
-  )}
-    <div style="text-align:center;margin:6px 0 16px;">${statusPill}</div>
+      ? "Te hemos añadido a la lista de espera para la siguiente clase:"
+      : "Tu clase ha sido reservada con éxito. ¡Te esperamos en el estudio!"
+    )}
+    <div style="text-align:center;margin:8px 0 16px;">${statusPill}</div>
     ${infoTable([
-    infoRow("Clase", className),
-    infoRow("Fecha", fmtDate(date)),
-    infoRow("Hora", fmtTime(startTime)),
-    ...(instructor ? [infoRow("Instructor", instructor)] : []),
-    ...(classesLeftText ? [infoRow("Tu paquete", classesLeftText)] : []),
-  ])}
+      infoRow("Clase", className),
+      infoRow("Fecha", fmtDate(date)),
+      infoRow("Hora", fmtTime(startTime)),
+      ...(instructor ? [infoRow("Instructora", instructor)] : []),
+      ...(classesLeftText ? [infoRow("Tu paquete", classesLeftText)] : []),
+    ])}
     ${waitlistNote}
-    ${p("Recuerda que puedes cancelar tu reserva hasta <strong>2 horas antes</strong> para recuperar tu crédito de clase.")}
+    ${alertBox("Puedes cancelar hasta <strong>2 horas antes</strong> de la clase para recuperar tu crédito. Cancelaciones tardías no son reembolsables.", "warning")}
   `;
   const html = baseLayout({
-    preheader: isWaitlist ? `Estás en lista de espera para ${className}` : `Reserva confirmada para ${className} el ${fmtDate(date)}`,
+    preheader: isWaitlist ? `En lista de espera para ${className}` : `Reserva confirmada: ${className} — ${fmtDate(date)}`,
     content,
     ctaUrl: `${SITE_URL}/app/bookings`,
     ctaText: "Ver mis reservas",
   });
-  await sendEmail({ to, subject: isWaitlist ? `📋 En lista de espera — ${className}` : `✅ Reserva confirmada — ${className}`, html });
+  await sendEmail({ to, subject: isWaitlist ? `En lista de espera — ${className}` : `Reserva confirmada — ${className}`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── 3. RESERVA CANCELADA ──────────────────────────────────────────────────────
+// ── 3. RESERVA CANCELADA ─────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
-/**
- * @param {object} opts
- * @param {string}  opts.to
- * @param {string}  opts.name
- * @param {string}  opts.className
- * @param {string}  opts.date
- * @param {string}  opts.startTime
- * @param {boolean} opts.creditRestored  — true si se devolvió el crédito
- * @param {boolean} opts.isLate          — cancelación tardía (<2h)
- * @param {number|null} opts.classesLeft — clases restantes después de cancelar
- */
 async function sendBookingCancelled(opts) {
   const { to, name, className, date, startTime, creditRestored, isLate, classesLeft } = opts;
 
-  const classesLeftText = classesLeft === null ? "Ilimitadas ♾" : classesLeft !== undefined ? `${classesLeft} clases` : null;
+  const classesLeftText = classesLeft === null ? "Ilimitadas" : classesLeft !== undefined ? `${classesLeft} clases` : null;
 
   const creditBlock = creditRestored
-    ? alertBox(`✅ <strong>Clase devuelta a tu paquete.</strong> Cancelaste con más de 2 horas de anticipación.`, B.violet)
-    : alertBox(`⚠️ <strong>La clase NO se devolvió a tu paquete.</strong> La cancelación fue con menos de 2 horas de anticipación (política del studio).`, B.magenta);
+    ? alertBox("Tu clase fue <strong>devuelta a tu paquete</strong>. Cancelaste con más de 2 horas de anticipación.", "success")
+    : alertBox("La clase <strong>no se devolvió</strong> a tu paquete. La cancelación fue con menos de 2 horas de anticipación.", "error");
 
   const content = `
     ${h1(`Reserva cancelada, ${name.split(" ")[0]}`)}
     ${p("Tu reserva para la siguiente clase ha sido cancelada:")}
     ${infoTable([
-    infoRow("Clase", className),
-    infoRow("Fecha", fmtDate(date)),
-    infoRow("Hora", fmtTime(startTime)),
-    ...(classesLeftText ? [infoRow("Clases restantes", classesLeftText)] : []),
-  ])}
+      infoRow("Clase", className),
+      infoRow("Fecha", fmtDate(date)),
+      infoRow("Hora", fmtTime(startTime)),
+      ...(classesLeftText ? [infoRow("Clases restantes", classesLeftText)] : []),
+    ])}
     ${creditBlock}
     ${isLate
-      ? small("Si tienes dudas sobre la política de cancelación, contáctanos por WhatsApp o visita tu perfil.")
+      ? small("Recuerda: para cancelar tu reserva se tiene como mínimo 2 horas de anticipación. De no hacerlo se pierde la clase y no hay reposición.")
       : p("¿Quieres reservar otra clase? Hay muchos horarios disponibles.")
     }
   `;
   const html = baseLayout({
-    preheader: creditRestored ? "Tu clase fue devuelta al paquete." : "Cancelación tardía — crédito no recuperado.",
+    preheader: creditRestored ? "Clase devuelta a tu paquete." : "Cancelación tardía — clase no devuelta.",
     content,
-    ctaUrl: `${SITE_URL}/app/classes`,
+    ctaUrl: `${SITE_URL}/app/book`,
     ctaText: "Ver horario",
   });
-  await sendEmail({ to, subject: `❌ Reserva cancelada — ${className}`, html });
+  await sendEmail({ to, subject: `Reserva cancelada — ${className}`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── 4. RECORDATORIO SEMANAL (programa tu semana) ──────────────────────────────
+// ── 4. RECORDATORIO SEMANAL ──────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
-/**
- * @param {object} opts
- * @param {string} opts.to
- * @param {string} opts.name
- * @param {number|null} opts.classesLeft — null = ilimitado
- * @param {string|null} opts.endDate     — fecha de vencimiento del paquete
- */
 async function sendWeeklyReminder(opts) {
   const { to, name, classesLeft, endDate } = opts;
 
   const classesText = classesLeft === null
-    ? "Tienes clases <strong>ilimitadas</strong> esta semana. ♾"
+    ? "Tienes clases <strong>ilimitadas</strong> esta semana."
     : `Tienes <strong>${classesLeft} clase${classesLeft !== 1 ? "s" : ""}</strong> disponible${classesLeft !== 1 ? "s" : ""} en tu paquete.`;
 
   const expiryNote = endDate
-    ? alertBox(`📅 Tu membresía vence el <strong>${fmtDate(endDate)}</strong>. ¡Aprovecha tus clases!`, B.violet)
+    ? alertBox(`Tu membresía vence el <strong>${fmtDate(endDate)}</strong>. ¡Aprovecha tus clases!`, "warning")
     : "";
 
   const content = `
-    ${h1(`¡Hola ${name.split(" ")[0]}! ¿Ya programaste tu semana? 🧘‍♀️`)}
-    ${p("Es un nuevo comienzo. Esta semana tienes nuevos horarios disponibles en Punto Neutro.")}
+    ${h1(`¡Hola ${name.split(" ")[0]}! ¿Ya programaste tu semana?`)}
+    ${p("Nueva semana, nuevas oportunidades para moverte. Estos son los horarios disponibles en Punto Neutro.")}
     ${p(classesText)}
     ${expiryNote}
-    ${h2("¿Por qué no faltar?")}
-    ${p("Pilates <strong>fortalece tu core</strong>, mejora tu postura y eleva tu bienestar. ¡Vale mucho la pena!")}
-    ${p("Entra ahora y reserva tus clases antes de que se llenen los spots:")}
+    ${h2("Tu cuerpo te lo agradece")}
+    ${p("Pilates <strong>fortalece tu core</strong>, mejora tu postura y eleva tu bienestar. ¡Cada clase cuenta!")}
   `;
   const html = baseLayout({
-    preheader: `¡Nueva semana, nuevas clases! Tienes ${classesLeft === null ? "clases ilimitadas" : `${classesLeft} clases`} disponibles.`,
+    preheader: `Nueva semana — ${classesLeft === null ? "clases ilimitadas" : `${classesLeft} clases disponibles`}.`,
     content,
-    ctaUrl: `${SITE_URL}/app/classes`,
+    ctaUrl: `${SITE_URL}/app/book`,
     ctaText: "Programar mi semana",
   });
-  await sendEmail({ to, subject: `🗓️ ¡Programa tu semana en Punto Neutro!`, html });
+  await sendEmail({ to, subject: `Programa tu semana — Punto Neutro`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── 5. RECORDATORIO DE RENOVACIÓN ─────────────────────────────────────────────
+// ── 5. RECORDATORIO DE RENOVACIÓN ────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
-/**
- * @param {object} opts
- * @param {string}  opts.to
- * @param {string}  opts.name
- * @param {string}  opts.planName
- * @param {number|null} opts.classesLeft  — null = ilimitado
- * @param {string|null} opts.endDate
- * @param {'last_class'|'expiring_soon'} opts.reason
- */
 async function sendRenewalReminder(opts) {
   const { to, name, planName, classesLeft, endDate, reason } = opts;
 
   const isLastClass = reason === "last_class";
-  const isExpiring = reason === "expiring_soon";
 
   const urgencyBlock = isLastClass
-    ? alertBox(`🎯 Te queda <strong>1 sola clase</strong> en tu paquete ${planName}. ¡Renueva antes de quedarte sin acceso!`, B.magenta)
-    : alertBox(`⏰ Tu membresía <strong>${planName}</strong> vence el <strong>${fmtDate(endDate)}</strong>. ¡Renueva para no perder tu ritmo!`, B.violet);
-
-  const benefit = isLastClass
-    ? p("Aprovecha y reserva esa última clase hoy, y de paso renueva tu paquete para seguir entrenando sin interrupciones.")
-    : p("Renovar antes del vencimiento es la mejor forma de mantener tu constancia. ¡No dejes que el progreso se detenga!");
+    ? alertBox(`Te queda <strong>1 sola clase</strong> en tu paquete ${planName}. ¡Renueva antes de quedarte sin acceso!`, "warning")
+    : alertBox(`Tu membresía <strong>${planName}</strong> vence el <strong>${fmtDate(endDate)}</strong>. ¡Renueva para seguir entrenando!`, "warning");
 
   const content = `
-    ${h1(`${name.split(" ")[0]}, es momento de renovar 🔄`)}
+    ${h1(`${name.split(" ")[0]}, es momento de renovar`)}
     ${urgencyBlock}
-    ${p("En Punto Neutro nos aseguramos de que nunca pierdas el hilo de tu entrenamiento.")}
+    ${p("Mantener tu constancia es la clave del progreso. No dejes que tu entrenamiento se detenga.")}
     ${infoTable([
-    infoRow("Plan actual", planName),
-    ...(classesLeft !== null ? [infoRow("Clases restantes", `${classesLeft}`)] : []),
-    ...(endDate ? [infoRow("Vencimiento", fmtDate(endDate))] : []),
-  ])}
-    ${benefit}
+      infoRow("Plan actual", planName),
+      ...(classesLeft !== null ? [infoRow("Clases restantes", `${classesLeft}`)] : []),
+      ...(endDate ? [infoRow("Vencimiento", fmtDate(endDate))] : []),
+    ])}
+    ${p(isLastClass
+      ? "Reserva esa última clase hoy y renueva tu paquete para seguir sin interrupciones."
+      : "Renueva antes del vencimiento para mantener tu ritmo en el estudio."
+    )}
   `;
   const html = baseLayout({
-    preheader: isLastClass ? `¡Solo te queda 1 clase! Renueva tu paquete ahora.` : `Tu membresía vence pronto. Renueva para seguir entrenando.`,
+    preheader: isLastClass ? "¡Solo te queda 1 clase! Renueva tu paquete." : "Tu membresía vence pronto — renueva ahora.",
     content,
     ctaUrl: `${SITE_URL}/app/checkout`,
-    ctaText: "Renovar mi membresía",
+    ctaText: "Renovar membresía",
   });
   await sendEmail({
     to,
     subject: isLastClass
-      ? `⚡ ¡Solo te queda 1 clase! Renueva tu membresía`
-      : `⏰ Tu membresía vence pronto — Punto Neutro`,
+      ? `Te queda 1 clase — Renueva tu membresía`
+      : `Tu membresía vence pronto — Punto Neutro`,
     html,
   });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── 6. RECUPERACION DE CONTRASEÑA ─────────────────────────────────────────────
+// ── 6. RECUPERACIÓN DE CONTRASEÑA ────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
-/**
- * @param {object} opts
- * @param {string} opts.to
- * @param {string} opts.name
- * @param {string} opts.token
- * @param {string=} opts.resetUrl
- */
 async function sendPasswordResetEmail(opts) {
   const { to, name, token, resetUrl } = opts;
-  const safeName = String(name || "Clienta");
-  const firstName = safeName.trim().split(/\s+/)[0] || "Clienta";
+  const firstName = String(name || "").trim().split(/\s+/)[0] || "Alumna";
   const resolvedResetUrl = String(
     resetUrl || `${SITE_URL}/auth/reset-password?token=${encodeURIComponent(token)}`,
   );
   const content = `
-    ${h1(`Recupera tu contraseña, ${firstName} 🔐`)}
-    ${p("Hemos recibido una solicitud para cambiar la contraseña de tu cuenta en Punto Neutro.")}
-    ${p("Si fuiste tú, haz clic en el siguiente enlace para crear una contraseña nueva. Este enlace expirará en 2 horas.")}
-    ${p("Si no solicitaste este cambio, puedes ignorar este correo; tu cuenta seguirá segura.")}
-    ${small(`Si el botón no abre, copia y pega este enlace en tu navegador:<br><a href="${resolvedResetUrl}" style="color:${B.magenta};word-break:break-all;">${resolvedResetUrl}</a>`)}
+    ${h1(`Recupera tu contraseña, ${firstName}`)}
+    ${p("Recibimos una solicitud para cambiar la contraseña de tu cuenta en Punto Neutro.")}
+    ${p("Si fuiste tú, haz clic en el botón de abajo para crear una contraseña nueva. Este enlace expira en <strong>2 horas</strong>.")}
+    ${alertBox("Si no solicitaste este cambio, puedes ignorar este correo. Tu cuenta seguirá segura.", "info")}
+    ${small(`Si el botón no funciona, copia y pega este enlace en tu navegador:<br><a href="${resolvedResetUrl}" style="color:${B.brown};word-break:break-all;">${resolvedResetUrl}</a>`)}
   `;
   const html = baseLayout({
     preheader: "Recupera el acceso a tu cuenta de Punto Neutro",
     content,
     ctaUrl: resolvedResetUrl,
-    ctaText: "Reestablecer mi contraseña",
+    ctaText: "Restablecer contraseña",
   });
-  await sendEmail({ to, subject: "🔐 Restablecer contraseña — Punto Neutro", html });
+  await sendEmail({ to, subject: "Restablecer contraseña — Punto Neutro", html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── 7. RECHAZO DE COMPROBANTE ─────────────────────────────────────────────────
+// ── 7. RECHAZO DE COMPROBANTE ────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
-/**
- * @param {object} opts
- * @param {string} opts.to
- * @param {string} opts.name
- * @param {string} opts.reason
- */
 async function sendOrderRejected(opts) {
   const { to, name, reason } = opts;
   const content = `
-    ${h1(`Comprobante no aprobado 😔`)}
+    ${h1(`Comprobante no aprobado`)}
     ${p(`Hola ${name.split(" ")[0]}, revisamos tu comprobante de pago y lamentablemente <strong>no pudo ser aprobado</strong>.`)}
-    <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-           style="background:rgba(225,92,184,.08);border-left:3px solid #E15CB8;border-radius:0 8px 8px 0;margin:16px 0;">
-      <tr><td style="padding:16px 20px;">
-        <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#ECD6FB;">
-          <strong style="color:#E15CB8;">Motivo:</strong><br>${reason}
-        </p>
-      </td></tr>
-    </table>
-    ${p("Si crees que hubo un error, por favor contáctanos directamente por WhatsApp o responde este correo. ¡Estamos para ayudarte! 💜")}
+    ${alertBox(`<strong>Motivo:</strong> ${reason}`, "error")}
+    ${p("Si crees que hubo un error, contáctanos por WhatsApp o acércate al estudio. ¡Estamos para ayudarte!")}
   `;
   const html = baseLayout({
     preheader: "Tu comprobante de pago fue revisado — Punto Neutro",
     content,
-    ctaUrl: `https://wa.me/521${process.env.STUDIO_PHONE || ""}`,
-    ctaText: "Contactar por WhatsApp",
+    ctaUrl: `${SITE_URL}/app/checkout`,
+    ctaText: "Reintentar pago",
   });
-  await sendEmail({ to, subject: "Comprobante de pago no aprobado — Punto Neutro", html });
+  await sendEmail({ to, subject: "Comprobante no aprobado — Punto Neutro", html });
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
