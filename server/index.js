@@ -645,6 +645,24 @@ async function ensureSchema() {
         ON CONFLICT DO NOTHING;
       `);
     }
+    // ── Ensure "Clase Muestra" plan always exists ──
+    const trialExists = await pool.query(`SELECT id FROM plans WHERE name = 'Clase Muestra' LIMIT 1`);
+    if (trialExists.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
+        VALUES (
+          'Clase Muestra',
+          'Sesión de prueba para nuevas alumnas. Pago total de $110 requerido. No reembolsable.',
+          110, 'MXN', 7, 1, 'all',
+          '["1 clase de prueba","Confirmar disponibilidad antes de pagar","No reembolsable ni transferible"]'::jsonb,
+          true, 0, true, true, 'trial_single_session'
+        );
+      `);
+      console.log("[schema] Created 'Clase Muestra' plan");
+    } else {
+      // Re-activate if it was accidentally deactivated
+      await pool.query(`UPDATE plans SET is_active = true, is_non_transferable = true, is_non_repeatable = true, repeat_key = 'trial_single_session' WHERE name = 'Clase Muestra' AND is_active = false`).catch(() => { });
+    }
     // ── Backfill class_category on existing plans ──
     await pool.query(`UPDATE plans SET class_category = 'all' WHERE class_category IS NULL`).catch(() => { });
     // ── Products table ─────────────────────────────────────────────────────
