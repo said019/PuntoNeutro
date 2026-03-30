@@ -82,9 +82,9 @@ const PlanCard = ({
         <ul className="mt-2 space-y-0.5">
           {features.map((f, i) => (
             <li key={i} className={cn(
-              "text-[10px] flex items-start gap-1.5",
+              "flex items-start gap-1.5",
               (f.toLowerCase().includes("descuento") || f.toLowerCase().includes("costo con"))
-                ? "text-[#4a7a38] font-semibold" : "text-[#2d2d2d]/45"
+                ? "text-[#1a6b0a] font-bold text-[11px]" : "text-[10px] text-[#2d2d2d]/45"
             )}>
               <span className="mt-0.5 shrink-0">{(f.toLowerCase().includes("descuento") || f.toLowerCase().includes("costo con")) ? "💰" : "•"}</span>
               {f}
@@ -187,7 +187,21 @@ const Checkout = () => {
   // Compute price
   const basePrice = (selectedComplement && comboTier) ? comboTier.price : (selectedPlan?.price ?? 0);
   const comboDiscountPrice = (selectedComplement && comboTier) ? comboTier.discount : null;
-  const finalAmount = discountResult ? basePrice - (discountResult.discount_amount ?? 0) : basePrice;
+
+  // Check if plan has a cash/transfer discount in its features
+  const planFeatures: string[] = Array.isArray(selectedPlan?.features) ? selectedPlan.features : [];
+  const planDiscountFeature = planFeatures.find((f: string) =>
+    f.toLowerCase().includes("descuento") || f.toLowerCase().includes("costo con")
+  );
+  const planCashDiscount = planDiscountFeature
+    ? Number(planDiscountFeature.replace(/[^0-9]/g, "")) || null
+    : null;
+
+  // Apply payment method discount: combo discount or plan feature discount
+  const cashTransferPrice = comboDiscountPrice ?? planCashDiscount ?? null;
+  const effectivePrice = (paymentMethod === "transfer" || paymentMethod === "cash") && cashTransferPrice
+    ? cashTransferPrice : basePrice;
+  const finalAmount = discountResult ? effectivePrice - (discountResult.discount_amount ?? 0) : effectivePrice;
 
   const validateCodeMutation = useMutation({
     mutationFn: () => api.post("/discount-codes/validate", { code: discountCode, planId: selectedPlan?.id }),
@@ -275,9 +289,10 @@ const Checkout = () => {
                           ¿Agregar complemento de bienestar?
                         </p>
                       </div>
-                      <p className="text-[10px] text-[#94867a]/60 -mt-1">
-                        {classCount} clases + complemento: <strong>${comboTier.price.toLocaleString("es-MX")}</strong>
-                        {" "}(efectivo/transf: <strong>${comboTier.discount.toLocaleString("es-MX")}</strong>)
+                      <p className="text-[11px] text-[#2d2d2d]/60 -mt-1">
+                        {classCount} clases + complemento: <strong className="text-[#2d2d2d]/80">${comboTier.price.toLocaleString("es-MX")}</strong>
+                        {" "}
+                        <span className="text-[#1a6b0a] font-bold">(efectivo/transf: ${comboTier.discount.toLocaleString("es-MX")})</span>
                       </p>
 
                       <div className="grid grid-cols-1 gap-2">
@@ -318,15 +333,18 @@ const Checkout = () => {
               {/* Summary + continue */}
               {selectedPlan && (
                 <div className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-4 space-y-4">
-                  <div className="text-xs text-[#2d2d2d]/60 space-y-1">
+                  <div className="text-xs text-[#2d2d2d]/60 space-y-1.5">
                     <p><strong className="text-[#2d2d2d]/80">{selectedPlan.name}</strong></p>
                     {complementData && (
-                      <p className="text-[#b5bf9c]">+ {complementData.name} ({complementData.specialist})</p>
+                      <p className="text-[#1a6b0a] font-semibold">+ {complementData.name} ({complementData.specialist})</p>
                     )}
                     {comboDiscountPrice && comboDiscountPrice < basePrice && (
-                      <p className="text-[#b5bf9c] text-[0.72rem]">
-                        Paga con efectivo/transferencia: <strong>${comboDiscountPrice.toLocaleString("es-MX")}</strong>
-                      </p>
+                      <div className="flex items-center gap-2 bg-[#1a6b0a]/10 border border-[#1a6b0a]/20 rounded-lg px-3 py-2">
+                        <span className="text-base">💰</span>
+                        <p className="text-[#1a6b0a] font-bold text-xs">
+                          Paga con efectivo/transferencia: <span className="text-sm">${comboDiscountPrice.toLocaleString("es-MX")}</span>
+                        </p>
+                      </div>
                     )}
                   </div>
 
@@ -358,7 +376,14 @@ const Checkout = () => {
                   {/* Total */}
                   <div className="flex items-center justify-between py-3 border-t border-[#94867a]/15">
                     <span className="text-sm text-[#2d2d2d]/60">Total a pagar</span>
-                    <span className="text-2xl font-bold text-[#2d2d2d]">${finalAmount.toLocaleString("es-MX")} <span className="text-sm font-normal text-[#2d2d2d]/35">MXN</span></span>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-[#2d2d2d]">${basePrice.toLocaleString("es-MX")} <span className="text-sm font-normal text-[#2d2d2d]/35">MXN</span></span>
+                      {cashTransferPrice && cashTransferPrice < basePrice && (
+                        <p className="text-[11px] text-[#1a6b0a] font-bold mt-0.5">
+                          💰 Efectivo/transf: ${cashTransferPrice.toLocaleString("es-MX")}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   <button
@@ -382,10 +407,24 @@ const Checkout = () => {
               <div className="rounded-2xl border border-[#94867a]/20 bg-[#94867a]/5 px-4 py-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-[#2d2d2d]/70">{selectedPlan?.name}</span>
-                  <span className="text-lg font-bold text-[#2d2d2d]">${finalAmount.toLocaleString("es-MX")} MXN</span>
+                  <div className="text-right">
+                    {cashTransferPrice && cashTransferPrice < basePrice ? (
+                      <>
+                        <span className="text-xs text-[#2d2d2d]/30 line-through mr-2">${basePrice.toLocaleString("es-MX")}</span>
+                        <span className="text-lg font-bold text-[#1a6b0a]">${finalAmount.toLocaleString("es-MX")} MXN</span>
+                      </>
+                    ) : (
+                      <span className="text-lg font-bold text-[#2d2d2d]">${finalAmount.toLocaleString("es-MX")} MXN</span>
+                    )}
+                  </div>
                 </div>
                 {complementData && (
-                  <p className="text-xs text-[#b5bf9c] mt-1">+ {complementData.name}</p>
+                  <p className="text-xs text-[#1a6b0a] font-semibold mt-1">+ {complementData.name}</p>
+                )}
+                {cashTransferPrice && cashTransferPrice < basePrice && (
+                  <p className="text-[11px] text-[#1a6b0a] font-bold mt-1.5 flex items-center gap-1">
+                    💰 Ahorras ${(basePrice - cashTransferPrice).toLocaleString("es-MX")} con efectivo/transferencia
+                  </p>
                 )}
               </div>
 
