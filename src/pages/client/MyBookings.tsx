@@ -206,7 +206,12 @@ const MyBookings = () => {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>¿Cancelar reserva?</AlertDialogTitle>
-              <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+              <AlertDialogDescription className="space-y-3">
+                <span className="block">Esta acción no se puede deshacer.</span>
+                <span className="block rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-amber-800 text-xs leading-relaxed">
+                  <strong>Importante:</strong> Si cancelas con menos de <strong>2 horas de anticipación</strong>, la clase se perderá y <strong>no será devuelta</strong> a tu paquete.
+                </span>
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Volver</AlertDialogCancel>
