@@ -134,7 +134,7 @@ function normalizeBankInfo(rawValue) {
 async function getConfiguredBankInfo(dbClient = pool) {
   try {
     const settingsRes = await dbClient.query(
-      "SELECT value FROM system_settings WHERE key = 'bank_info' LIMIT 1"
+      "SELECT value FROM settings WHERE key = 'bank_info' LIMIT 1"
     );
     const raw = settingsRes.rows.length > 0 ? settingsRes.rows[0].value : null;
     return normalizeBankInfo(raw);
@@ -3156,8 +3156,16 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     // Cash orders skip proof upload → go straight to pending_verification so admin can approve
     const initialStatus = paymentMethod === "cash" ? "pending_verification" : "pending_payment";
     // Build INSERT dynamically — complement_id column may not exist yet
-    const cols = ["user_id", "plan_id", "status", "payment_method", "subtotal", "tax_amount", "total_amount", "discount_amount", "discount_code_id", "bank_info", "expires_at"];
-    const vals = [req.userId, planId, initialStatus, paymentMethod, subtotal, 0, total, discount, appliedDiscountCode?.id ?? null, JSON.stringify(bankInfo), expires];
+    const cols = ["user_id", "plan_id", "status", "payment_method", "subtotal", "tax_amount", "total_amount", "bank_info", "expires_at"];
+    const vals = [req.userId, planId, initialStatus, paymentMethod, subtotal, 0, total, JSON.stringify(bankInfo), expires];
+    if (discount > 0 || appliedDiscountCode) {
+      cols.push("discount_amount");
+      vals.push(discount);
+      if (appliedDiscountCode?.id) {
+        cols.push("discount_code_id");
+        vals.push(appliedDiscountCode.id);
+      }
+    }
     if (activeComplement) {
       cols.push("complement_type");
       vals.push(activeComplement);
