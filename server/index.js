@@ -839,6 +839,7 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS plan_id UUID`).catch(() => { });
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_by UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS complement_type VARCHAR(100)`).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_discount_code_id ON orders(discount_code_id)`).catch(() => { });
     // Make plan_id nullable (POS orders don't always have a plan)
     await pool.query(`ALTER TABLE orders ALTER COLUMN plan_id DROP NOT NULL`).catch(() => { });
@@ -3135,6 +3136,8 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     const cols = ["user_id", "plan_id", "status", "payment_method", "subtotal", "tax_amount", "total_amount", "discount_amount", "discount_code_id", "bank_info", "expires_at"];
     const vals = [req.userId, planId, initialStatus, paymentMethod, subtotal, 0, total, discount, appliedDiscountCode?.id ?? null, JSON.stringify(bankInfo), expires];
     if (activeComplement) {
+      cols.push("complement_type");
+      vals.push(activeComplement);
       cols.push("notes");
       vals.push(`Complemento: ${activeComplement}`);
     }
@@ -8886,15 +8889,25 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
       }
 
       // ── Create consultation record if order has a complement ──
-      if (order.complement_id) {
-        try {
-          await client.query(
-            `INSERT INTO consultations (order_id, user_id, complement_id, status)
-             VALUES ($1, $2, $3, 'pending')
-             ON CONFLICT DO NOTHING`,
-            [order.id, order.user_id, order.complement_id]
-          );
-        } catch (_compErr) { /* consultations table may not exist yet */ }
+      const orderComplementType = order.complement_type || null;
+      if (orderComplementType) {
+        const compInfo = COMPLEMENT_MAP[orderComplementType] || null;
+        if (compInfo) {
+          try {
+            // Find the membership just created for this order
+            const memForOrder = await client.query(
+              "SELECT id FROM memberships WHERE order_id = $1 LIMIT 1", [order.id]
+            );
+            const membershipId = memForOrder.rows[0]?.id || null;
+            await client.query(
+              `INSERT INTO consultations (membership_id, user_id, complement_type, complement_name, specialist, status)
+               VALUES ($1, $2, $3, $4, $5, 'pending')`,
+              [membershipId, order.user_id, orderComplementType, compInfo.name, compInfo.specialist]
+            );
+          } catch (_compErr) {
+            console.error("[consultations] insert on verify error:", _compErr.message);
+          }
+        }
       }
 
       if (order.discount_code_id) {
