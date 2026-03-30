@@ -29,6 +29,14 @@ const COMBO_PRICES: Record<number, { price: number; discount: number }> = {
   16: { price: 1450, discount: 1340 },
 };
 
+// Discount prices for cash/transfer by plan price
+const PLAN_DISCOUNT_PRICES: Record<number, number> = {
+  120: 110,   // Clase suelta
+  400: 380,   // 4 clases
+  680: 640,   // 8 clases
+  900: 840,   // 12 clases
+};
+
 function flag(value: unknown): boolean {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
@@ -46,6 +54,8 @@ const PlanCard = ({
   const nonRepeatable = flag(plan.isNonRepeatable ?? plan.is_non_repeatable);
   const features: string[] = (Array.isArray(plan.features) ? plan.features : [])
     .filter((f: string) => !f.toLowerCase().includes("descuento") && !f.toLowerCase().includes("costo con"));
+  const planPrice = Number(plan.price ?? 0);
+  const discountPrice = PLAN_DISCOUNT_PRICES[planPrice] ?? null;
 
   return (
     <button
@@ -76,9 +86,14 @@ const PlanCard = ({
         </div>
       </div>
       <div className="flex items-baseline gap-1 mt-2">
-        <span className="text-2xl font-bold text-[#2d2d2d]">${Number(plan.price ?? 0).toLocaleString("es-MX")}</span>
+        <span className="text-2xl font-bold text-[#2d2d2d]">${planPrice.toLocaleString("es-MX")}</span>
         <span className="text-xs text-[#2d2d2d]/35">{plan.currency ?? "MXN"}</span>
       </div>
+      {discountPrice && (
+        <p className="text-[11px] text-[#1a6b0a] font-bold mt-0.5">
+          Efectivo/transferencia: ${discountPrice.toLocaleString("es-MX")}
+        </p>
+      )}
       {features.length > 0 && (
         <ul className="mt-2 space-y-0.5">
           {features.map((f, i) => (
@@ -185,8 +200,10 @@ const Checkout = () => {
   const basePrice = (selectedComplement && comboTier) ? comboTier.price : (selectedPlan?.price ?? 0);
   const comboDiscountPrice = (selectedComplement && comboTier) ? comboTier.discount : null;
 
-  // Apply combo discount when paying with cash/transfer
-  const cashTransferPrice = comboDiscountPrice ?? null;
+  // Apply discount when paying with cash/transfer (combo or individual plan)
+  const planBasePrice = Number(selectedPlan?.price ?? 0);
+  const individualDiscount = PLAN_DISCOUNT_PRICES[planBasePrice] ?? null;
+  const cashTransferPrice = comboDiscountPrice ?? (selectedComplement ? null : individualDiscount);
   const effectivePrice = (paymentMethod === "transfer" || paymentMethod === "cash") && cashTransferPrice
     ? cashTransferPrice : basePrice;
   const finalAmount = discountResult ? effectivePrice - (discountResult.discount_amount ?? 0) : effectivePrice;

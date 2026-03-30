@@ -3088,17 +3088,22 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
 
-    // ── Combo pricing: complementType from frontend ──
+    // ── Pricing with cash/transfer discounts ──
     const COMBO_PRICES = { 8: { price: 1030, discount: 990 }, 12: { price: 1250, discount: 1190 }, 16: { price: 1450, discount: 1340 } };
+    const PLAN_DISCOUNT_PRICES = { 120: 110, 400: 380, 680: 640, 900: 840 };
     const activeComplement = complementType || complementId || null;
     let subtotal = parseFloat(plan.price);
+    const isCashOrTransfer = paymentMethod === "cash" || paymentMethod === "transfer";
 
     if (activeComplement) {
       const cl = plan.class_limit;
       const combo = COMBO_PRICES[cl];
       if (combo) {
-        subtotal = (paymentMethod === "cash" || paymentMethod === "transfer") ? combo.discount : combo.price;
+        subtotal = isCashOrTransfer ? combo.discount : combo.price;
       }
+    } else if (isCashOrTransfer) {
+      const planDiscount = PLAN_DISCOUNT_PRICES[subtotal];
+      if (planDiscount) subtotal = planDiscount;
     }
 
     let discount = 0;
