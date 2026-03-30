@@ -5,19 +5,19 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import Schedule from "@/components/Schedule";
 import { Dumbbell, Music, Waves, Flame, Zap, Heart, Activity, Sparkles, Flower2, Clock, type LucideIcon, ChevronLeft, ChevronRight, MapPin, Phone, Mail, ArrowUpRight, Menu, X } from "lucide-react";
-import pnImg1 from "@/assets/punto-neutro-images/1000452084.jpg";
-import pnImg2 from "@/assets/punto-neutro-images/1000452086.jpg";
-import pnImg3 from "@/assets/punto-neutro-images/1000452092.jpg";
-import pnImg4 from "@/assets/punto-neutro-images/1000452104.jpg";
-import pnImg5 from "@/assets/punto-neutro-images/1000452105.jpg";
-import pnImg6 from "@/assets/punto-neutro-images/1000452106.jpg";
-import pnCafe1 from "@/assets/punto-neutro-images/1000452109.jpg";
-import pnCafe2 from "@/assets/punto-neutro-images/1000452120.jpg";
-import pnImg7 from "@/assets/punto-neutro-images/1000431479.jpg";
-import pnImg8 from "@/assets/punto-neutro-images/1000439853.jpg";
-import pnImg9 from "@/assets/punto-neutro-images/1000452523.jpg";
-import pnImg10 from "@/assets/punto-neutro-images/1000452524.jpg";
-import angiePhoto from "@/assets/punto-neutro-images/1000453952.jpg";
+import pnImg1 from "@/assets/punto-neutro-images/1000452084.webp";
+import pnImg2 from "@/assets/punto-neutro-images/1000452086.webp";
+import pnImg3 from "@/assets/punto-neutro-images/1000452092.webp";
+import pnImg4 from "@/assets/punto-neutro-images/1000452104.webp";
+import pnImg5 from "@/assets/punto-neutro-images/1000452105.webp";
+import pnImg6 from "@/assets/punto-neutro-images/1000452106.webp";
+import pnCafe1 from "@/assets/punto-neutro-images/1000452109.webp";
+import pnCafe2 from "@/assets/punto-neutro-images/1000452120.webp";
+import pnImg7 from "@/assets/punto-neutro-images/1000431479.webp";
+import pnImg8 from "@/assets/punto-neutro-images/1000439853.webp";
+import pnImg9 from "@/assets/punto-neutro-images/1000452523.webp";
+import pnImg10 from "@/assets/punto-neutro-images/1000452524.webp";
+import angiePhoto from "@/assets/punto-neutro-images/1000453952.webp";
 import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 import imgPilates from "@/assets/pilates_2320695.png";
 
@@ -456,7 +456,7 @@ const Index = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {/* Recepción — hero */}
             <div className="lg:col-span-2 rounded-2xl overflow-hidden relative group aspect-[16/10]">
-              <img src={pnCafe1} alt="Recepción Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <img src={pnCafe1} alt="Recepción Punto Neutro" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/50 via-transparent to-transparent" />
               <div className="absolute bottom-5 left-5 right-5">
                 <span className="bg-[#b5bf9c]/30 backdrop-blur-md text-white text-[0.62rem] uppercase tracking-[0.15em] px-3 py-1.5 rounded-full mb-2 inline-block font-medium">
@@ -467,7 +467,7 @@ const Index = () => {
             </div>
             {/* Side plank instructora */}
             <div className="rounded-2xl overflow-hidden relative group aspect-[3/4] sm:aspect-[16/10] lg:aspect-[3/4]">
-              <img src={angiePhoto} alt="Instructora Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
+              <img src={angiePhoto} alt="Instructora Punto Neutro" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
               <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/35 to-transparent" />
               <div className="absolute bottom-4 left-4">
                 <span className="text-white/90 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Fuerza & Equilibrio</span>
@@ -479,19 +479,19 @@ const Index = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-3 sm:mt-4">
             {/* Sala amplia */}
             <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
-              <img src={pnImg2} alt="Sala de práctica" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <img src={pnImg2} alt="Sala de práctica" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
             {/* Clase con pesas */}
             <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
-              <img src={pnImg8} alt="Clase con pesas" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
+              <img src={pnImg8} alt="Clase con pesas" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 20%" }} />
             </div>
             {/* Rack de mats */}
             <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
-              <img src={pnImg5} alt="Mats del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <img src={pnImg5} alt="Mats del estudio" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
             {/* Rincón con planta */}
             <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
-              <img src={pnImg4} alt="Ambiente del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <img src={pnImg4} alt="Ambiente del estudio" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
           </div>
 
@@ -499,7 +499,7 @@ const Index = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
             {/* Alumnas pilates mat */}
             <div className="rounded-2xl overflow-hidden relative group aspect-[3/4] sm:aspect-[16/10] lg:aspect-[3/4]">
-              <img src={pnImg9} alt="Clase de pilates" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 30%" }} />
+              <img src={pnImg9} alt="Clase de pilates" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 30%" }} />
               <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/30 to-transparent" />
               <div className="absolute bottom-4 left-4">
                 <span className="text-white/90 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Clases grupales</span>
@@ -507,7 +507,7 @@ const Index = () => {
             </div>
             {/* Lobby Body Motion Mind */}
             <div className="lg:col-span-2 rounded-2xl overflow-hidden relative group aspect-[16/10]">
-              <img src={pnCafe2} alt="Lobby Punto Neutro" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <img src={pnCafe2} alt="Lobby Punto Neutro" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/40 via-transparent to-transparent" />
               <div className="absolute bottom-5 left-5">
                 <span className="text-white/90 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Body · Motion · Mind in Peace</span>
@@ -519,15 +519,15 @@ const Index = () => {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
             {/* Planks en pelotas */}
             <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
-              <img src={pnImg10} alt="Body Strong" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 30%" }} />
+              <img src={pnImg10} alt="Body Strong" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 30%" }} />
             </div>
             {/* Equipo organizado */}
             <div className="rounded-2xl overflow-hidden relative group aspect-[4/5]">
-              <img src={pnImg1} alt="Equipo del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <img src={pnImg1} alt="Equipo del estudio" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
             {/* Matcha / café */}
             <div className="col-span-2 lg:col-span-1 rounded-2xl overflow-hidden relative group aspect-[16/10] lg:aspect-[4/5]">
-              <img src={pnImg7} alt="Punto Neutro Coffee" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 40%" }} />
+              <img src={pnImg7} alt="Punto Neutro Coffee" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 40%" }} />
               <div className="absolute inset-0 bg-gradient-to-t from-[#2d2d2d]/40 to-transparent" />
               <div className="absolute bottom-4 left-4">
                 <span className="text-white/90 text-[0.65rem] uppercase tracking-[0.15em] font-medium">Studio & Coffee</span>
@@ -537,7 +537,7 @@ const Index = () => {
 
           {/* ── Row 5: wide panoramic ── */}
           <div className="mt-3 sm:mt-4 rounded-2xl overflow-hidden relative group aspect-[21/9]">
-            <img src={pnImg3} alt="Vista panorámica del estudio" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 40%" }} />
+            <img src={pnImg3} alt="Vista panorámica del estudio" loading="lazy" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" style={{ objectPosition: "center 40%" }} />
             <div className="absolute inset-0 bg-[#2d2d2d]/20 group-hover:bg-[#2d2d2d]/10 transition-colors duration-500" />
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-white font-bebas text-3xl sm:text-4xl lg:text-5xl tracking-widest opacity-90">MOVIMIENTO CON PROPÓSITO</p>
@@ -860,6 +860,7 @@ const Index = () => {
                     <img
                       src={inst.photoUrl}
                       alt={inst.label}
+                      loading="lazy"
                       className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 grayscale-[30%] group-hover:grayscale-0"
                       style={{ objectPosition: clampFocus(inst.photoFocusX) + "% " + clampFocus(inst.photoFocusY) + "%" }}
                     />

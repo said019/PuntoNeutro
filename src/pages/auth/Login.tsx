@@ -6,8 +6,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, ArrowRight, Share, Plus, MoreVertical, X } from "lucide-react";
-import pnImg4 from "@/assets/punto-neutro-images/1000452104.jpg";
-import pnImg9 from "@/assets/punto-neutro-images/1000452523.jpg";
+import pnImg4 from "@/assets/punto-neutro-images/1000452104.webp";
+import pnImg9 from "@/assets/punto-neutro-images/1000452523.webp";
 import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 
 const schema = z.object({

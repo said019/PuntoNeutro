@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   Check, Loader2, CreditCard, Copy, Banknote, Building2,
-  Tag, ChevronRight, ArrowLeft, Upload, CheckCircle, Heart,
+  Tag, ChevronRight, ArrowLeft, Upload, CheckCircle, Heart, Sparkles,
 } from "lucide-react";
 import imgPilates from "@/assets/pilates_2320695.png";
 
@@ -186,10 +186,13 @@ const Checkout = () => {
   });
 
   const rawPlans: any[] = Array.isArray(plansData?.data) ? plansData.data : Array.isArray(plansData) ? plansData : [];
-  const plans = rawPlans
+  const allPlans = rawPlans
     .filter((p) => (p.isActive ?? p.is_active) !== false)
     .filter((p) => !(p.name ?? "").toLowerCase().includes("paquete +"))
     .sort((a, b) => (a.sortOrder ?? a.sort_order ?? 99) - (b.sortOrder ?? b.sort_order ?? 99));
+
+  const trialPlan = allPlans.find((p) => (p.name ?? "").toLowerCase().includes("muestra"));
+  const plans = allPlans.filter((p) => p !== trialPlan);
 
   // Is this plan eligible for a complement add-on?
   const classCount = selectedPlan ? (selectedPlan.classLimit ?? selectedPlan.class_limit ?? 0) : 0;
@@ -264,6 +267,53 @@ const Checkout = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
+                  {/* Clase muestra */}
+                  {trialPlan && (
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#b5bf9c]/80">
+                        Conoce nuestro estudio
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPlan(trialPlan);
+                          setSelectedComplement(null);
+                          setDiscountResult(null);
+                        }}
+                        className={cn(
+                          "relative w-full text-left rounded-2xl border p-4 transition-all duration-200 overflow-hidden",
+                          selectedPlan?.id === trialPlan.id
+                            ? "border-[#b5bf9c]/60 bg-gradient-to-br from-[#b5bf9c]/10 to-[#94867a]/5 shadow-[0_0_20px_rgba(181,191,156,0.15)]"
+                            : "border-[#b5bf9c]/25 bg-[#b5bf9c]/[0.04] hover:border-[#b5bf9c]/40 hover:bg-[#b5bf9c]/[0.06]"
+                        )}
+                      >
+                        {selectedPlan?.id === trialPlan.id && (
+                          <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-gradient-to-br from-[#b5bf9c] to-[#94867a] flex items-center justify-center">
+                            <Check size={11} className="text-white" />
+                          </span>
+                        )}
+                        <div className="flex items-start gap-3 pr-7">
+                          <div className="h-11 w-11 rounded-xl border flex items-center justify-center shrink-0 border-[#b5bf9c]/30 bg-[#b5bf9c]/10">
+                            <Sparkles size={18} className="text-[#b5bf9c]" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-[#2d2d2d]/85 leading-snug">{trialPlan.name}</p>
+                            <p className="text-[11px] text-[#2d2d2d]/45 mt-0.5 leading-snug">{trialPlan.description}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-baseline gap-1 mt-2">
+                          <span className="text-2xl font-bold text-[#2d2d2d]">${Number(trialPlan.price ?? 0).toLocaleString("es-MX")}</span>
+                          <span className="text-xs text-[#2d2d2d]/35">{trialPlan.currency ?? "MXN"}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <span className="text-[10px] text-[#4a5638] bg-[#b5bf9c]/15 border border-[#b5bf9c]/25 rounded-full px-2 py-0.5">1 clase</span>
+                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">No transferible</span>
+                          <span className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5">No reembolsable</span>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+
                   {/* Plan cards */}
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-[#94867a]/70">
