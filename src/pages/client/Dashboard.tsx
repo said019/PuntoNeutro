@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MembershipCard } from "@/components/MembershipCard";
-import { Calendar, ClipboardList, Stethoscope, Clock, CalendarCheck } from "lucide-react";
+import { Calendar, ClipboardList, Stethoscope, Clock, CalendarCheck, ShoppingBag, ArrowRight, Sparkles } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
 import type { BookingClient } from "@/types/booking";
 
@@ -61,6 +61,10 @@ const Dashboard = () => {
     .filter((b) => b.status === "confirmed" || b.status === "waitlist")
     .slice(0, 2);
 
+  const classesRemaining = membership?.classesRemaining ?? membership?.classes_remaining ?? null;
+  const isLowCredits = membership && classesRemaining !== null && classesRemaining <= 2;
+  const noMembership = !loadingMembership && !membership;
+
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
       <ClientLayout>
@@ -74,6 +78,7 @@ const Dashboard = () => {
           <div className="flex flex-wrap gap-3">
             <Button asChild size="sm"><Link to="/app/classes"><Calendar size={16} className="mr-2" />Reservar clase</Link></Button>
             <Button asChild variant="outline" size="sm"><Link to="/app/bookings"><ClipboardList size={16} className="mr-2" />Mis reservas</Link></Button>
+            <Button asChild variant="outline" size="sm"><Link to="/app/checkout"><ShoppingBag size={16} className="mr-2" />Adquirir plan</Link></Button>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -96,6 +101,32 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* CTA: Adquirir / Renovar plan */}
+          {(noMembership || isLowCredits) && (
+            <Link to="/app/checkout" className="block no-underline">
+              <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/15">
+                      <Sparkles size={20} className="text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground text-sm">
+                        {noMembership ? "Adquiere tu membresía" : "Renueva tu plan"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {noMembership
+                          ? "Elige el plan ideal para ti y comienza a reservar clases"
+                          : `Te quedan ${classesRemaining} clase${classesRemaining === 1 ? "" : "s"} — renueva para seguir entrenando`}
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight size={18} className="text-primary shrink-0" />
+                </div>
+              </div>
+            </Link>
+          )}
 
           {/* Consultas pendientes */}
           {consultations.length > 0 && (
