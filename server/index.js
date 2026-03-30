@@ -1430,6 +1430,32 @@ function isMembershipCategoryCompatible(membershipCategory, classCategory) {
   return memCat === clsCat;
 }
 
+// ── Clase Muestra (trial) schedule restriction ──────────────────────────────
+// Trial plans can only book on specific day+time slots:
+//   Monday:   08:20, 19:20
+//   Tuesday:  09:30
+//   Thursday: 09:30
+const TRIAL_ALLOWED_SCHEDULES = [
+  { day: 1, time: "08:20" }, // Lunes 8:20 AM
+  { day: 1, time: "19:20" }, // Lunes 7:20 PM
+  { day: 2, time: "09:30" }, // Martes 9:30 AM
+  { day: 4, time: "09:30" }, // Jueves 9:30 AM
+];
+
+function isTrialPlan(membership) {
+  const rk = String(membership?.repeat_key ?? "").toLowerCase();
+  const name = String(membership?.plan_name ?? "").toLowerCase();
+  return rk.startsWith("trial_single_session") || name.includes("muestra");
+}
+
+function isClassAllowedForTrial(classDate, classStartTime) {
+  const d = new Date(classDate);
+  // getUTCDay: 0=Sun, 1=Mon ... 6=Sat
+  const dayOfWeek = d.getUTCDay();
+  const timeStr = String(classStartTime ?? "").slice(0, 5); // "HH:MM"
+  return TRIAL_ALLOWED_SCHEDULES.some((s) => s.day === dayOfWeek && s.time === timeStr);
+}
+
 async function selectMembershipForClass({ userId, classCategory, client = null }) {
   if (!userId) return null;
   const q = client ?? pool;
@@ -1440,7 +1466,9 @@ async function selectMembershipForClass({ userId, classCategory, client = null }
             m.classes_remaining,
             m.end_date,
             m.created_at,
-            COALESCE(p.class_category, 'all') AS class_category
+            COALESCE(p.class_category, 'all') AS class_category,
+            p.repeat_key,
+            p.name AS plan_name
        FROM memberships m
        LEFT JOIN plans p ON p.id = m.plan_id
       WHERE m.user_id = $1
@@ -2280,7 +2308,8 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
               COALESCE(p.class_limit, m.class_limit_override)      AS class_limit,
               COALESCE(p.duration_days, 30)                        AS duration_days,
               p.features,
-              COALESCE(p.class_category, 'all')                    AS class_category
+              COALESCE(p.class_category, 'all')                    AS class_category,
+              p.repeat_key
        FROM memberships m
        LEFT JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1
@@ -2484,6 +2513,14 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(403).json({
         message: `Tu membresía no incluye este tipo de clase. Necesitas una membresía compatible.`,
+      });
+    }
+
+    // ── Clase Muestra: restrict to allowed day+time slots ──
+    if (isTrialPlan(membership) && !isClassAllowedForTrial(cls.date, cls.start_time)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({
+        message: "Tu Clase Muestra solo puede reservarse en los horarios disponibles: Lunes 8:20 AM / 7:20 PM, Martes 9:30 AM, Jueves 9:30 AM.",
       });
     }
 
@@ -8463,6 +8500,14 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       });
     }
 
+    // ── Clase Muestra: restrict to allowed day+time slots ──
+    if (isTrialPlan(membership) && !isClassAllowedForTrial(cls.date, cls.start_time)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({
+        message: "La Clase Muestra solo puede reservarse: Lunes 8:20 AM / 7:20 PM, Martes 9:30 AM, Jueves 9:30 AM.",
+      });
+    }
+
     if (!isUnlimitedClasses(lockedMembership.classes_remaining) && Number(lockedMembership.classes_remaining) <= 0) {
       await client.query("ROLLBACK");
       return res.status(403).json({
@@ -8925,6 +8970,29 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
     return res.status(status).json({ message: err?.message || "Error interno" });
   } finally {
     client.release();
+  }
+});
+
+// ─── Routes: /api/consultations (client) ─────────────────────────────────────
+
+// GET /api/consultations/my — client's own consultations
+app.get("/api/consultations/my", authMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, complement_type, complement_name, specialist, status,
+              scheduled_date, notes, created_at
+         FROM consultations
+        WHERE user_id = $1
+          AND status IN ('pending', 'scheduled')
+        ORDER BY
+          CASE status WHEN 'scheduled' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END,
+          created_at DESC`,
+      [req.userId]
+    );
+    return res.json({ data: r.rows });
+  } catch (err) {
+    console.error("GET /api/consultations/my error:", err);
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 

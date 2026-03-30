@@ -12,6 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Punto Neutro" />
+  <link rel="apple-touch-startup-image" href="/icon-512.png" />
   <title>Punto Neutro</title>
   <meta name="description" content="Punto Neutro — Estudio de pilates en San Juan del Río, Querétaro. Movimiento con propósito." />
   <meta name="author" content="Punto Neutro" />
@@ -29,6 +30,13 @@
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      });
+    }
+  </script>
 </body>
 
 </html>

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Loader2, Eye, EyeOff, ArrowRight, Share, Plus, MoreVertical, X } from "lucide-react";
 import pnImg4 from "@/assets/punto-neutro-images/1000452104.jpg";
 import pnImg9 from "@/assets/punto-neutro-images/1000452523.jpg";
 import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
@@ -22,6 +22,19 @@ const Login = () => {
   const [params] = useSearchParams();
   const { toast } = useToast();
   const [showPass, setShowPass] = useState(false);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+      || ("standalone" in navigator && (navigator as any).standalone);
+    if (isStandalone) return; // Already installed
+    const dismissed = sessionStorage.getItem("pwa-banner-dismissed");
+    if (dismissed) return;
+    const ua = navigator.userAgent.toLowerCase();
+    setIsIOS(/iphone|ipad|ipod/.test(ua));
+    setShowInstallBanner(true);
+  }, []);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -110,9 +123,10 @@ const Login = () => {
 
         <div className="relative z-10 w-full max-w-[400px]">
 
-          {/* Mobile logo */}
-          <Link to="/" className="lg:hidden block mb-10">
-            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-16 w-auto" />
+          {/* Mobile logo — prominent for PWA home screen identity */}
+          <Link to="/" className="lg:hidden flex flex-col items-center mb-10">
+            <img src={puntoNeutroLogo} alt="Punto Neutro" className="h-20 w-auto drop-shadow-sm" />
+            <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground mt-2">Estudio de Pilates</span>
           </Link>
 
           {/* heading */}
@@ -211,6 +225,37 @@ const Login = () => {
           <p className="text-center text-xs text-muted-foreground/50 mt-8">
             © {new Date().getFullYear()} Punto Neutro · Tequisquiapan, Qro.
           </p>
+
+          {/* PWA Install Banner */}
+          {showInstallBanner && (
+            <div className="mt-6 relative bg-[#94867a]/10 border border-[#94867a]/30 rounded-xl p-4">
+              <button
+                onClick={() => { setShowInstallBanner(false); sessionStorage.setItem("pwa-banner-dismissed", "1"); }}
+                className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={14} />
+              </button>
+              <div className="flex items-start gap-3">
+                <img src={puntoNeutroLogo} alt="" className="w-10 h-10 rounded-lg object-contain shrink-0" />
+                <div className="text-xs text-foreground/80 leading-relaxed">
+                  <p className="font-semibold text-foreground mb-1.5">Instala Punto Neutro en tu teléfono</p>
+                  {isIOS ? (
+                    <ol className="list-decimal ml-3 space-y-1">
+                      <li>Toca el botón <Share size={12} className="inline -mt-0.5 text-[#007AFF]" /> <span className="font-medium">Compartir</span> en la barra inferior</li>
+                      <li>Selecciona <span className="font-medium">"Agregar a pantalla de inicio"</span> <Plus size={11} className="inline -mt-0.5" /></li>
+                      <li>Toca <span className="font-medium">"Agregar"</span></li>
+                    </ol>
+                  ) : (
+                    <ol className="list-decimal ml-3 space-y-1">
+                      <li>Toca el menú <MoreVertical size={12} className="inline -mt-0.5" /> de tu navegador (arriba a la derecha)</li>
+                      <li>Selecciona <span className="font-medium">"Agregar a pantalla de inicio"</span></li>
+                      <li>Confirma tocando <span className="font-medium">"Instalar"</span></li>
+                    </ol>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

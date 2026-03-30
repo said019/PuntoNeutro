@@ -12,7 +12,7 @@ import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, Lock, CheckCircle2, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BookingClient } from "@/types/booking";
 
@@ -41,6 +41,26 @@ function inferClassCat(name: string): ClassCat {
 function canBook(classCat: ClassCat, membershipCat: ClassCat | null): boolean {
   if (!membershipCat || membershipCat === "all") return true;
   return classCat === membershipCat;
+}
+
+// ── Clase Muestra schedule restriction ───────────────────────────────────────
+const TRIAL_ALLOWED_SCHEDULES = [
+  { day: 1, time: "08:20" }, // Lunes 8:20 AM
+  { day: 1, time: "19:20" }, // Lunes 7:20 PM
+  { day: 2, time: "09:30" }, // Martes 9:30 AM
+  { day: 4, time: "09:30" }, // Jueves 9:30 AM
+];
+
+function isTrialMembership(membership: any): boolean {
+  const rk = String(membership?.repeatKey ?? membership?.repeat_key ?? "").toLowerCase();
+  const name = String(membership?.planName ?? membership?.plan_name ?? "").toLowerCase();
+  return rk.startsWith("trial_single_session") || name.includes("muestra");
+}
+
+function isClassAllowedForTrial(classDate: Date, startTimeStr: string): boolean {
+  const day = classDate.getDay(); // 0=Sun … 6=Sat
+  const time = startTimeStr.slice(0, 5); // "HH:MM"
+  return TRIAL_ALLOWED_SCHEDULES.some((s) => s.day === day && s.time === time);
 }
 
 // ── Membership banner ─────────────────────────────────────────────────────────
@@ -113,6 +133,7 @@ const BookClasses = () => {
   const membershipCat: ClassCat | null = hasActive
     ? ((membership.classCategory ?? membership.class_category ?? "all") as ClassCat)
     : null;
+  const isTrial = hasActive && isTrialMembership(membership);
 
   const myBookedClassIds = new Set(myBookings.map((b) => b.class_id));
 
@@ -176,6 +197,21 @@ const BookClasses = () => {
             </div>
           )}
 
+          {/* Trial schedule restriction banner */}
+          {isTrial && (
+            <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-blue-500/30 bg-blue-50 text-sm">
+              <Clock size={15} className="text-blue-600 shrink-0 mt-0.5" />
+              <div className="text-blue-800 text-xs leading-relaxed">
+                <span className="font-semibold">Clase Muestra</span> — solo puedes reservar en estos horarios:
+                <ul className="mt-1 ml-3 list-disc space-y-0.5">
+                  <li>Lunes: 8:20 AM y 7:20 PM</li>
+                  <li>Martes: 9:30 AM</li>
+                  <li>Jueves: 9:30 AM</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
           {/* Week grid */}
           <div className="overflow-x-auto">
             <div className="grid grid-cols-7 gap-1 min-w-[520px] sm:min-w-[560px]">
@@ -193,7 +229,8 @@ const BookClasses = () => {
                         const classCat = inferClassCat(cls.class_type_name ?? "");
                         const c = CAT_COLORS[classCat];
                         const allowed = canBook(classCat, membershipCat);
-                        const locked = !isBooked && !isPast && !allowed;
+                        const trialBlocked = isTrial && !isClassAllowedForTrial(day, format(safeParse(cls.start_time), "HH:mm"));
+                        const locked = !isBooked && !isPast && (!allowed || trialBlocked);
                         const disabled = isPast || locked;
 
                         return (
