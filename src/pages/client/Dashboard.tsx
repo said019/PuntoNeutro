@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MembershipCard } from "@/components/MembershipCard";
-import { Calendar, ClipboardList, Stethoscope, Clock, CalendarCheck, ShoppingBag, ArrowRight, Sparkles } from "lucide-react";
+import { Calendar, ClipboardList, Stethoscope, Clock, CalendarCheck, ShoppingBag, ArrowRight, Sparkles, Upload, CreditCard, Banknote } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
 import type { BookingClient } from "@/types/booking";
 
@@ -44,6 +44,14 @@ const Dashboard = () => {
     queryKey: ["my-consultations"],
     queryFn: async () => (await api.get("/consultations/my")).data,
   });
+
+  const { data: ordersData } = useQuery({
+    queryKey: ["my-orders"],
+    queryFn: async () => (await api.get("/orders")).data,
+  });
+
+  const pendingOrders: any[] = (Array.isArray(ordersData?.data) ? ordersData.data : [])
+    .filter((o: any) => o.status === "pending_payment" || o.status === "pending_verification");
 
   const consultations: Consultation[] = Array.isArray(consultationsData?.data)
     ? consultationsData.data
@@ -126,6 +134,67 @@ const Dashboard = () => {
                 </div>
               </div>
             </Link>
+          )}
+
+          {/* Órdenes pendientes */}
+          {pendingOrders.length > 0 && (
+            <Card className="border-[#94867a]/30 bg-[#94867a]/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-[#94867a] flex items-center gap-2">
+                  <CreditCard size={16} />
+                  {pendingOrders.length === 1 ? "Orden pendiente" : "Órdenes pendientes"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {pendingOrders.map((o: any) => (
+                    <div key={o.id} className="rounded-xl border border-[#94867a]/20 bg-white p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="font-semibold text-sm text-[#2d2d2d]">{o.plan_name}</p>
+                          <p className="text-xs text-[#5a524a]">
+                            ${Number(o.total_amount).toLocaleString("es-MX")} MXN · {o.payment_method === "cash" ? "Efectivo" : "Transferencia"}
+                          </p>
+                          {o.order_number && (
+                            <p className="text-[10px] text-[#94867a] font-mono">Orden: {o.order_number}</p>
+                          )}
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={o.status === "pending_payment"
+                            ? "border-amber-500/50 text-amber-700 bg-amber-50"
+                            : "border-blue-500/50 text-blue-700 bg-blue-50"
+                          }
+                        >
+                          {o.status === "pending_payment" ? (
+                            <><Upload size={11} className="mr-1" /> Subir comprobante</>
+                          ) : (
+                            <><Clock size={11} className="mr-1" /> En revisión</>
+                          )}
+                        </Badge>
+                      </div>
+                      {o.status === "pending_payment" && (
+                        <Button asChild size="sm" className="mt-3 w-full sm:w-auto">
+                          <Link to="/app/checkout">
+                            <Upload size={14} className="mr-2" />Subir comprobante de pago
+                          </Link>
+                        </Button>
+                      )}
+                      {o.status === "pending_verification" && o.payment_method === "cash" && (
+                        <p className="text-xs text-blue-700 mt-3 bg-blue-50 rounded-lg px-3 py-2">
+                          Acércate a recepción para completar tu pago. Tu membresía se activará al confirmar.
+                        </p>
+                      )}
+                      {o.status === "pending_verification" && o.payment_method !== "cash" && (
+                        <p className="text-xs text-blue-700 mt-3 bg-blue-50 rounded-lg px-3 py-2">
+                          Tu comprobante está siendo revisado. Recibirás una notificación cuando se apruebe.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Consultas pendientes */}
