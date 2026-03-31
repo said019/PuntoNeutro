@@ -19,7 +19,11 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Skip API calls — only cache static assets
+  if (event.request.url.includes("/api/")) return;
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request)
+      .then((response) => response)
+      .catch(() => caches.match(event.request).then((r) => r || new Response("Offline", { status: 503 })))
   );
 });
