@@ -15,7 +15,7 @@ if (process.env.RESEND_API_KEY) {
 
 const FROM_EMAIL = process.env.EMAIL_FROM || "Punto Neutro <onboarding@resend.dev>";
 const SITE_URL = String(process.env.SITE_URL || process.env.APP_URL || "https://puntoneutro.com.mx").replace(/\/+$/, "");
-const LOGO_URL = `${SITE_URL}/punto-neutro-logo.png`;
+const LOGO_URL = `${SITE_URL}/pn-logo-email.png`;
 
 // ─── Brand palette (matches website) ─────────────────────────────────────────
 const B = {
@@ -77,8 +77,8 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
         <!-- Logo -->
         <tr><td align="center" style="padding:32px 40px 4px;">
           <a href="${SITE_URL}" style="text-decoration:none;">
-            <img src="${LOGO_URL}" alt="Punto Neutro" width="140" height="auto"
-                 style="display:block;max-width:140px;" />
+            <img src="${LOGO_URL}" alt="Punto Neutro" width="200" height="auto"
+                 style="display:block;max-width:200px;" />
           </a>
         </td></tr>
 
@@ -228,7 +228,7 @@ async function sendMembershipActivated(opts) {
   const html = baseLayout({
     preheader: `Tu membresía ${planName} está activa. ¡Reserva tus clases!`,
     content,
-    ctaUrl: `${SITE_URL}/app/book`,
+    ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Reservar clases",
   });
   await sendEmail({ to, subject: `Tu membresía está activa — Punto Neutro`, html });
@@ -310,7 +310,7 @@ async function sendBookingCancelled(opts) {
   const html = baseLayout({
     preheader: creditRestored ? "Clase devuelta a tu paquete." : "Cancelación tardía — clase no devuelta.",
     content,
-    ctaUrl: `${SITE_URL}/app/book`,
+    ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Ver horario",
   });
   await sendEmail({ to, subject: `Reserva cancelada — ${className}`, html });
@@ -341,7 +341,7 @@ async function sendWeeklyReminder(opts) {
   const html = baseLayout({
     preheader: `Nueva semana — ${classesLeft === null ? "clases ilimitadas" : `${classesLeft} clases disponibles`}.`,
     content,
-    ctaUrl: `${SITE_URL}/app/book`,
+    ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Programar mi semana",
   });
   await sendEmail({ to, subject: `Programa tu semana — Punto Neutro`, html });
