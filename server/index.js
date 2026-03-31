@@ -132,15 +132,21 @@ function normalizeBankInfo(rawValue) {
 }
 
 async function getConfiguredBankInfo(dbClient = pool) {
-  try {
-    const settingsRes = await dbClient.query(
-      "SELECT value FROM settings WHERE key = 'bank_info' LIMIT 1"
-    );
-    const raw = settingsRes.rows.length > 0 ? settingsRes.rows[0].value : null;
-    return normalizeBankInfo(raw);
-  } catch (_) {
-    return normalizeBankInfo(DEFAULT_BANK_INFO);
+  // Use pool (not transaction client) to avoid aborting active transactions on error
+  const safeClient = pool;
+  for (const table of ["system_settings", "settings"]) {
+    try {
+      const settingsRes = await safeClient.query(
+        `SELECT value FROM ${table} WHERE key = 'bank_info' LIMIT 1`
+      );
+      if (settingsRes.rows.length > 0) {
+        return normalizeBankInfo(settingsRes.rows[0].value);
+      }
+    } catch (_) {
+      // Table may not exist, try the next one
+    }
   }
+  return normalizeBankInfo(DEFAULT_BANK_INFO);
 }
 
 const DEFAULT_POLICIES_SETTINGS = {
