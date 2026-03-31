@@ -549,9 +549,9 @@ const Checkout = () => {
           {/* ── Step 3a: Bank details (transfer) ── */}
           {step === "bank" && bankDetails && (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-[#b5bf9c]/20 bg-[#b5bf9c]/5 p-5 space-y-4">
-                <p className="text-sm font-semibold text-[#b5bf9c]">Datos de transferencia SPEI</p>
-                <p className="text-xs text-[#2d2d2d]/40">Realiza la transferencia con los siguientes datos. Luego sube tu comprobante.</p>
+              <div className="rounded-2xl border border-[#94867a]/25 bg-white p-5 space-y-1">
+                <p className="text-base font-bold text-[#2d2d2d] mb-1">Datos de transferencia SPEI</p>
+                <p className="text-sm text-[#5a524a] mb-4">Realiza la transferencia y luego sube tu comprobante.</p>
                 {[
                   { label: "CLABE", value: bankDetails.clabe },
                   { label: "Cuenta", value: bankDetails.account_number ?? bankDetails.accountNumber },
@@ -559,18 +559,22 @@ const Checkout = () => {
                   { label: "Titular", value: bankDetails.account_holder ?? bankDetails.accountHolder },
                   { label: "Monto", value: `$${bankDetails.amount?.toLocaleString("es-MX")} MXN` },
                 ].map(({ label, value }) => value && (
-                  <div key={label} className="flex items-center justify-between py-2 border-b border-[#94867a]/15 last:border-0">
-                    <span className="text-xs text-[#2d2d2d]/40">{label}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-semibold text-[#2d2d2d]/80">{value}</span>
-                      <button onClick={() => { navigator.clipboard.writeText(String(value)); toast({ title: "Copiado" }); }} className="text-[#b5bf9c]/50 hover:text-[#b5bf9c] transition-colors">
+                  <div key={label} className="flex items-center justify-between py-3 border-b border-[#e8e9e3] last:border-0">
+                    <span className="text-sm text-[#5a524a] font-medium">{label}</span>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(String(value).replace(/\s/g, "")); toast({ title: `${label} copiado` }); }}
+                      className="flex items-center gap-2 group"
+                    >
+                      <span className="font-mono text-sm font-bold text-[#2d2d2d] select-all">{value}</span>
+                      <span className="w-7 h-7 rounded-lg bg-[#94867a]/10 flex items-center justify-center text-[#94867a] group-hover:bg-[#94867a]/20 transition-colors">
                         <Copy size={13} />
-                      </button>
-                    </div>
+                      </span>
+                    </button>
                   </div>
                 ))}
               </div>
-              <button onClick={() => setStep("upload")} className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity">
+              <p className="text-xs text-[#5a524a] text-center">Toca cualquier dato para copiarlo al portapapeles</p>
+              <button onClick={() => setStep("upload")} className="w-full py-3.5 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity text-sm tracking-wide uppercase">
                 Ya realicé la transferencia →
               </button>
             </div>
@@ -601,34 +605,37 @@ const Checkout = () => {
 
           {/* ── Step 4: Upload proof ── */}
           {step === "upload" && (
-            <div className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-5 space-y-4">
-              <p className="font-semibold text-[#2d2d2d]">Subir comprobante</p>
-              <p className="text-xs text-[#2d2d2d]/40">Sube una foto o PDF de tu comprobante de transferencia.</p>
+            <div className="rounded-2xl border border-[#94867a]/20 bg-white p-5 space-y-4">
+              <div>
+                <p className="text-base font-bold text-[#2d2d2d]">Subir comprobante</p>
+                <p className="text-sm text-[#5a524a] mt-1">Sube una foto o captura de pantalla de tu comprobante de transferencia.</p>
+              </div>
               <div
                 onClick={() => fileRef.current?.click()}
                 className={cn(
-                  "border-2 border-dashed rounded-2xl p-8 cursor-pointer text-center transition-all",
-                  file ? "border-[#4ade80]/40 bg-[#4ade80]/5" : "border-[#94867a]/15 hover:border-[#94867a]/30"
+                  "border-2 border-dashed rounded-2xl p-10 cursor-pointer text-center transition-all",
+                  file ? "border-[#4ade80]/50 bg-[#4ade80]/5" : "border-[#94867a]/25 hover:border-[#94867a]/40 bg-[#f4f5ef]"
                 )}
               >
                 <input type="file" accept="image/*,.pdf" ref={fileRef} className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
                 {file ? (
                   <>
-                    <Check size={24} className="text-[#4ade80] mx-auto mb-2" />
-                    <p className="text-sm text-[#4ade80] font-medium">{file.name}</p>
+                    <Check size={28} className="text-[#4ade80] mx-auto mb-2" />
+                    <p className="text-sm text-[#2d2d2d] font-semibold">{file.name}</p>
+                    <p className="text-xs text-[#5a524a] mt-1">Toca para cambiar archivo</p>
                   </>
                 ) : (
                   <>
-                    <Upload size={24} className="text-[#2d2d2d]/20 mx-auto mb-2" />
-                    <p className="text-sm text-[#2d2d2d]/40">Haz clic o arrastra tu comprobante aquí</p>
-                    <p className="text-xs text-[#2d2d2d]/20 mt-1">JPG, PNG o PDF</p>
+                    <Upload size={28} className="text-[#94867a] mx-auto mb-2" />
+                    <p className="text-sm text-[#2d2d2d] font-medium">Toca aquí para subir tu comprobante</p>
+                    <p className="text-xs text-[#5a524a] mt-1">JPG, PNG o PDF</p>
                   </>
                 )}
               </div>
               <button
                 onClick={() => uploadProofMutation.mutate()}
                 disabled={!file || uploadProofMutation.isPending}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-white bg-gradient-to-r from-[#94867a] to-[#b5bf9c] hover:opacity-90 transition-opacity disabled:opacity-40 text-sm tracking-wide uppercase"
               >
                 {uploadProofMutation.isPending ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
                 {uploadProofMutation.isPending ? "Enviando…" : "Enviar comprobante"}
