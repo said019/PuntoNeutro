@@ -3172,7 +3172,12 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       cols.push("notes");
       vals.push(`Complemento: ${activeComplement}`);
     }
-    const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
+    const placeholders = vals.map((_, i) => {
+      const col = cols[i];
+      if (col === "status") return `$${i + 1}::order_status`;
+      if (col === "payment_method") return `$${i + 1}::payment_method`;
+      return `$${i + 1}`;
+    }).join(", ");
     let orderRes;
     try {
       orderRes = await client.query(
