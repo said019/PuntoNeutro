@@ -1754,7 +1754,7 @@ async function processPosSale({ userId, items, paymentMethod = "efectivo", disco
          user_id, subtotal, tax_amount, total_amount, payment_method,
          status, discount_amount, discount_code_id, channel
        )
-       VALUES ($1,$2,0,$3,$4,'approved',$5,$6,'pos')
+       VALUES ($1,$2,0,$3,$4::payment_method,'approved'::order_status,$5,$6,'pos')
        RETURNING *`,
       [userId || null, subtotal, total, paymentMethod, discountAmount, discountCodeRow?.id ?? null]
     );
