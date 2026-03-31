@@ -1463,8 +1463,8 @@ function isMembershipCategoryCompatible(membershipCategory, classCategory) {
 const TRIAL_ALLOWED_SCHEDULES = [
   { day: 1, time: "08:20" }, // Lunes 8:20 AM
   { day: 1, time: "19:20" }, // Lunes 7:20 PM
-  { day: 2, time: "09:30" }, // Martes 9:30 AM
-  { day: 4, time: "09:30" }, // Jueves 9:30 AM
+  { day: 2, time: "09:25" }, // Martes 9:25 AM
+  { day: 4, time: "09:25" }, // Jueves 9:25 AM
 ];
 
 function isTrialPlan(membership) {
@@ -2546,7 +2546,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     if (isTrialPlan(membership) && !isClassAllowedForTrial(cls.date, cls.start_time)) {
       await client.query("ROLLBACK");
       return res.status(403).json({
-        message: "Tu Clase Muestra solo puede reservarse en los horarios disponibles: Lunes 8:20 AM / 7:20 PM, Martes 9:30 AM, Jueves 9:30 AM.",
+        message: "Tu Clase Muestra solo puede reservarse en los horarios disponibles: Lunes 8:20 AM / 7:20 PM, Martes 9:25 AM, Jueves 9:25 AM.",
       });
     }
 
@@ -8550,7 +8550,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     if (isTrialPlan(membership) && !isClassAllowedForTrial(cls.date, cls.start_time)) {
       await client.query("ROLLBACK");
       return res.status(403).json({
-        message: "La Clase Muestra solo puede reservarse: Lunes 8:20 AM / 7:20 PM, Martes 9:30 AM, Jueves 9:30 AM.",
+        message: "La Clase Muestra solo puede reservarse: Lunes 8:20 AM / 7:20 PM, Martes 9:25 AM, Jueves 9:25 AM.",
       });
     }
 

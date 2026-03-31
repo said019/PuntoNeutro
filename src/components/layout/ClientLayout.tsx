@@ -18,6 +18,7 @@ const NAV_GROUPS = [
       { to: "/app", label: "Inicio", icon: LayoutDashboard, activeColor: "#94867a" },
       { to: "/app/classes", label: "Reservar clase", icon: Calendar, activeColor: "#94867a" },
       { to: "/app/bookings", label: "Mis reservas", icon: ClipboardList, activeColor: "#b5bf9c" },
+      { to: "/app/orders", label: "Mis órdenes", icon: CreditCard, activeColor: "#94867a" },
     ],
   },
 ];

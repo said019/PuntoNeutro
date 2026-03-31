@@ -47,8 +47,8 @@ function canBook(classCat: ClassCat, membershipCat: ClassCat | null): boolean {
 const TRIAL_ALLOWED_SCHEDULES = [
   { day: 1, time: "08:20" }, // Lunes 8:20 AM
   { day: 1, time: "19:20" }, // Lunes 7:20 PM
-  { day: 2, time: "09:30" }, // Martes 9:30 AM
-  { day: 4, time: "09:30" }, // Jueves 9:30 AM
+  { day: 2, time: "09:25" }, // Martes 9:25 AM
+  { day: 4, time: "09:25" }, // Jueves 9:25 AM
 ];
 
 function isTrialMembership(membership: any): boolean {
@@ -205,8 +205,8 @@ const BookClasses = () => {
                 <span className="font-semibold">Clase Muestra</span> — solo puedes reservar en estos horarios:
                 <ul className="mt-1 ml-3 list-disc space-y-0.5">
                   <li>Lunes: 8:20 AM y 7:20 PM</li>
-                  <li>Martes: 9:30 AM</li>
-                  <li>Jueves: 9:30 AM</li>
+                  <li>Martes: 9:25 AM</li>
+                  <li>Jueves: 9:25 AM</li>
                 </ul>
               </div>
             </div>
