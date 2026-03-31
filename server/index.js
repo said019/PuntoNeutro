@@ -1920,7 +1920,7 @@ async function findNonRepeatablePlanConflict({
          o.plan_id = $2
          OR (COALESCE(p.repeat_key, '') <> '' AND p.repeat_key = $3)
        )
-       AND o.status = ANY($4::text[])
+       AND o.status = ANY($4::order_status[])
   `;
   if (excludeOrderId) {
     params.push(excludeOrderId);
