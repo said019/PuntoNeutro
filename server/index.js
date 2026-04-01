@@ -10871,7 +10871,7 @@ async function runWeeklyReminderCron() {
 async function runRenewalReminderCron() {
   try {
     const res = await pool.query(`
-      SELECT u.email, COALESCE(u.display_name, 'Alumna') AS name,
+      SELECT u.email, u.phone, COALESCE(u.display_name, 'Alumna') AS name,
              m.classes_remaining, m.end_date,
              COALESCE(p.name, m.plan_name_override, 'Tu membresía') AS plan_name
       FROM memberships m
@@ -10895,10 +10895,143 @@ async function runRenewalReminderCron() {
         endDate: row.end_date,
         reason,
       }).catch((e) => console.error("[Email] renewal cron:", e.message));
+      // WhatsApp renewal reminder
+      sendConfiguredWhatsAppTemplate({
+        templateKey: "renewal_reminder",
+        phone: row.phone,
+        vars: {
+          name: row.name,
+          plan: row.plan_name,
+          expiresAt: row.end_date ? new Date(row.end_date).toLocaleDateString("es-MX") : "",
+          classesRemaining: row.classes_remaining ?? "",
+        },
+        fallbackMessage: row.classes_remaining === 1
+          ? `Hola ${row.name}, te queda 1 clase en tu plan ${row.plan_name}. ¡Renueva para seguir entrenando!`
+          : `Hola ${row.name}, tu plan ${row.plan_name} está por vencer. ¡Renueva pronto!`,
+      }).catch((e) => console.error("[WA] renewal cron:", e.message));
       await new Promise((r) => setTimeout(r, 200));
     }
   } catch (err) {
     console.error("[Cron] Renewal reminder error:", err.message);
+  }
+}
+
+/**
+ * Runs every hour. Sends WhatsApp class reminders for classes starting
+ * within the next `reminder_hours_before` hours (default 2).
+ * When multiple students share the same class time, messages are staggered
+ * 3 minutes apart to avoid WhatsApp rate-limits / spam detection.
+ */
+const CLASS_REMINDER_STAGGER_MS = 3 * 60 * 1000; // 3 minutes between messages for same-time classes
+
+async function runClassReminderCron() {
+  try {
+    const notificationSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+    if (notificationSettings?.whatsapp_reminders === false) {
+      console.log("[Cron] Class reminder — WhatsApp disabled, skipping");
+      return;
+    }
+    const hoursBeforeRaw = notificationSettings?.reminder_hours_before ?? 2;
+    const hoursBefore = Math.max(1, Math.min(24, Number(hoursBeforeRaw) || 2));
+
+    // Find all bookings for classes starting within the reminder window
+    const now = new Date();
+    const windowStart = new Date(now.getTime());
+    const windowEnd = new Date(now.getTime() + hoursBefore * 60 * 60 * 1000);
+
+    const res = await pool.query(`
+      SELECT b.id AS booking_id, b.user_id,
+             u.phone, COALESCE(u.display_name, 'Alumna') AS name,
+             u.receive_reminders,
+             ct.name AS class_name,
+             c.date, c.start_time,
+             c.date + c.start_time AS class_datetime
+      FROM bookings b
+      JOIN classes c ON b.class_id = c.id
+      JOIN class_types ct ON c.class_type_id = ct.id
+      JOIN users u ON b.user_id = u.id
+      WHERE b.status = 'confirmed'
+        AND c.status = 'scheduled'
+        AND (c.date + c.start_time) BETWEEN $1 AND $2
+        AND u.phone IS NOT NULL
+        AND u.receive_reminders IS NOT FALSE
+      ORDER BY c.start_time ASC, b.created_at ASC
+    `, [windowStart.toISOString(), windowEnd.toISOString()]);
+
+    if (!res.rows.length) {
+      console.log("[Cron] Class reminder — no upcoming classes in window");
+      return;
+    }
+
+    // Check which reminders were already sent (avoid duplicates on re-run)
+    const alreadySent = new Set();
+    try {
+      const sentRes = await pool.query(`
+        SELECT booking_id FROM whatsapp_reminders_sent
+        WHERE sent_date = CURRENT_DATE
+      `);
+      for (const r of sentRes.rows) alreadySent.add(r.booking_id);
+    } catch (_) {
+      // Table may not exist yet — will be created below
+    }
+
+    // Ensure tracking table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS whatsapp_reminders_sent (
+        booking_id UUID PRIMARY KEY,
+        sent_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `).catch(() => {});
+
+    // Group by start_time so we can stagger within each time slot
+    const byTime = {};
+    for (const row of res.rows) {
+      const timeKey = String(row.start_time).slice(0, 5);
+      if (!byTime[timeKey]) byTime[timeKey] = [];
+      byTime[timeKey].push(row);
+    }
+
+    let totalSent = 0;
+    for (const [timeKey, students] of Object.entries(byTime)) {
+      for (let i = 0; i < students.length; i++) {
+        const row = students[i];
+        if (alreadySent.has(row.booking_id)) continue;
+
+        // Stagger: wait 3 minutes between each student in the same time slot
+        if (i > 0) {
+          await sleep(CLASS_REMINDER_STAGGER_MS);
+        }
+
+        const dateStr = row.date ? new Date(row.date).toLocaleDateString("es-MX") : "";
+        await sendConfiguredWhatsAppTemplate({
+          templateKey: "class_reminder",
+          phone: row.phone,
+          vars: {
+            name: row.name,
+            class: row.class_name,
+            date: dateStr,
+            time: timeKey,
+          },
+          fallbackMessage: `Hola ${row.name}, te recordamos tu clase de ${row.class_name} hoy a las ${timeKey}. ¡Te esperamos!`,
+        }).catch((e) => console.error("[WA] class reminder:", e.message));
+
+        // Mark as sent
+        await pool.query(
+          `INSERT INTO whatsapp_reminders_sent (booking_id) VALUES ($1) ON CONFLICT DO NOTHING`,
+          [row.booking_id]
+        ).catch(() => {});
+
+        totalSent++;
+      }
+    }
+
+    // Cleanup old tracking records (older than 2 days)
+    await pool.query(`DELETE FROM whatsapp_reminders_sent WHERE sent_date < CURRENT_DATE - INTERVAL '2 days'`).catch(() => {});
+
+    console.log(`[Cron] Class reminder — ${totalSent} WhatsApp reminders sent`);
+  } catch (err) {
+    console.error("[Cron] Class reminder error:", err.message);
   }
 }
 
@@ -10921,6 +11054,11 @@ function scheduleEmailCrons() {
       console.log("[Cron] Triggering renewal reminder...");
       runRenewalReminderCron();
     }
+
+    // Class reminder: every hour, sends WhatsApp for classes in the next N hours
+    // Runs every hour; the function itself checks the configured reminder window
+    console.log("[Cron] Checking class reminders...");
+    runClassReminderCron();
   }, 60 * 60 * 1000); // every 1 hour
 }
 
