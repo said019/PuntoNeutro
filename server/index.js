@@ -3112,6 +3112,21 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
 
+    // ── Block duplicate pending orders for the same plan ──
+    const pendingDup = await client.query(
+      `SELECT id FROM orders
+       WHERE user_id = $1 AND plan_id = $2
+         AND status IN ('pending_payment', 'pending_verification')
+       LIMIT 1`,
+      [req.userId, planId]
+    );
+    if (pendingDup.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({
+        message: "Ya tienes una orden pendiente para este plan. Completa o cancela la orden existente antes de crear otra.",
+      });
+    }
+
     // ── Pricing with cash/transfer discounts ──
     const COMBO_PRICES = { 8: { price: 1030, discount: 990 }, 12: { price: 1250, discount: 1190 }, 16: { price: 1450, discount: 1340 } };
     const PLAN_DISCOUNT_PRICES = { 120: 110, 400: 380, 680: 640, 900: 840 };
@@ -6827,6 +6842,7 @@ app.put("/api/loyalty/config", adminMiddleware, async (req, res) => {
        ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
       [JSON.stringify(clean)]
     );
+    invalidateSettingsCache("loyalty_config");
     return res.json({ data: clean });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
@@ -7098,9 +7114,22 @@ const PUBLIC_SETTINGS_KEYS = new Set([
   "policies_settings",
 ]);
 
+// ─── Settings cache (in-memory, TTL-based, invalidated on write) ────────────
+const SETTINGS_CACHE_TTL_MS = 60_000; // 1 minute
+const settingsCache = new Map(); // key → { value, expiresAt }
+
+function invalidateSettingsCache(key) {
+  if (key) { settingsCache.delete(key); } else { settingsCache.clear(); }
+}
+
 async function getSettingValueWithDefaults(key) {
+  const cached = settingsCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return mergeSettingsWithDefaults(key, cached.value);
+  }
   const r = await pool.query("SELECT value FROM settings WHERE key=$1", [key]);
   const raw = r.rows.length ? r.rows[0].value : null;
+  settingsCache.set(key, { value: raw, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS });
   return mergeSettingsWithDefaults(key, raw);
 }
 
@@ -7135,6 +7164,7 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
       "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()",
       [req.params.key, JSON.stringify(merged)]
     );
+    invalidateSettingsCache(req.params.key);
     return res.json({ data: { key: req.params.key, value: merged } });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
@@ -7172,9 +7202,14 @@ function queueWhatsAppSend(number, text) {
 
 async function getSettingsValue(key, fallback = null) {
   try {
+    const cached = settingsCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value ?? fallback;
+    }
     const r = await pool.query("SELECT value FROM settings WHERE key = $1 LIMIT 1", [key]);
-    if (!r.rows.length || r.rows[0].value == null) return fallback;
-    return r.rows[0].value;
+    const raw = r.rows.length ? r.rows[0].value : null;
+    settingsCache.set(key, { value: raw, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS });
+    return raw ?? fallback;
   } catch (_) {
     return fallback;
   }
@@ -8922,10 +8957,17 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
         if (existingMem.rows.length) {
           await client.query("UPDATE memberships SET status = 'active' WHERE order_id = $1", [order.id]);
         } else {
+          // Cancel any other pending orders for the same plan+user to prevent duplicates
+          await client.query(
+            `UPDATE orders SET status = 'cancelled', notes = COALESCE(notes,'') || ' [auto-cancelada: otra orden del mismo plan fue aprobada]'
+             WHERE user_id = $1 AND plan_id = $2 AND id != $3
+               AND status IN ('pending_payment', 'pending_verification')`,
+            [order.user_id, order.plan_id, order.id]
+          );
           await client.query(
             `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
              VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)`,
-            [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit ?? 9999, order.id]
+            [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit === 0 ? null : (plan.class_limit ?? null), order.id]
           );
         }
       }
