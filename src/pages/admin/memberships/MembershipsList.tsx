@@ -386,13 +386,10 @@ const MembershipsList = () => {
                 if (combo) {
                   total = combo.price;
                   if (isDiscount) discountTotal = combo.discount;
-                } else {
-                  // Parse discount from features if available
-                  const features = selPlan?.features ?? [];
-                  const discFeat = features.find((f: string) => f.includes("descuento"));
-                  if (discFeat && isDiscount) {
-                    const m = discFeat.match(/\$[\d,]+/);
-                    if (m) discountTotal = parseFloat(m[0].replace(/[$,]/g, ""));
+                } else if (isDiscount) {
+                  const dp = selPlan?.discountPrice ?? selPlan?.discount_price;
+                  if (dp != null && dp !== "" && Number(dp) > 0) {
+                    discountTotal = Number(dp);
                   }
                 }
                 const finalPrice = discountTotal ?? total;

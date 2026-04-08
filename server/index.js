@@ -581,6 +581,18 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_non_transferable BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_non_repeatable BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS repeat_key VARCHAR(80)`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS discount_price NUMERIC(10,2)`).catch(() => { });
+    // Seed discount_price for existing plans that don't have one yet
+    await pool.query(`
+      UPDATE plans SET discount_price = CASE
+        WHEN price = 120 THEN 110
+        WHEN price = 400 THEN 380
+        WHEN price = 680 THEN 640
+        WHEN price = 900 THEN 840
+        ELSE NULL
+      END
+      WHERE discount_price IS NULL AND price IN (120, 400, 680, 900)
+    `).catch(() => { });
     // ── Migrate class_types: normalize categories for Punto Neutro ──
     await pool.query(`
       UPDATE class_types SET category = 'pilates' WHERE category NOT IN ('pilates','bienestar','funcional');
@@ -3129,7 +3141,6 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
 
     // ── Pricing with cash/transfer discounts ──
     const COMBO_PRICES = { 8: { price: 1030, discount: 990 }, 12: { price: 1250, discount: 1190 }, 16: { price: 1450, discount: 1340 } };
-    const PLAN_DISCOUNT_PRICES = { 120: 110, 400: 380, 680: 640, 900: 840 };
     const activeComplement = complementType || complementId || null;
     let subtotal = parseFloat(plan.price);
     const isCashOrTransfer = paymentMethod === "cash" || paymentMethod === "transfer";
@@ -3140,9 +3151,8 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       if (combo) {
         subtotal = isCashOrTransfer ? combo.discount : combo.price;
       }
-    } else if (isCashOrTransfer) {
-      const planDiscount = PLAN_DISCOUNT_PRICES[subtotal];
-      if (planDiscount) subtotal = planDiscount;
+    } else if (isCashOrTransfer && plan.discount_price != null && parseFloat(plan.discount_price) > 0) {
+      subtotal = parseFloat(plan.discount_price);
     }
 
     let discount = 0;
@@ -6264,6 +6274,7 @@ app.post("/api/admin/plans", adminMiddleware, async (req, res) => {
   const {
     name, description, price, currency, duration_days, class_limit, class_category,
     features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
+    discount_price,
   } = req.body;
   if (!name?.trim() || price === undefined) return res.status(400).json({ message: "name y price requeridos" });
   try {
@@ -6274,11 +6285,12 @@ app.post("/api/admin/plans", adminMiddleware, async (req, res) => {
     const safeRepeatKey = nonRepeatable ? String(repeat_key ?? "").trim() || null : null;
     const r = await pool.query(
       `INSERT INTO plans
-        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, discount_price)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [name.trim(), description || null, price, currency || "MXN",
       duration_days || 30, class_limit || null,
-        cat, JSON.stringify(features || []), is_active ?? true, sort_order ?? 0, nonTransferable, nonRepeatable, safeRepeatKey]
+        cat, JSON.stringify(features || []), is_active ?? true, sort_order ?? 0, nonTransferable, nonRepeatable, safeRepeatKey,
+        discount_price != null && discount_price !== "" ? parseFloat(discount_price) : null]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
@@ -6292,6 +6304,7 @@ app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
   const {
     name, description, price, currency, duration_days, class_limit, class_category,
     features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
+    discount_price,
   } = req.body;
   try {
     const validCats = ["pilates", "bienestar", "funcional", "mixto", "all"];
@@ -6314,12 +6327,15 @@ app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
          is_non_transferable = COALESCE($11, is_non_transferable),
          is_non_repeatable   = COALESCE($12, is_non_repeatable),
          repeat_key          = CASE WHEN COALESCE($12, is_non_repeatable) = true THEN $13 ELSE NULL END,
+         discount_price      = $14,
          updated_at    = NOW()
-       WHERE id = $14 RETURNING *`,
+       WHERE id = $15 RETURNING *`,
       [name || null, description || null, price ?? null, currency || null,
       duration_days || null, class_limit ?? null,
         cat, features ? JSON.stringify(features) : null,
-      is_active ?? null, sort_order ?? null, nonTransferable, nonRepeatable, safeRepeatKey, req.params.id]
+      is_active ?? null, sort_order ?? null, nonTransferable, nonRepeatable, safeRepeatKey,
+        discount_price != null && discount_price !== "" ? parseFloat(discount_price) : null,
+        req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
     return res.json({ data: r.rows[0] });

@@ -29,13 +29,12 @@ const COMBO_PRICES: Record<number, { price: number; discount: number }> = {
   16: { price: 1450, discount: 1340 },
 };
 
-// Discount prices for cash/transfer by plan price
-const PLAN_DISCOUNT_PRICES: Record<number, number> = {
-  120: 110,   // Clase suelta
-  400: 380,   // 4 clases
-  680: 640,   // 8 clases
-  900: 840,   // 12 clases
-};
+// Helper: get discount price from plan's discount_price field (DB-driven)
+function getPlanDiscountPrice(plan: any): number | null {
+  const dp = plan?.discountPrice ?? plan?.discount_price;
+  if (dp == null || dp === "" || dp === 0) return null;
+  return Number(dp);
+}
 
 function flag(value: unknown): boolean {
   if (typeof value === "boolean") return value;
@@ -55,7 +54,7 @@ const PlanCard = ({
   const features: string[] = (Array.isArray(plan.features) ? plan.features : [])
     .filter((f: string) => !f.toLowerCase().includes("descuento") && !f.toLowerCase().includes("costo con"));
   const planPrice = Number(plan.price ?? 0);
-  const discountPrice = PLAN_DISCOUNT_PRICES[planPrice] ?? null;
+  const discountPrice = getPlanDiscountPrice(plan);
 
   return (
     <button
@@ -205,7 +204,7 @@ const Checkout = () => {
 
   // Apply discount when paying with cash/transfer (combo or individual plan)
   const planBasePrice = Number(selectedPlan?.price ?? 0);
-  const individualDiscount = PLAN_DISCOUNT_PRICES[planBasePrice] ?? null;
+  const individualDiscount = getPlanDiscountPrice(selectedPlan);
   const cashTransferPrice = comboDiscountPrice ?? (selectedComplement ? null : individualDiscount);
   const effectivePrice = (paymentMethod === "transfer" || paymentMethod === "cash") && cashTransferPrice
     ? cashTransferPrice : basePrice;

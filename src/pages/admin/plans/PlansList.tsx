@@ -49,6 +49,7 @@ const planSchema = z.object({
   isNonRepeatable: z.boolean().default(false),
   repeatKey: z.string().optional(),
   sortOrder: z.coerce.number().default(0),
+  discountPrice: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().nullable().default(null)),
 });
 
 type PlanFormData = z.infer<typeof planSchema>;
@@ -80,6 +81,12 @@ function normalizePlanRow(row: any): Plan {
     isNonRepeatable: Boolean(row?.isNonRepeatable ?? row?.is_non_repeatable ?? false),
     repeatKey: String(row?.repeatKey ?? row?.repeat_key ?? ""),
     sortOrder: Number(row?.sortOrder ?? row?.sort_order ?? 0),
+    discountPrice: (() => {
+      const raw = row?.discountPrice ?? row?.discount_price;
+      if (raw === "" || raw === undefined || raw === null) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : null;
+    })(),
   };
 }
 
@@ -87,12 +94,14 @@ const EMPTY: PlanFormData = {
   name: "", description: "", price: 0, currency: "MXN",
   durationDays: 30, classLimit: null, classCategory: "all",
   features: "", isActive: true, isNonTransferable: false, isNonRepeatable: false, repeatKey: "", sortOrder: 0,
+  discountPrice: null,
 };
 
 function serializePlan(d: PlanFormData) {
   return {
     ...d,
     repeatKey: d.isNonRepeatable ? (d.repeatKey?.trim() || null) : null,
+    discount_price: d.discountPrice,
     features: d.features
       ? d.features.split(",").map((s) => s.trim()).filter(Boolean)
       : [],
@@ -109,6 +118,11 @@ function normalizePlan(p: Plan): PlanFormData {
     isNonTransferable: Boolean((p as any).isNonTransferable ?? (p as any).is_non_transferable),
     isNonRepeatable: Boolean((p as any).isNonRepeatable ?? (p as any).is_non_repeatable),
     repeatKey: String((p as any).repeatKey ?? (p as any).repeat_key ?? ""),
+    discountPrice: (() => {
+      const raw = (p as any).discountPrice ?? (p as any).discount_price;
+      if (raw === "" || raw === undefined || raw === null) return null;
+      return Number(raw);
+    })(),
   };
 }
 
@@ -189,7 +203,12 @@ const PlansList = () => {
                   : plans.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.name}</TableCell>
-                      <TableCell>${p.price} {p.currency}</TableCell>
+                      <TableCell>
+                        <span>${p.price} {p.currency}</span>
+                        {p.discountPrice != null && p.discountPrice > 0 && (
+                          <p className="text-[10px] text-[#1a6b0a] font-semibold">Efvo/transf: ${p.discountPrice}</p>
+                        )}
+                      </TableCell>
                       <TableCell>{p.durationDays} días</TableCell>
                       <TableCell>{p.classLimit == null ? "Ilimitado" : p.classLimit === 0 ? "0" : p.classLimit}</TableCell>
                       <TableCell>
@@ -291,9 +310,13 @@ const PlansList = () => {
                   <Input type="number" {...form.register("price")} />
                 </div>
                 <div className="space-y-1">
-                  <Label>Duración (días)</Label>
-                  <Input type="number" {...form.register("durationDays")} />
+                  <Label>Precio efectivo/transf.</Label>
+                  <Input type="number" placeholder="Vacío = sin descuento" {...form.register("discountPrice")} />
                 </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Duración (días)</Label>
+                <Input type="number" {...form.register("durationDays")} />
               </div>
               <div className="space-y-1">
                 <Label>Límite de clases (vacío = ilimitado)</Label>
