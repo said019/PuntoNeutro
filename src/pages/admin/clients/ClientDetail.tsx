@@ -13,7 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, Save, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Pencil, Save, X, Minus, Plus, MoreHorizontal, Loader2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const methodLabel: Record<string, string> = {
   cash: "Efectivo",
@@ -22,6 +24,126 @@ const methodLabel: Record<string, string> = {
   transferencia: "Transferencia",
   card: "Tarjeta",
   tarjeta: "Tarjeta",
+};
+
+const MembershipsTab = ({ userId }: { userId: string }) => {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [editingMem, setEditingMem] = useState<any>(null);
+  const [credits, setCredits] = useState(0);
+
+  const { data: memberships } = useQuery({
+    queryKey: ["client-memberships", userId],
+    queryFn: async () => (await api.get(`/memberships?userId=${userId}`)).data,
+    enabled: !!userId,
+  });
+
+  const updateMem = useMutation({
+    mutationFn: ({ memId, classesRemaining }: { memId: string; classesRemaining: number }) =>
+      api.put(`/memberships/${memId}`, { classesRemaining }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["client-memberships", userId] });
+      toast({ title: "Créditos actualizados" });
+      setEditingMem(null);
+    },
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+  });
+
+  const cancelMem = useMutation({
+    mutationFn: (memId: string) => api.put(`/memberships/${memId}/cancel`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["client-memberships", userId] });
+      toast({ title: "Membresía cancelada" });
+    },
+  });
+
+  const openEdit = (m: any) => {
+    setCredits(m.classesRemaining ?? 0);
+    setEditingMem(m);
+  };
+
+  const mems = Array.isArray(memberships?.data) ? memberships.data : [];
+
+  return (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Plan</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Vence</TableHead>
+            <TableHead>Clases</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {mems.map((m: any) => (
+            <TableRow key={m.id}>
+              <TableCell>{m.planName ?? m.planId}</TableCell>
+              <TableCell>
+                <Badge variant={m.status === "active" ? "default" : m.status === "cancelled" ? "destructive" : "secondary"}>
+                  {m.status === "active" ? "Activa" : m.status === "expired" ? "Expirada" : m.status === "cancelled" ? "Cancelada" : m.status}
+                </Badge>
+              </TableCell>
+              <TableCell>{m.endDate ? new Date(m.endDate).toLocaleDateString("es-MX") : "—"}</TableCell>
+              <TableCell>{m.classesRemaining ?? "∞"}</TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => openEdit(m)}>Ajustar créditos</DropdownMenuItem>
+                    {m.status === "active" && (
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => { if (window.confirm("¿Cancelar esta membresía?")) cancelMem.mutate(m.id); }}
+                      >
+                        Cancelar membresía
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      <Dialog open={!!editingMem} onOpenChange={(v) => !v && setEditingMem(null)}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Ajustar créditos</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{editingMem?.planName}</p>
+          <div className="flex items-center justify-center gap-4 py-4">
+            <Button variant="outline" size="icon" onClick={() => setCredits((c) => Math.max(0, c - 1))}>
+              <Minus size={16} />
+            </Button>
+            <Input
+              type="number"
+              className="w-20 text-center text-lg font-bold"
+              value={credits}
+              onChange={(e) => setCredits(Math.max(0, parseInt(e.target.value) || 0))}
+            />
+            <Button variant="outline" size="icon" onClick={() => setCredits((c) => c + 1)}>
+              <Plus size={16} />
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingMem(null)}>Cancelar</Button>
+            <Button
+              onClick={() => editingMem && updateMem.mutate({ memId: editingMem.id, classesRemaining: credits })}
+              disabled={updateMem.isPending}
+            >
+              {updateMem.isPending ? <Loader2 className="animate-spin mr-1" size={14} /> : null}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 };
 
 const ClientDetail = () => {
@@ -164,19 +286,7 @@ const ClientDetail = () => {
 
             {/* ── Membresías ── */}
             <TabsContent value="memberships" className="mt-4">
-              <Table>
-                <TableHeader><TableRow><TableHead>Plan</TableHead><TableHead>Estado</TableHead><TableHead>Vence</TableHead><TableHead>Clases</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {(Array.isArray(memberships?.data) ? memberships.data : []).map((m: any) => (
-                    <TableRow key={m.id}>
-                      <TableCell>{m.planName ?? m.planId}</TableCell>
-                      <TableCell><Badge>{m.status === "active" ? "Activa" : m.status === "expired" ? "Expirada" : m.status}</Badge></TableCell>
-                      <TableCell>{m.endDate ? new Date(m.endDate).toLocaleDateString("es-MX") : "—"}</TableCell>
-                      <TableCell>{m.classesRemaining}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <MembershipsTab userId={id!} />
             </TabsContent>
 
             {/* ── Reservas ── */}
