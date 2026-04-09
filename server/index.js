@@ -2105,7 +2105,7 @@ app.post("/api/auth/register", async (req, res) => {
       `INSERT INTO users (display_name, email, phone, gender, password_hash, accepts_terms, accepts_communications, role)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'client')
        RETURNING *`,
-      [displayName.trim(), email.toLowerCase().trim(), phone || null, gender || null, passwordHash, acceptsTerms ?? false, acceptsCommunications ?? false]
+      [displayName.trim(), email.toLowerCase().trim(), normalizePhoneForStorage(phone), gender || null, passwordHash, acceptsTerms ?? false, acceptsCommunications ?? false]
     );
     const user = result.rows[0];
     // Auto-create referral code
@@ -6063,7 +6063,7 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
        WHERE id = $13
        RETURNING *`,
       [
-        displayName || null, phone || null, dateOfBirth || null,
+        displayName || null, normalizePhoneForStorage(phone), dateOfBirth || null,
         emergencyContactName || null, emergencyContactPhone || null, healthNotes || null,
         receiveReminders ?? null, receivePromotions ?? null, receiveWeeklySummary ?? null,
         acceptsCommunications ?? null,
@@ -7190,9 +7190,20 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
 // Helper: normalise phone to WhatsApp format (521XXXXXXXXXX for MX)
 function normalisePhone(raw) {
   let phone = String(raw).replace(/\D/g, "");
-  if (phone.startsWith("52") && phone.length === 12) return phone; // already 521XXXXXXXXXX or 52XXXXXXXXXX
-  if (phone.length === 10) return "52" + phone; // local MX 10 digits
+  if (phone.startsWith("52") && phone.length === 12) return phone;
+  if (phone.length === 10) return "52" + phone;
   return phone;
+}
+
+// Helper: normalise phone for DB storage (+52XXXXXXXXXX for MX)
+function normalizePhoneForStorage(raw) {
+  if (!raw) return null;
+  let phone = String(raw).trim().replace(/[\s\-()]/g, "");
+  if (phone.startsWith("+")) return phone; // already has country code
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return "+52" + digits;
+  if (digits.length === 12 && digits.startsWith("52")) return "+" + digits;
+  return phone; // return as-is if unrecognized format
 }
 
 const EVOLUTION_SEND_DELAY_MS = Number(process.env.EVOLUTION_SEND_DELAY_MS || 1200);
@@ -8820,7 +8831,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
          phone = EXCLUDED.phone,
          updated_at = NOW()
        RETURNING id, display_name, email`,
-      [displayName, finalEmail, phone || null, dateOfBirth || null,
+      [displayName, finalEmail, normalizePhoneForStorage(phone), dateOfBirth || null,
         emergencyContactName || null, emergencyContactPhone || null, healthNotes || null, hash]
     );
     const user = userRes.rows[0];
