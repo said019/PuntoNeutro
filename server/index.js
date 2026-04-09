@@ -8152,7 +8152,7 @@ app.delete("/api/users/:id", adminMiddleware, async (req, res) => {
 // GET /api/memberships — admin list all
 app.get("/api/memberships", adminMiddleware, async (req, res) => {
   try {
-    const { status, limit = 100 } = req.query;
+    const { status, userId, limit = 100 } = req.query;
     let q = `SELECT m.*, u.display_name AS user_name, p.name AS plan_name,
                     p.class_limit, p.duration_days, p.class_category
              FROM memberships m
@@ -8160,6 +8160,7 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
              LEFT JOIN plans p ON m.plan_id = p.id
              WHERE 1=1`;
     const params = [];
+    if (userId) { params.push(userId); q += ` AND m.user_id = $${params.length}`; }
     if (status) { params.push(status); q += ` AND m.status = $${params.length}`; }
     params.push(parseInt(limit)); q += ` ORDER BY m.created_at DESC LIMIT $${params.length}`;
     const r = await pool.query(q, params);
