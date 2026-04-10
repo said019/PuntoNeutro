@@ -925,6 +925,17 @@ async function ensureSchema() {
       ) sub
       WHERE m.id = sub.membership_id AND m.cancellations_used != sub.cnt;
     `).catch(() => { });
+    // ── Reconcile current_bookings counter with actual confirmed bookings ──
+    await pool.query(`
+      UPDATE classes c
+      SET current_bookings = sub.cnt
+      FROM (
+        SELECT b.class_id, COUNT(*) FILTER (WHERE b.status IN ('confirmed','checked_in'))::int AS cnt
+        FROM bookings b
+        GROUP BY b.class_id
+      ) sub
+      WHERE c.id = sub.class_id AND c.current_bookings != sub.cnt;
+    `).catch(() => { });
     // ── homepage_video_cards: editable 3-card section on landing page ──────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS homepage_video_cards (
@@ -2390,6 +2401,7 @@ app.get("/api/classes", async (req, res) => {
     let query = `
       SELECT c.*,
              c.max_capacity                         AS capacity,
+             (SELECT COUNT(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in'))::int AS current_bookings,
              (c.date || 'T' || c.start_time)        AS start_time_full,
              (c.date || 'T' || c.end_time)          AS end_time_full,
              ct.name  AS class_type_name,
@@ -8211,15 +8223,16 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     if (nonRepeatableConflict) {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
-    const start = startDate ? new Date(startDate) : new Date();
-    const end = new Date(start);
-    end.setDate(end.getDate() + (plan.duration_days || 30));
+    const startStr = startDate ? String(startDate).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const endD = new Date(startStr + "T12:00:00"); // noon to avoid timezone shifts
+    endD.setDate(endD.getDate() + (plan.duration_days || 30));
+    const endStr = endD.toISOString().slice(0, 10);
     const compInfo = complementType ? COMPLEMENT_MAP[complementType] : null;
     const complementNote = compInfo ? `Complemento: ${compInfo.name} — ${compInfo.specialist}` : null;
     const r = await pool.query(
       `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes)
        VALUES ($1,$2,'active',$3,$4,$5,$6,$7) RETURNING *`,
-      [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null, complementNote]
+      [userId, planId, paymentMethod, startStr, endStr, plan.class_limit ?? null, complementNote]
     );
 
     // ── Create consultation if complement was selected ────────────────
@@ -8761,6 +8774,47 @@ app.put("/api/bookings/:id/no-show", adminMiddleware, async (req, res) => {
   }
 });
 
+// PUT /api/admin/bookings/:id/cancel — admin cancels a booking and restores credit
+app.put("/api/admin/bookings/:id/cancel", adminMiddleware, async (req, res) => {
+  try {
+    const booking = await pool.query(
+      "SELECT b.*, c.date, c.start_time FROM bookings b JOIN classes c ON b.class_id = c.id WHERE b.id = $1",
+      [req.params.id]
+    );
+    if (!booking.rows.length) return res.status(404).json({ message: "Reserva no encontrada" });
+    const b = booking.rows[0];
+    if (b.status === "cancelled") return res.status(400).json({ message: "Ya está cancelada" });
+
+    await pool.query(
+      "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1",
+      [req.params.id]
+    );
+
+    // Decrement class count if was confirmed/checked_in
+    if (b.status === "confirmed" || b.status === "checked_in") {
+      await pool.query(
+        "UPDATE classes SET current_bookings = GREATEST(current_bookings - 1, 0) WHERE id = $1",
+        [b.class_id]
+      );
+    }
+
+    // Restore credit if membership has counted limit
+    if (b.membership_id && (b.status === "confirmed" || b.status === "checked_in")) {
+      await pool.query(
+        `UPDATE memberships SET classes_remaining = classes_remaining + 1
+         WHERE id = $1 AND classes_remaining IS NOT NULL AND classes_remaining < 9999`,
+        [b.membership_id]
+      );
+    }
+
+    triggerWalletPassSync(b.user_id, "booking_cancelled_by_admin");
+    return res.json({ data: { message: "Reserva cancelada y crédito devuelto" } });
+  } catch (err) {
+    console.error("PUT /admin/bookings/:id/cancel error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
 // GET /api/classes/:id/roster — lista de alumnos reservados en una clase
 app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
   try {
@@ -8847,15 +8901,15 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         await client.query("ROLLBACK");
         return res.status(409).json({ message: nonRepeatableConflict.message });
       }
-      const start = startDate ? new Date(startDate) : new Date();
-      const end = new Date(start);
-      end.setDate(end.getDate() + plan.duration_days);
+      const startStr = startDate ? String(startDate).slice(0, 10) : new Date().toISOString().slice(0, 10);
+      const endD = new Date(startStr + "T12:00:00");
+      endD.setDate(endD.getDate() + plan.duration_days);
+      const endStr = endD.toISOString().slice(0, 10);
       const memRes = await client.query(
         `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date,
           classes_remaining, notes)
          VALUES ($1,$2,'active',$3,$4,$5,$6,$7) RETURNING *`,
-        [user.id, plan.id, paymentMethod, start.toISOString().split("T")[0],
-        end.toISOString().split("T")[0],
+        [user.id, plan.id, paymentMethod, startStr, endStr,
         plan.class_limit === 0 ? null : plan.class_limit,
         (complementType ? `${notes || "Alta manual por admin"} | Complemento: ${complementType}` : notes || `Alta manual por admin`)]
       );
@@ -8976,8 +9030,10 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
 
       // Activate membership if this order is for a plan
       if (order.plan_id && plan && order.user_id) {
-        const end = new Date();
-        end.setDate(end.getDate() + (plan.duration_days || 30));
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const endD = new Date(todayStr + "T12:00:00");
+        endD.setDate(endD.getDate() + (plan.duration_days || 30));
+        const endStr = endD.toISOString().slice(0, 10);
         // Check if membership already exists for this order
         const existingMem = await client.query(
           "SELECT id FROM memberships WHERE order_id = $1", [order.id]
@@ -8994,8 +9050,8 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
           );
           await client.query(
             `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
-             VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)`,
-            [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), plan.class_limit === 0 ? null : (plan.class_limit ?? null), order.id]
+             VALUES ($1,$2,'active',$3,$4,$5,$6,$7)`,
+            [order.user_id, order.plan_id, order.payment_method || "transfer", todayStr, endStr, plan.class_limit === 0 ? null : (plan.class_limit ?? null), order.id]
           );
         }
       }
@@ -9879,7 +9935,8 @@ app.get("/api/admin/reports", adminMiddleware, async (req, res) => {
 app.get("/api/admin/classes", adminMiddleware, async (req, res) => {
   try {
     const { startDate, endDate, instructorId } = req.query;
-    let q = `SELECT c.*, ct.name AS class_type_name, i.display_name AS instructor_name
+    let q = `SELECT c.*, ct.name AS class_type_name, i.display_name AS instructor_name,
+             (SELECT COUNT(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in'))::int AS current_bookings
              FROM classes c
              LEFT JOIN class_types ct ON c.class_type_id = ct.id
              LEFT JOIN instructors i ON c.instructor_id = i.id

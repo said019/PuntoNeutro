@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft, ChevronRight, Users, CheckCircle2,
-  Clock, ArrowLeft, UserCheck, UserX, Calendar, Plus, Search,
+  Clock, ArrowLeft, UserCheck, UserX, Calendar, Plus, Search, Ban,
 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -78,6 +78,15 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
       toast({ title: "✅ Check-in registrado" });
     },
     onError: () => toast({ title: "Error al hacer check-in", variant: "destructive" }),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => api.put(`/admin/bookings/${id}/cancel`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["class-roster", classId] });
+      toast({ title: "Reserva cancelada y crédito devuelto" });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al cancelar", variant: "destructive" }),
   });
 
   const noShowMutation = useMutation({
@@ -189,6 +198,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
               const sc = statusConfig[entry.status] ?? statusConfig.confirmed;
               const canCheckin = entry.status === "confirmed" || entry.status === "waitlist";
               const canNoShow  = entry.status === "confirmed";
+              const canCancel  = entry.status === "confirmed" || entry.status === "waitlist";
               return (
                 <div
                   key={entry.bookingId}
@@ -255,6 +265,16 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                         className="w-8 h-8 rounded-lg bg-[#f87171]/8 border border-[#f87171]/20 text-[#f87171]/70 hover:bg-[#f87171]/15 flex items-center justify-center transition-all disabled:opacity-40"
                       >
                         <UserX size={14} />
+                      </button>
+                    )}
+                    {canCancel && (
+                      <button
+                        onClick={() => { if (window.confirm("¿Cancelar esta reserva y devolver crédito?")) cancelMutation.mutate(entry.bookingId); }}
+                        disabled={cancelMutation.isPending}
+                        title="Cancelar reserva"
+                        className="w-8 h-8 rounded-lg bg-[#94867a]/8 border border-[#94867a]/20 text-[#94867a]/70 hover:bg-[#94867a]/15 flex items-center justify-center transition-all disabled:opacity-40"
+                      >
+                        <Ban size={14} />
                       </button>
                     )}
                   </div>
