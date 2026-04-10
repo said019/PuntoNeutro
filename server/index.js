@@ -7197,6 +7197,32 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
+// ─── Membership date helper ──────────────────────────────────────────────────
+// Adds N months (calendar-based) to a YYYY-MM-DD string.
+// e.g. addMonths("2026-03-24", 1) → "2026-04-24"
+// Handles month-end: addMonths("2026-01-31", 1) → "2026-02-28"
+function addMonths(dateStr, months) {
+  const d = new Date(dateStr + "T12:00:00");
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  // If the day overflowed (e.g. Jan 31 → Mar 3), clamp to last day of target month
+  if (d.getDate() !== day) d.setDate(0);
+  return d.toISOString().slice(0, 10);
+}
+
+// Calculates membership end date: plans with duration_days <= 7 use days, otherwise 1 calendar month
+function calcMembershipEndDate(startStr, plan) {
+  const days = plan.duration_days || 30;
+  if (days <= 7) {
+    const d = new Date(startStr + "T12:00:00");
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+  // Calendar month: 30 days = 1 month, 60 = 2, etc.
+  const months = Math.max(1, Math.round(days / 30));
+  return addMonths(startStr, months);
+}
+
 // ─── Evolution API (WhatsApp) ─────────────────────────────────────────────────
 
 // Helper: normalise phone to WhatsApp format (521XXXXXXXXXX for MX)
@@ -8224,9 +8250,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
     const startStr = startDate ? String(startDate).slice(0, 10) : new Date().toISOString().slice(0, 10);
-    const endD = new Date(startStr + "T12:00:00"); // noon to avoid timezone shifts
-    endD.setDate(endD.getDate() + (plan.duration_days || 30));
-    const endStr = endD.toISOString().slice(0, 10);
+    const endStr = calcMembershipEndDate(startStr, plan);
     const compInfo = complementType ? COMPLEMENT_MAP[complementType] : null;
     const complementNote = compInfo ? `Complemento: ${compInfo.name} — ${compInfo.specialist}` : null;
     const r = await pool.query(
@@ -8902,9 +8926,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         return res.status(409).json({ message: nonRepeatableConflict.message });
       }
       const startStr = startDate ? String(startDate).slice(0, 10) : new Date().toISOString().slice(0, 10);
-      const endD = new Date(startStr + "T12:00:00");
-      endD.setDate(endD.getDate() + plan.duration_days);
-      const endStr = endD.toISOString().slice(0, 10);
+      const endStr = calcMembershipEndDate(startStr, plan);
       const memRes = await client.query(
         `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date,
           classes_remaining, notes)
@@ -9031,9 +9053,7 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
       // Activate membership if this order is for a plan
       if (order.plan_id && plan && order.user_id) {
         const todayStr = new Date().toISOString().slice(0, 10);
-        const endD = new Date(todayStr + "T12:00:00");
-        endD.setDate(endD.getDate() + (plan.duration_days || 30));
-        const endStr = endD.toISOString().slice(0, 10);
+        const endStr = calcMembershipEndDate(todayStr, plan);
         // Check if membership already exists for this order
         const existingMem = await client.query(
           "SELECT id FROM memberships WHERE order_id = $1", [order.id]
@@ -9094,8 +9114,7 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
     // Email: membership activated
     if (justApproved && order.user_id && plan) {
       try {
-        const end = new Date();
-        end.setDate(end.getDate() + (plan.duration_days || 30));
+        const emailEndStr = calcMembershipEndDate(new Date().toISOString().slice(0, 10), plan);
         const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [order.user_id]);
         if (uRes.rows[0]) {
           const u = uRes.rows[0];
@@ -9104,8 +9123,8 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
               to: u.email,
               name: u.display_name || "Alumna",
               planName: plan.name,
-              startDate: new Date().toISOString(),
-              endDate: end.toISOString(),
+              startDate: new Date().toISOString().slice(0, 10),
+              endDate: emailEndStr,
               classLimit: plan.class_limit ?? null,
             }).catch((e) => console.error("[Email] admin order verify:", e.message));
           }
