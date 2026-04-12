@@ -9382,7 +9382,7 @@ app.get("/api/payments", adminMiddleware, async (req, res) => {
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN plans p ON o.plan_id = p.id
-      WHERE o.status IN ('approved','paid')`;
+      WHERE o.status = 'approved'`;
     if (startIdx) q += ` AND o.created_at >= $${startIdx}`;
     if (endIdx) q += ` AND o.created_at <= $${endIdx}`;
     if (userIdx) q += ` AND o.user_id = $${userIdx}`;
