@@ -987,6 +987,12 @@ async function ensureSchema() {
     await pool.query(`UPDATE discount_codes SET class_category = NULL WHERE class_category NOT IN ('all','pilates','bienestar','funcional','mixto')`).catch(() => { });
     // ── bookings: add checked_in_at column ────────────────────────────────
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
+    // Prevent duplicate active bookings (same user + same class)
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_user_class_active
+      ON bookings (user_id, class_id)
+      WHERE status NOT IN ('cancelled')
+    `).catch(() => { });
     // ── Settings table ─────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS settings (

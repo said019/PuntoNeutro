@@ -307,22 +307,28 @@ const ClientDetail = () => {
 
             {/* ── Pagos ── */}
             <TabsContent value="payments" className="mt-4">
-              <Table>
-                <TableHeader><TableRow><TableHead>Monto</TableHead><TableHead>Método</TableHead><TableHead>Fecha</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {paymentsArr.map((p: any) => {
-                    const date = p.createdAt || p.created_at;
-                    const method = p.method || p.payment_method || "";
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell>${parseFloat(p.total_amount ?? p.totalAmount ?? p.amount ?? 0).toFixed(2)}</TableCell>
-                        <TableCell>{methodLabel[method.toLowerCase()] ?? method}</TableCell>
-                        <TableCell>{date ? new Date(date).toLocaleDateString("es-MX") : "—"}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              {paymentsArr.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">Sin pagos registrados</p>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow><TableHead>Plan</TableHead><TableHead>Monto</TableHead><TableHead>Método</TableHead><TableHead>Estado</TableHead><TableHead>Fecha</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {paymentsArr.map((p: any) => {
+                      const date = p.createdAt || p.created_at;
+                      const method = p.method || p.payment_method || "";
+                      return (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">{p.planName ?? p.plan_name ?? "—"}</TableCell>
+                          <TableCell>${parseFloat(p.total_amount ?? p.totalAmount ?? p.amount ?? 0).toFixed(2)}</TableCell>
+                          <TableCell>{methodLabel[method.toLowerCase()] ?? method}</TableCell>
+                          <TableCell><Badge variant={p.status === "active" || p.status === "approved" ? "default" : "secondary"}>{p.status === "active" ? "Activa" : p.status === "approved" ? "Aprobada" : p.status === "cancelled" ? "Cancelada" : p.status}</Badge></TableCell>
+                          <TableCell>{date ? new Date(date).toLocaleDateString("es-MX") : "—"}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
             </TabsContent>
           </Tabs>
         </div>
