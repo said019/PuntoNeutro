@@ -24,7 +24,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck, Sparkles, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck, Sparkles, Calendar, Users } from "lucide-react";
 
 /* ── Palette ── */
 const PALETTE_COLORS = [
@@ -185,6 +185,60 @@ function getFocusFromPointerEvent(event: React.PointerEvent<HTMLElement>) {
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PAGE
    ═══════════════════════════════════════════════════════════════════ */
+const STATUS_LABEL: Record<string, string> = {
+  confirmed: "Confirmada",
+  checked_in: "Asistió",
+  waitlist: "Lista espera",
+  no_show: "No asistió",
+  cancelled: "Cancelada",
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  confirmed: "bg-[#94867a]/15 text-[#94867a]",
+  checked_in: "bg-emerald-500/15 text-emerald-600",
+  waitlist: "bg-amber-500/15 text-amber-600",
+  no_show: "bg-red-500/15 text-red-600",
+  cancelled: "bg-gray-500/15 text-gray-500",
+};
+
+const ClassAttendees = ({ classId }: { classId: string }) => {
+  const { data, isLoading } = useQuery({
+    queryKey: ["class-roster-mini", classId],
+    queryFn: async () => (await api.get(`/classes/${classId}/roster`)).data,
+    enabled: !!classId,
+  });
+
+  const roster: any[] = data?.data?.roster ?? data?.roster ?? [];
+
+  return (
+    <div className="space-y-2 pt-2 border-t border-border">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <Users size={14} />
+        Asistentes ({roster.length})
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-16 w-full" />
+      ) : roster.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Sin reservas</p>
+      ) : (
+        <div className="space-y-1.5 max-h-60 overflow-auto">
+          {roster.map((r: any) => (
+            <div key={r.bookingId ?? r.booking_id} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-1.5">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{r.displayName ?? r.display_name ?? "—"}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{r.planName ?? r.plan_name ?? ""}</p>
+              </div>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${STATUS_COLOR[r.status] ?? ""}`}>
+                {STATUS_LABEL[r.status] ?? r.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ClassesCalendar = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -629,7 +683,11 @@ function CalendarTab({
               <div><span className="font-medium">Inicio:</span> {selectedClass.startTime ? new Date(selectedClass.startTime).toLocaleString("es-MX", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</div>
               <div><span className="font-medium">Cupo:</span> {(selectedClass.bookedCount ?? selectedClass.currentBookings ?? 0) + " / " + (selectedClass.maxCapacity ?? selectedClass.capacity ?? "?")}</div>
               {selectedClass.notes && <div><span className="font-medium">Notas:</span> {selectedClass.notes}</div>}
-              <div className="pt-4 flex flex-col gap-2">
+
+              {/* ── Attendees list ── */}
+              <ClassAttendees classId={selectedClass.id} />
+
+              <div className="pt-2 flex flex-col gap-2">
                 {!selectedClass.isCancelled && (
                   <Button variant="destructive" onClick={() => cancelMutation.mutate(selectedClass.id)} disabled={cancelMutation.isPending}>
                     Cancelar clase

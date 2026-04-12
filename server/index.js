@@ -8573,7 +8573,7 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
 // GET /api/bookings — admin sees all
 app.get("/api/bookings", adminMiddleware, async (req, res) => {
   try {
-    const { status, classId, limit = 100 } = req.query;
+    const { status, classId, userId, limit = 100 } = req.query;
     let q = `SELECT b.*, u.display_name AS user_name, (c.date || 'T' || c.start_time) AS start_time, ct.name AS class_name
              FROM bookings b
              LEFT JOIN users u ON b.user_id = u.id
@@ -8581,6 +8581,7 @@ app.get("/api/bookings", adminMiddleware, async (req, res) => {
              LEFT JOIN class_types ct ON c.class_type_id = ct.id
              WHERE 1=1`;
     const params = [];
+    if (userId) { params.push(userId); q += ` AND b.user_id = $${params.length}`; }
     if (status) { params.push(status); q += ` AND b.status = $${params.length}`; }
     if (classId) { params.push(classId); q += ` AND b.class_id = $${params.length}`; }
     params.push(parseInt(limit)); q += ` ORDER BY b.created_at DESC LIMIT $${params.length}`;
@@ -9395,7 +9396,7 @@ app.get("/api/payments", adminMiddleware, async (req, res) => {
       FROM memberships m
       LEFT JOIN users u ON m.user_id = u.id
       LEFT JOIN plans p ON m.plan_id = p.id
-      WHERE m.status = 'active'`;
+      WHERE m.order_id IS NULL`;
     if (startIdx) mq += ` AND m.created_at >= $${startIdx}`;
     if (endIdx) mq += ` AND m.created_at <= $${endIdx}`;
     if (userIdx) mq += ` AND m.user_id = $${userIdx}`;
