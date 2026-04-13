@@ -987,6 +987,9 @@ async function ensureSchema() {
     await pool.query(`UPDATE discount_codes SET class_category = NULL WHERE class_category NOT IN ('all','pilates','bienestar','funcional','mixto')`).catch(() => { });
     // ── bookings: add checked_in_at column ────────────────────────────────
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
+    // ── bookings: walk-in support (nullable user_id + guest_name) ──────────
+    await pool.query(`ALTER TABLE bookings ALTER COLUMN user_id DROP NOT NULL`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS guest_name TEXT`).catch(() => { });
     // Prevent duplicate active bookings (same user + same class)
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_user_class_active
@@ -8850,11 +8853,11 @@ app.put("/api/admin/bookings/:id/cancel", adminMiddleware, async (req, res) => {
 app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT b.id AS booking_id, b.status, b.checked_in_at,
+      `SELECT b.id AS booking_id, b.status, b.checked_in_at, b.guest_name,
               u.id AS user_id, u.display_name, u.email, u.phone,
               m.plan_id, p.name AS plan_name, m.classes_remaining
        FROM bookings b
-       JOIN users u ON b.user_id = u.id
+       LEFT JOIN users u ON b.user_id = u.id
        LEFT JOIN memberships m ON b.membership_id = m.id
        LEFT JOIN plans p ON m.plan_id = p.id
        WHERE b.class_id = $1 AND b.status != 'cancelled'
@@ -8864,7 +8867,7 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
          WHEN 'waitlist'   THEN 3
          WHEN 'no_show'    THEN 4
          ELSE 5 END,
-         u.display_name ASC`,
+         COALESCE(u.display_name, b.guest_name) ASC`,
       [req.params.id]
     );
     // Also get class info
@@ -8881,6 +8884,46 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
     return res.json({ data: { class: camelRow(cls.rows[0] ?? {}), roster: r.rows.map(camelRow) } });
   } catch (err) {
     console.error("[GET /classes/:id/roster]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/classes/:id/walkin — bloquea un lugar para una persona sin cuenta
+app.post("/api/admin/classes/:id/walkin", adminMiddleware, async (req, res) => {
+  const classId = req.params.id;
+  const { name } = req.body;
+  if (!name || !String(name).trim()) return res.status(400).json({ message: "Se requiere el nombre del invitado" });
+  try {
+    const cls = await pool.query("SELECT id, current_bookings, max_capacity FROM classes WHERE id = $1", [classId]);
+    if (!cls.rows.length) return res.status(404).json({ message: "Clase no encontrada" });
+    const c = cls.rows[0];
+    if (c.current_bookings >= c.max_capacity) return res.status(409).json({ message: "La clase está llena" });
+    const r = await pool.query(
+      `INSERT INTO bookings (class_id, user_id, guest_name, status)
+       VALUES ($1, NULL, $2, 'confirmed') RETURNING *`,
+      [classId, String(name).trim()]
+    );
+    await pool.query("UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1", [classId]);
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("[POST /admin/classes/:id/walkin]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/admin/bookings/:id/walkin — cancela un lugar bloqueado (walk-in)
+app.delete("/api/admin/bookings/:id/walkin", adminMiddleware, async (req, res) => {
+  try {
+    const b = await pool.query("SELECT * FROM bookings WHERE id = $1 AND user_id IS NULL", [req.params.id]);
+    if (!b.rows.length) return res.status(404).json({ message: "Reserva walk-in no encontrada" });
+    await pool.query("UPDATE bookings SET status = 'cancelled' WHERE id = $1", [req.params.id]);
+    await pool.query(
+      "UPDATE classes SET current_bookings = GREATEST(current_bookings - 1, 0) WHERE id = $1",
+      [b.rows[0].class_id]
+    );
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[DELETE /admin/bookings/:id/walkin]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });

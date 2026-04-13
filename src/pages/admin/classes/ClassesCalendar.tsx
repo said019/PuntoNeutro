@@ -24,7 +24,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck, Sparkles, Calendar, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck, Sparkles, Calendar, Users, X } from "lucide-react";
 
 /* ── Palette ── */
 const PALETTE_COLORS = [
@@ -202,19 +202,69 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const ClassAttendees = ({ classId }: { classId: string }) => {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [showWalkIn, setShowWalkIn] = useState(false);
+  const [walkInName, setWalkInName] = useState("");
+
   const { data, isLoading } = useQuery({
     queryKey: ["class-roster-mini", classId],
     queryFn: async () => (await api.get(`/classes/${classId}/roster`)).data,
     enabled: !!classId,
   });
 
+  const walkInMutation = useMutation({
+    mutationFn: (name: string) => api.post(`/admin/classes/${classId}/walkin`, { name }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["class-roster-mini", classId] });
+      qc.invalidateQueries({ queryKey: ["admin-classes"] });
+      toast({ title: "Lugar bloqueado" });
+      setWalkInName("");
+      setShowWalkIn(false);
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al bloquear", variant: "destructive" }),
+  });
+
+  const cancelWalkInMutation = useMutation({
+    mutationFn: (bookingId: string) => api.delete(`/admin/bookings/${bookingId}/walkin`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["class-roster-mini", classId] });
+      qc.invalidateQueries({ queryKey: ["admin-classes"] });
+      toast({ title: "Lugar liberado" });
+    },
+    onError: () => toast({ title: "Error al liberar lugar", variant: "destructive" }),
+  });
+
   const roster: any[] = data?.data?.roster ?? data?.roster ?? [];
 
   return (
     <div className="space-y-2 pt-2 border-t border-border">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Users size={14} />
-        Asistentes ({roster.length})
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Users size={14} />
+          Asistentes ({roster.length})
+        </div>
+        {!showWalkIn ? (
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowWalkIn(true)}>
+            <Plus size={12} className="mr-1" />Bloquear lugar
+          </Button>
+        ) : (
+          <div className="flex items-center gap-1">
+            <Input
+              className="h-7 text-xs w-36"
+              placeholder="Nombre del asistente"
+              value={walkInName}
+              onChange={(e) => setWalkInName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && walkInName.trim()) walkInMutation.mutate(walkInName); }}
+              autoFocus
+            />
+            <Button size="sm" className="h-7 text-xs" disabled={!walkInName.trim() || walkInMutation.isPending}
+              onClick={() => walkInMutation.mutate(walkInName)}>
+              {walkInMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : "OK"}
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setShowWalkIn(false); setWalkInName(""); }}>✕</Button>
+          </div>
+        )}
       </div>
       {isLoading ? (
         <Skeleton className="h-16 w-full" />
@@ -222,17 +272,38 @@ const ClassAttendees = ({ classId }: { classId: string }) => {
         <p className="text-xs text-muted-foreground">Sin reservas</p>
       ) : (
         <div className="space-y-1.5 max-h-60 overflow-auto">
-          {roster.map((r: any) => (
-            <div key={r.bookingId ?? r.booking_id} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-1.5">
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{r.displayName ?? r.display_name ?? "—"}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{r.planName ?? r.plan_name ?? ""}</p>
+          {roster.map((r: any) => {
+            const isWalkIn = !r.userId && !r.user_id;
+            const name = r.displayName ?? r.display_name ?? r.guestName ?? r.guest_name ?? "—";
+            const bookingId = r.bookingId ?? r.booking_id;
+            return (
+              <div key={bookingId} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-1.5">
+                <div className="min-w-0 flex items-center gap-1.5">
+                  <div>
+                    <p className="text-sm font-medium truncate">{name}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {isWalkIn ? "Walk-in / Sin cuenta" : (r.planName ?? r.plan_name ?? "")}
+                    </p>
+                  </div>
+                  {isWalkIn && (
+                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-amber-400/60 text-amber-600">Invitado</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[r.status] ?? ""}`}>
+                    {STATUS_LABEL[r.status] ?? r.status}
+                  </span>
+                  {isWalkIn && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive"
+                      onClick={() => cancelWalkInMutation.mutate(bookingId)}
+                      disabled={cancelWalkInMutation.isPending}>
+                      <X size={11} />
+                    </Button>
+                  )}
+                </div>
               </div>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${STATUS_COLOR[r.status] ?? ""}`}>
-                {STATUS_LABEL[r.status] ?? r.status}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
