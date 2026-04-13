@@ -113,10 +113,16 @@ const MembershipsTab = ({ userId }: { userId: string }) => {
       <Dialog open={!!editingMem} onOpenChange={(v) => !v && setEditingMem(null)}>
         <DialogContent className="max-w-xs">
           <DialogHeader>
-            <DialogTitle>Ajustar créditos</DialogTitle>
+            <DialogTitle>Corregir créditos</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">{editingMem?.planName}</p>
-          <div className="flex items-center justify-center gap-4 py-4">
+          <p className="text-sm font-medium">{editingMem?.planName}</p>
+          <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+            ⚠️ Solo usar para corregir errores. Para registrar asistencia usa la vista de clase → Asignar reserva → Check-in.
+          </div>
+          <div className="text-center text-xs text-muted-foreground">
+            Clases disponibles (actualmente: <strong>{editingMem?.classesRemaining ?? "?"}</strong> de <strong>{editingMem?.classLimit ?? "?"}</strong>)
+          </div>
+          <div className="flex items-center justify-center gap-4 py-2">
             <Button variant="outline" size="icon" onClick={() => setCredits((c) => Math.max(0, c - 1))}>
               <Minus size={16} />
             </Button>
@@ -130,6 +136,11 @@ const MembershipsTab = ({ userId }: { userId: string }) => {
               <Plus size={16} />
             </Button>
           </div>
+          {credits !== (editingMem?.classesRemaining ?? 0) && (
+            <p className="text-center text-xs text-muted-foreground">
+              Cambio: {editingMem?.classesRemaining ?? "?"} → <strong className={credits < (editingMem?.classesRemaining ?? 0) ? "text-destructive" : "text-emerald-600"}>{credits}</strong>
+            </p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingMem(null)}>Cancelar</Button>
             <Button
