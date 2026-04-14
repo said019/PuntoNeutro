@@ -175,7 +175,7 @@ const Dashboard = () => {
                       </div>
                       {o.status === "pending_payment" && (
                         <Button asChild size="sm" className="mt-3 w-full sm:w-auto">
-                          <Link to="/app/checkout">
+                          <Link to={`/app/checkout?orderId=${o.id}`}>
                             <Upload size={14} className="mr-2" />Subir comprobante de pago
                           </Link>
                         </Button>

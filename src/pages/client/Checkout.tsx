@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
@@ -168,6 +169,7 @@ const Checkout = () => {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>("select");
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [selectedComplement, setSelectedComplement] = useState<string | null>(null);
@@ -178,6 +180,15 @@ const Checkout = () => {
   const [orderUuid, setOrderUuid] = useState<string | null>(null);
   const [bankDetails, setBankDetails] = useState<any>(null);
   const [file, setFile] = useState<File | null>(null);
+
+  // If arriving with ?orderId=xxx, jump straight to upload step
+  useEffect(() => {
+    const oid = searchParams.get("orderId");
+    if (oid) {
+      setOrderUuid(oid);
+      setStep("upload");
+    }
+  }, []);
 
   const { data: plansData, isLoading: loadingPlans } = useQuery({
     queryKey: ["plans"],
