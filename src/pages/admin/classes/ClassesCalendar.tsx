@@ -205,7 +205,7 @@ const ClassAttendees = ({ classId }: { classId: string }) => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [showWalkIn, setShowWalkIn] = useState(false);
-  const [walkInName, setWalkInName] = useState("");
+  const [walkInForm, setWalkInForm] = useState({ name: "", phone: "", planId: "", paymentMethod: "cash", amount: "" });
 
   const { data, isLoading } = useQuery({
     queryKey: ["class-roster-mini", classId],
@@ -213,13 +213,22 @@ const ClassAttendees = ({ classId }: { classId: string }) => {
     enabled: !!classId,
   });
 
+  const { data: plansData } = useQuery({
+    queryKey: ["plans-walkin"],
+    queryFn: async () => (await api.get("/plans")).data,
+    enabled: showWalkIn,
+  });
+  const walkInPlans: any[] = (Array.isArray(plansData?.data) ? plansData.data : [])
+    .filter((p: any) => (p.isActive ?? p.is_active) !== false);
+
   const walkInMutation = useMutation({
-    mutationFn: (name: string) => api.post(`/admin/classes/${classId}/walkin`, { name }),
+    mutationFn: (body: any) => api.post(`/admin/classes/${classId}/walkin`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["class-roster-mini", classId] });
       qc.invalidateQueries({ queryKey: ["admin-classes"] });
-      toast({ title: "Lugar bloqueado" });
-      setWalkInName("");
+      qc.invalidateQueries({ queryKey: ["payments"] });
+      toast({ title: "Lugar bloqueado y pago registrado" });
+      setWalkInForm({ name: "", phone: "", planId: "", paymentMethod: "cash", amount: "" });
       setShowWalkIn(false);
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al bloquear", variant: "destructive" }),
@@ -244,28 +253,79 @@ const ClassAttendees = ({ classId }: { classId: string }) => {
           <Users size={14} />
           Asistentes ({roster.length})
         </div>
-        {!showWalkIn ? (
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowWalkIn(true)}>
-            <Plus size={12} className="mr-1" />Bloquear lugar
-          </Button>
-        ) : (
-          <div className="flex items-center gap-1">
-            <Input
-              className="h-7 text-xs w-36"
-              placeholder="Nombre del asistente"
-              value={walkInName}
-              onChange={(e) => setWalkInName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && walkInName.trim()) walkInMutation.mutate(walkInName); }}
-              autoFocus
-            />
-            <Button size="sm" className="h-7 text-xs" disabled={!walkInName.trim() || walkInMutation.isPending}
-              onClick={() => walkInMutation.mutate(walkInName)}>
-              {walkInMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : "OK"}
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setShowWalkIn(false); setWalkInName(""); }}>✕</Button>
-          </div>
-        )}
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowWalkIn(true)}>
+          <Plus size={12} className="mr-1" />Bloquear lugar
+        </Button>
       </div>
+
+      <Dialog open={showWalkIn} onOpenChange={(v) => { if (!v) setShowWalkIn(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Bloquear lugar — Walk-in</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Nombre *</Label>
+              <Input value={walkInForm.name} onChange={(e) => setWalkInForm({ ...walkInForm, name: e.target.value })} autoFocus />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Teléfono (opcional)</Label>
+              <Input type="tel" placeholder="10 dígitos" value={walkInForm.phone}
+                onChange={(e) => setWalkInForm({ ...walkInForm, phone: e.target.value })} />
+              <p className="text-[10px] text-muted-foreground">Si después se registra, se vincularán sus compras automáticamente.</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Plan</Label>
+              <Select value={walkInForm.planId} onValueChange={(v) => {
+                const plan = walkInPlans.find((p: any) => p.id === v);
+                const price = plan?.discountPrice ?? plan?.discount_price ?? plan?.price ?? "";
+                setWalkInForm({ ...walkInForm, planId: v, amount: price ? String(price) : walkInForm.amount });
+              }}>
+                <SelectTrigger><SelectValue placeholder="Selecciona un plan" /></SelectTrigger>
+                <SelectContent>
+                  {walkInPlans.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} — ${p.price}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Método de pago</Label>
+                <Select value={walkInForm.paymentMethod} onValueChange={(v) => setWalkInForm({ ...walkInForm, paymentMethod: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Efectivo</SelectItem>
+                    <SelectItem value="transfer">Transferencia</SelectItem>
+                    <SelectItem value="card">Tarjeta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Monto cobrado</Label>
+                <Input type="number" placeholder="0" value={walkInForm.amount}
+                  onChange={(e) => setWalkInForm({ ...walkInForm, amount: e.target.value })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWalkIn(false)}>Cancelar</Button>
+            <Button
+              disabled={!walkInForm.name.trim() || walkInMutation.isPending}
+              onClick={() => walkInMutation.mutate({
+                name: walkInForm.name.trim(),
+                phone: walkInForm.phone.trim() || null,
+                planId: walkInForm.planId || null,
+                paymentMethod: walkInForm.paymentMethod,
+                amount: walkInForm.amount ? Number(walkInForm.amount) : 0,
+              })}
+            >
+              {walkInMutation.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {isLoading ? (
         <Skeleton className="h-16 w-full" />
       ) : roster.length === 0 ? (

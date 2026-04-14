@@ -200,6 +200,24 @@ const ClientDetail = () => {
 
   const u = user?.data ?? user;
 
+  const { data: walkinMatches } = useQuery({
+    queryKey: ["walkin-matches", u?.phone],
+    queryFn: async () => (await api.get(`/admin/walkins/by-phone?phone=${encodeURIComponent(u?.phone ?? "")}`)).data,
+    enabled: !!u?.phone,
+  });
+  const walkinList: any[] = Array.isArray(walkinMatches?.data) ? walkinMatches.data : [];
+
+  const linkWalkinsMutation = useMutation({
+    mutationFn: () => api.post("/admin/walkins/link", { userId: id, phone: u?.phone }),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["walkin-matches", u?.phone] });
+      qc.invalidateQueries({ queryKey: ["client-payments", id] });
+      qc.invalidateQueries({ queryKey: ["client-bookings", id] });
+      toast({ title: res?.data?.message ?? "Compras vinculadas" });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al vincular", variant: "destructive" }),
+  });
+
   const startEditing = () => {
     setForm({
       displayName: u?.displayName ?? "",
@@ -228,6 +246,23 @@ const ClientDetail = () => {
             <div className="mb-6">
               <h1 className="text-2xl font-bold">{u?.displayName}</h1>
               <p className="text-muted-foreground text-sm">{u?.email} · {u?.phone}</p>
+            </div>
+          )}
+
+          {walkinList.length > 0 && (
+            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  {walkinList.length} compra(s) previa(s) como invitada con este teléfono
+                </p>
+                <p className="text-xs text-amber-800">
+                  Total: ${walkinList.reduce((s, w) => s + parseFloat(w.totalAmount ?? w.total_amount ?? 0), 0).toFixed(2)}
+                </p>
+              </div>
+              <Button size="sm" onClick={() => linkWalkinsMutation.mutate()} disabled={linkWalkinsMutation.isPending}>
+                {linkWalkinsMutation.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
+                Vincular a esta cuenta
+              </Button>
             </div>
           )}
 

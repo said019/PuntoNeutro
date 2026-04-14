@@ -987,9 +987,15 @@ async function ensureSchema() {
     await pool.query(`UPDATE discount_codes SET class_category = NULL WHERE class_category NOT IN ('all','pilates','bienestar','funcional','mixto')`).catch(() => { });
     // ── bookings: add checked_in_at column ────────────────────────────────
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
-    // ── bookings: walk-in support (nullable user_id + guest_name) ──────────
+    // ── bookings: walk-in support (nullable user_id + guest_name/phone + order link) ─
     await pool.query(`ALTER TABLE bookings ALTER COLUMN user_id DROP NOT NULL`).catch(() => { });
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS guest_name TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS guest_phone TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS order_id UUID REFERENCES orders(id) ON DELETE SET NULL`).catch(() => { });
+    // ── orders: walk-in support (nullable user_id was set earlier; add guest fields) ─
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS guest_name TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS guest_phone TEXT`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_guest_phone ON orders(guest_phone) WHERE guest_phone IS NOT NULL`).catch(() => { });
     // Prevent duplicate active bookings (same user + same class)
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_user_class_active
@@ -8888,26 +8894,109 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/admin/classes/:id/walkin — bloquea un lugar para una persona sin cuenta
+// POST /api/admin/classes/:id/walkin — bloquea un lugar + registra cobro de walk-in
 app.post("/api/admin/classes/:id/walkin", adminMiddleware, async (req, res) => {
   const classId = req.params.id;
-  const { name } = req.body;
+  const { name, phone, planId, paymentMethod: rawPM, amount } = req.body;
   if (!name || !String(name).trim()) return res.status(400).json({ message: "Se requiere el nombre del invitado" });
+
+  const client = await pool.connect();
   try {
-    const cls = await pool.query("SELECT id, current_bookings, max_capacity FROM classes WHERE id = $1", [classId]);
-    if (!cls.rows.length) return res.status(404).json({ message: "Clase no encontrada" });
+    await client.query("BEGIN");
+
+    const cls = await client.query("SELECT id, current_bookings, max_capacity FROM classes WHERE id = $1 FOR UPDATE", [classId]);
+    if (!cls.rows.length) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Clase no encontrada" }); }
     const c = cls.rows[0];
-    if (c.current_bookings >= c.max_capacity) return res.status(409).json({ message: "La clase está llena" });
-    const r = await pool.query(
-      `INSERT INTO bookings (class_id, user_id, guest_name, status)
-       VALUES ($1, NULL, $2, 'confirmed') RETURNING *`,
-      [classId, String(name).trim()]
+    if (c.current_bookings >= c.max_capacity) { await client.query("ROLLBACK"); return res.status(409).json({ message: "La clase está llena" }); }
+
+    const guestName = String(name).trim();
+    const guestPhone = phone ? normalizePhoneForStorage(String(phone).trim()) : null;
+
+    // Create order if payment info provided
+    let orderId = null;
+    const amt = Number(amount);
+    if (amt > 0) {
+      const paymentMethod = normalizePaymentMethod(rawPM || "cash");
+      const orderRes = await client.query(
+        `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, total_amount,
+                             guest_name, guest_phone, channel, paid_at, approved_at, approved_by)
+         VALUES (NULL, $1, 'approved', $2, $3, $3, $4, $5, 'walkin', NOW(), NOW(), $6)
+         RETURNING id`,
+        [planId || null, paymentMethod, amt, guestName, guestPhone, req.userId || null]
+      );
+      orderId = orderRes.rows[0].id;
+    }
+
+    const bookingRes = await client.query(
+      `INSERT INTO bookings (class_id, user_id, guest_name, guest_phone, order_id, status)
+       VALUES ($1, NULL, $2, $3, $4, 'confirmed') RETURNING *`,
+      [classId, guestName, guestPhone, orderId]
     );
-    await pool.query("UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1", [classId]);
-    return res.json({ data: r.rows[0] });
+    await client.query("UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1", [classId]);
+
+    await client.query("COMMIT");
+    return res.json({ data: { ...bookingRes.rows[0], orderId } });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
     console.error("[POST /admin/classes/:id/walkin]", err.message);
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/admin/walkins/by-phone?phone=xxx — busca compras previas de invitadas por teléfono
+app.get("/api/admin/walkins/by-phone", adminMiddleware, async (req, res) => {
+  const raw = String(req.query.phone || "").trim();
+  if (!raw) return res.json({ data: [] });
+  const normalized = normalizePhoneForStorage(raw);
+  try {
+    const r = await pool.query(
+      `SELECT o.id, o.total_amount, o.payment_method, o.paid_at, o.created_at,
+              o.guest_name, o.guest_phone,
+              p.name AS plan_name
+       FROM orders o
+       LEFT JOIN plans p ON p.id = o.plan_id
+       WHERE o.user_id IS NULL AND o.guest_phone = $1
+       ORDER BY o.created_at DESC`,
+      [normalized]
+    );
+    return res.json({ data: r.rows.map(camelRow) });
+  } catch (err) {
+    console.error("[GET /admin/walkins/by-phone]", err.message);
     return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST /api/admin/walkins/link — vincula órdenes y bookings de invitada a un usuario
+app.post("/api/admin/walkins/link", adminMiddleware, async (req, res) => {
+  const { userId, phone } = req.body;
+  if (!userId || !phone) return res.status(400).json({ message: "userId y phone son requeridos" });
+  const normalized = normalizePhoneForStorage(String(phone).trim());
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const ordersUpd = await client.query(
+      `UPDATE orders SET user_id = $1, guest_name = NULL, guest_phone = NULL
+       WHERE user_id IS NULL AND guest_phone = $2 RETURNING id`,
+      [userId, normalized]
+    );
+    const bookingsUpd = await client.query(
+      `UPDATE bookings SET user_id = $1, guest_name = NULL, guest_phone = NULL
+       WHERE user_id IS NULL AND guest_phone = $2 RETURNING id`,
+      [userId, normalized]
+    );
+    await client.query("COMMIT");
+    return res.json({
+      data: { ordersLinked: ordersUpd.rowCount, bookingsLinked: bookingsUpd.rowCount },
+      message: `Vinculado: ${ordersUpd.rowCount} pago(s) y ${bookingsUpd.rowCount} reserva(s)`,
+    });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[POST /admin/walkins/link]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -8998,13 +9087,33 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
       }
     }
 
+    // Auto-link previous walk-in orders/bookings by matching phone
+    let walkinLinks = { ordersLinked: 0, bookingsLinked: 0 };
+    const normalizedPhone = phone ? normalizePhoneForStorage(phone) : null;
+    if (normalizedPhone) {
+      const ordersUpd = await client.query(
+        `UPDATE orders SET user_id = $1, guest_name = NULL, guest_phone = NULL
+         WHERE user_id IS NULL AND guest_phone = $2 RETURNING id`,
+        [user.id, normalizedPhone]
+      );
+      const bookingsUpd = await client.query(
+        `UPDATE bookings SET user_id = $1, guest_name = NULL, guest_phone = NULL
+         WHERE user_id IS NULL AND guest_phone = $2 RETURNING id`,
+        [user.id, normalizedPhone]
+      );
+      walkinLinks = { ordersLinked: ordersUpd.rowCount, bookingsLinked: bookingsUpd.rowCount };
+    }
+
     await client.query("COMMIT");
     if (membership?.userId || user?.id) {
       triggerWalletPassSync(membership?.userId || user.id, membership ? "admin_client_manual_with_membership" : "admin_client_manual_created");
     }
+    const linkMsg = walkinLinks.ordersLinked > 0
+      ? ` · Se vincularon ${walkinLinks.ordersLinked} compra(s) previa(s) como invitada`
+      : "";
     return res.status(201).json({
-      data: { user: camelRow(user), membership, tempPassword: planId ? undefined : tempPassword },
-      message: planId ? "Clienta registrada y membresía activada" : "Clienta registrada",
+      data: { user: camelRow(user), membership, tempPassword: planId ? undefined : tempPassword, walkinLinks },
+      message: (planId ? "Clienta registrada y membresía activada" : "Clienta registrada") + linkMsg,
     });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -9415,13 +9524,13 @@ app.get("/api/payments", adminMiddleware, async (req, res) => {
       SELECT
         o.id,
         o.user_id,
-        u.display_name AS user_name,
-        p.name AS plan_name,
+        COALESCE(u.display_name, o.guest_name) AS user_name,
+        COALESCE(p.name, 'Clase suelta') AS plan_name,
         o.total_amount,
         o.payment_method AS method,
         o.status::text AS status,
         o.created_at,
-        'order' AS source
+        CASE WHEN o.user_id IS NULL THEN 'walkin' ELSE 'order' END AS source
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN plans p ON o.plan_id = p.id
