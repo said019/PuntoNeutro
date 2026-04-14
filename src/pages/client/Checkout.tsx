@@ -16,6 +16,34 @@ import imgPilates from "@/assets/pilates_2320695.png";
 type Step = "select" | "method" | "bank" | "cash" | "upload" | "done";
 type PaymentMethod = "transfer" | "cash";
 
+function compressImage(file: File, maxWidth = 1200, quality = 0.8): Promise<File> {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith("image/") || file.type === "application/pdf") {
+      resolve(file);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob || blob.size >= file.size) { resolve(file); return; }
+          resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 // ── Complements config (hardcoded — no DB dependency) ────────────────────────
 const COMPLEMENTS = [
   { id: "nutricion-hormonal", name: "Nutrición — Salud Hormonal", specialist: "LN. Clara Pérez" },
@@ -248,14 +276,16 @@ const Checkout = () => {
   });
 
   const uploadProofMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      if (!orderUuid) throw new Error("No se encontró la orden. Regresa e intenta de nuevo.");
+      const compressed = await compressImage(file!);
       const fd = new FormData();
-      fd.append("file", file!);
+      fd.append("file", compressed);
       return api.post(`/orders/${orderUuid}/proof`, fd, { headers: { "Content-Type": "multipart/form-data" } });
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["my-orders"] }); setStep("done"); },
     onError: (err: any) =>
-      toast({ title: "Error al subir comprobante", description: err.response?.data?.message, variant: "destructive" }),
+      toast({ title: "Error al subir comprobante", description: err?.message || err.response?.data?.message, variant: "destructive" }),
   });
 
   return (
@@ -627,7 +657,7 @@ const Checkout = () => {
                   file ? "border-[#4ade80]/50 bg-[#4ade80]/5" : "border-[#94867a]/25 hover:border-[#94867a]/40 bg-[#f4f5ef]"
                 )}
               >
-                <input type="file" accept="image/*,.pdf" ref={fileRef} className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                <input type="file" accept="image/*,.pdf,.heic,.heif" ref={fileRef} className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
                 {file ? (
                   <>
                     <Check size={28} className="text-[#4ade80] mx-auto mb-2" />
