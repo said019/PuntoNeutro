@@ -11233,121 +11233,122 @@ async function runRenewalReminderCron() {
 }
 
 /**
- * Runs every hour. Sends WhatsApp class reminders for classes starting
- * within the next `reminder_hours_before` hours (default 2).
- * When multiple students share the same class time, messages are staggered
- * 3 minutes apart to avoid WhatsApp rate-limits / spam detection.
+ * Two-shot daily WhatsApp reminder strategy:
+ *
+ *   9:00 PM  →  "morning" mode  — reminds for tomorrow's classes that start before noon
+ *   8:00 AM  →  "afternoon" mode — reminds for today's classes that start at noon or later
+ *
+ * Every message is staggered 3 minutes apart to avoid Evolution API rate-limits.
+ * A booking is only ever reminded once (tracked in whatsapp_reminders_sent).
  */
-const CLASS_REMINDER_STAGGER_MS = 3 * 60 * 1000; // 3 minutes between messages for same-time classes
+const CLASS_REMINDER_STAGGER_MS = 3 * 60 * 1000; // 3 min between each WhatsApp
 
-async function runClassReminderCron() {
+async function runClassReminderCron(mode = "morning") {
   try {
     const notificationSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
     if (notificationSettings?.whatsapp_reminders === false) {
-      console.log("[Cron] Class reminder — WhatsApp disabled, skipping");
+      console.log(`[Cron] Class reminder (${mode}) — WhatsApp disabled, skipping`);
       return;
     }
-    const hoursBeforeRaw = notificationSettings?.reminder_hours_before ?? 2;
-    const hoursBefore = Math.max(1, Math.min(24, Number(hoursBeforeRaw) || 2));
 
-    // Find all bookings for classes starting within the reminder window
-    const now = new Date();
-    const windowStart = new Date(now.getTime());
-    const windowEnd = new Date(now.getTime() + hoursBefore * 60 * 60 * 1000);
+    // morning  → tomorrow's classes that start before 12:00
+    // afternoon → today's classes that start at 12:00 or later
+    // EXTRACT(EPOCH FROM start_time) works for both TIME and INTERVAL column types.
+    const targetDate = mode === "morning"
+      ? `(CURRENT_TIMESTAMP AT TIME ZONE 'America/Mexico_City')::date + 1`
+      : `(CURRENT_TIMESTAMP AT TIME ZONE 'America/Mexico_City')::date`;
+    const timeFilter = mode === "morning"
+      ? `EXTRACT(EPOCH FROM c.start_time) < 43200`   -- before 12:00
+      : `EXTRACT(EPOCH FROM c.start_time) >= 43200`;  -- 12:00 or later
+    const dayLabel = mode === "morning" ? "mañana" : "hoy";
 
     const res = await pool.query(`
       SELECT b.id AS booking_id, b.user_id,
              u.phone, COALESCE(u.display_name, 'Alumna') AS name,
              u.receive_reminders,
              ct.name AS class_name,
-             c.date, c.start_time,
-             c.date + c.start_time AS class_datetime
+             c.date, c.start_time
       FROM bookings b
       JOIN classes c ON b.class_id = c.id
       JOIN class_types ct ON c.class_type_id = ct.id
       JOIN users u ON b.user_id = u.id
       WHERE b.status = 'confirmed'
         AND c.status = 'scheduled'
-        AND (c.date + c.start_time) BETWEEN $1 AND $2
+        AND c.date = ${targetDate}
+        AND ${timeFilter}
         AND u.phone IS NOT NULL
         AND u.receive_reminders IS NOT FALSE
       ORDER BY c.start_time ASC, b.created_at ASC
-    `, [windowStart.toISOString(), windowEnd.toISOString()]);
+    `);
 
     if (!res.rows.length) {
-      console.log("[Cron] Class reminder — no upcoming classes in window");
+      console.log(`[Cron] Class reminder (${mode}) — no classes found`);
       return;
     }
 
-    // Check which reminders were already sent (avoid duplicates on re-run)
-    const alreadySent = new Set();
-    try {
-      const sentRes = await pool.query(`
-        SELECT booking_id FROM whatsapp_reminders_sent
-        WHERE sent_date = CURRENT_DATE
-      `);
-      for (const r of sentRes.rows) alreadySent.add(r.booking_id);
-    } catch (_) {
-      // Table may not exist yet — will be created below
-    }
-
-    // Ensure tracking table exists
+    // Ensure dedup tracking table exists
     await pool.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_reminders_sent (
         booking_id UUID PRIMARY KEY,
-        sent_date DATE NOT NULL DEFAULT CURRENT_DATE,
-        sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        sent_date  DATE NOT NULL DEFAULT CURRENT_DATE,
+        sent_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `).catch(() => {});
 
-    // Group by start_time so we can stagger within each time slot
-    const byTime = {};
-    for (const row of res.rows) {
-      const timeKey = String(row.start_time).slice(0, 5);
-      if (!byTime[timeKey]) byTime[timeKey] = [];
-      byTime[timeKey].push(row);
+    // Filter out already-sent bookings
+    const bookingIds = res.rows.map((r) => r.booking_id);
+    const sentRes = await pool.query(
+      `SELECT booking_id FROM whatsapp_reminders_sent WHERE booking_id = ANY($1)`,
+      [bookingIds]
+    ).catch(() => ({ rows: [] }));
+    const alreadySent = new Set(sentRes.rows.map((r) => r.booking_id));
+
+    const pending = res.rows.filter((r) => !alreadySent.has(r.booking_id));
+    if (!pending.length) {
+      console.log(`[Cron] Class reminder (${mode}) — all already sent`);
+      return;
     }
+
+    console.log(`[Cron] Class reminder (${mode}) — sending ${pending.length} reminders, staggered every 3 min`);
 
     let totalSent = 0;
-    for (const [timeKey, students] of Object.entries(byTime)) {
-      for (let i = 0; i < students.length; i++) {
-        const row = students[i];
-        if (alreadySent.has(row.booking_id)) continue;
+    for (let i = 0; i < pending.length; i++) {
+      const row = pending[i];
 
-        // Stagger: wait 3 minutes between each student in the same time slot
-        if (i > 0) {
-          await sleep(CLASS_REMINDER_STAGGER_MS);
-        }
+      // Wait before each subsequent message
+      if (i > 0) await sleep(CLASS_REMINDER_STAGGER_MS);
 
-        const dateStr = row.date ? new Date(row.date).toLocaleDateString("es-MX") : "";
-        await sendConfiguredWhatsAppTemplate({
-          templateKey: "class_reminder",
-          phone: row.phone,
-          vars: {
-            name: row.name,
-            class: row.class_name,
-            date: dateStr,
-            time: timeKey,
-          },
-          fallbackMessage: `Hola ${row.name}, te recordamos tu clase de ${row.class_name} hoy a las ${timeKey}. ¡Te esperamos!`,
-        }).catch((e) => console.error("[WA] class reminder:", e.message));
+      const timeKey = String(row.start_time).slice(0, 5);
+      const dateStr = row.date ? new Date(row.date).toLocaleDateString("es-MX") : "";
 
-        // Mark as sent
-        await pool.query(
-          `INSERT INTO whatsapp_reminders_sent (booking_id) VALUES ($1) ON CONFLICT DO NOTHING`,
-          [row.booking_id]
-        ).catch(() => {});
+      await sendConfiguredWhatsAppTemplate({
+        templateKey: "class_reminder",
+        phone: row.phone,
+        vars: {
+          name: row.name,
+          class: row.class_name,
+          date: dateStr,
+          time: timeKey,
+        },
+        fallbackMessage: `Hola ${row.name}, te recordamos tu clase de ${row.class_name} ${dayLabel} a las ${timeKey}. ¡Te esperamos!`,
+      }).catch((e) => console.error("[WA] class reminder:", e.message));
 
-        totalSent++;
-      }
+      await pool.query(
+        `INSERT INTO whatsapp_reminders_sent (booking_id) VALUES ($1) ON CONFLICT DO NOTHING`,
+        [row.booking_id]
+      ).catch(() => {});
+
+      totalSent++;
     }
 
-    // Cleanup old tracking records (older than 2 days)
-    await pool.query(`DELETE FROM whatsapp_reminders_sent WHERE sent_date < CURRENT_DATE - INTERVAL '2 days'`).catch(() => {});
+    // Cleanup records older than 3 days
+    await pool.query(
+      `DELETE FROM whatsapp_reminders_sent WHERE sent_date < CURRENT_DATE - INTERVAL '3 days'`
+    ).catch(() => {});
 
-    console.log(`[Cron] Class reminder — ${totalSent} WhatsApp reminders sent`);
+    console.log(`[Cron] Class reminder (${mode}) — ${totalSent} WhatsApp reminders sent`);
   } catch (err) {
-    console.error("[Cron] Class reminder error:", err.message);
+    console.error(`[Cron] Class reminder (${mode}) error:`, err.message);
   }
 }
 
@@ -11371,14 +11372,18 @@ function scheduleEmailCrons() {
       runRenewalReminderCron();
     }
 
-    // Class reminder: every hour, but only during quiet-safe hours.
-    // Do NOT send WhatsApp messages between 10 PM and 7 AM Mexico City time.
-    const isQuietHour = mexicoHour < 7 || mexicoHour >= 22;
-    if (!isQuietHour) {
-      console.log("[Cron] Checking class reminders...");
-      runClassReminderCron();
-    } else {
-      console.log(`[Cron] Class reminder skipped — quiet hours (Mexico hour: ${mexicoHour})`);
+    // Morning class reminder: every day at 9:00 PM Mexico time
+    // Sends for tomorrow's morning classes (before noon) — staggered 3 min each
+    if (mexicoHour === 21 && now.getUTCMinutes() < 60) {
+      console.log("[Cron] Triggering morning class reminders (tomorrow AM)...");
+      runClassReminderCron("morning");
+    }
+
+    // Afternoon class reminder: every day at 8:00 AM Mexico time
+    // Sends for today's afternoon/evening classes (noon+) — staggered 3 min each
+    if (mexicoHour === 8 && now.getUTCMinutes() < 60) {
+      console.log("[Cron] Triggering afternoon class reminders (today PM)...");
+      runClassReminderCron("afternoon");
     }
   }, 60 * 60 * 1000); // every 1 hour
 }
