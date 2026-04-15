@@ -11258,8 +11258,8 @@ async function runClassReminderCron(mode = "morning") {
       ? `(CURRENT_TIMESTAMP AT TIME ZONE 'America/Mexico_City')::date + 1`
       : `(CURRENT_TIMESTAMP AT TIME ZONE 'America/Mexico_City')::date`;
     const timeFilter = mode === "morning"
-      ? `EXTRACT(EPOCH FROM c.start_time) < 43200`   -- before 12:00
-      : `EXTRACT(EPOCH FROM c.start_time) >= 43200`;  -- 12:00 or later
+      ? `EXTRACT(EPOCH FROM c.start_time) < 43200`
+      : `EXTRACT(EPOCH FROM c.start_time) >= 43200`;
     const dayLabel = mode === "morning" ? "mañana" : "hoy";
 
     const res = await pool.query(`
