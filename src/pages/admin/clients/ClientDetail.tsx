@@ -72,7 +72,7 @@ const MembershipsTab = ({ userId }: { userId: string }) => {
     setEditingMem(m);
   };
 
-  const mems = Array.isArray(memberships?.data) ? memberships.data : [];
+  const mems = (Array.isArray(memberships?.data) ? memberships.data : []).filter((m: any) => m.status !== "cancelled");
 
   return (
     <>
