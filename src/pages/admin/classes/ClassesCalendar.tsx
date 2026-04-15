@@ -25,6 +25,7 @@ import { TimePicker } from "@/components/ui/time-picker";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck, Sparkles, Calendar, Users, X } from "lucide-react";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 /* ── Palette ── */
 const PALETTE_COLORS = [
@@ -270,8 +271,10 @@ const ClassAttendees = ({ classId }: { classId: string }) => {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Teléfono (opcional)</Label>
-              <Input type="tel" placeholder="10 dígitos" value={walkInForm.phone}
-                onChange={(e) => setWalkInForm({ ...walkInForm, phone: e.target.value })} />
+              <PhoneInput
+                value={walkInForm.phone}
+                onChange={(v) => setWalkInForm({ ...walkInForm, phone: v })}
+              />
               <p className="text-[10px] text-muted-foreground">Si después se registra, se vincularán sus compras automáticamente.</p>
             </div>
             <div className="space-y-1">

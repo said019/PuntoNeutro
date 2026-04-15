@@ -11,6 +11,7 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -271,7 +272,10 @@ const ClientsList = () => {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[#2d2d2d]/60 text-xs">Teléfono</Label>
-                  <Input className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d]" {...editForm.register("phone")} />
+                  <PhoneInput
+                    value={editForm.watch("phone") ?? ""}
+                    onChange={(v) => editForm.setValue("phone", v)}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[#2d2d2d]/60 text-xs">Fecha de nacimiento</Label>
@@ -347,10 +351,9 @@ const ClientsList = () => {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[#2d2d2d]/60 text-xs">Teléfono</Label>
-                    <Input
-                      className="bg-[#94867a]/[0.06] border-[#94867a]/15 text-[#2d2d2d] placeholder:text-[#94867a]/40"
-                      placeholder="55 1234 5678"
-                      {...manualForm.register("phone")}
+                    <PhoneInput
+                      value={manualForm.watch("phone") ?? ""}
+                      onChange={(v) => manualForm.setValue("phone", v)}
                     />
                   </div>
                   <div className="space-y-1">

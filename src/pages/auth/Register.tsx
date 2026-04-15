@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, Check, ArrowRight } from "lucide-react";
+import { COUNTRIES } from "@/components/ui/phone-input";
 import pnImg9 from "@/assets/punto-neutro-images/1000452523.webp";
 import puntoNeutroLogo from "@/assets/punto-neutro-logo.png";
 
@@ -14,8 +15,8 @@ const schema = z.object({
   email: z.string().email("Email inválido"),
   phone: z
     .string()
-    .transform((v) => v.replace(/\D/g, ""))           // quitar no-dígitos
-    .refine((v) => v.length === 10, "Debe tener 10 dígitos"),
+    .transform((v) => v.replace(/\D/g, ""))
+    .refine((v) => v.length >= 7 && v.length <= 15, "Teléfono inválido"),
   gender: z.enum(["female", "male", "other"]),
   password: z
     .string()
@@ -49,6 +50,7 @@ const Register = () => {
   const refCode = params.get("ref");
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [dialCode, setDialCode] = useState("52");
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -60,9 +62,9 @@ const Register = () => {
 
   const onSubmit = async (data: FormValues) => {
     clearError();
-    // normalizar teléfono: quitar no-dígitos y agregar prefijo +52
+    // normalizar teléfono: quitar no-dígitos y agregar prefijo del país seleccionado
     const rawPhone = data.phone.replace(/\D/g, "");
-    const phone = rawPhone.startsWith("52") ? `+${rawPhone}` : `+52${rawPhone}`;
+    const phone = rawPhone.startsWith(dialCode) ? `+${rawPhone}` : `+${dialCode}${rawPhone}`;
     try {
       await registerUser({
         email: data.email,
@@ -187,12 +189,23 @@ const Register = () => {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs text-muted-foreground uppercase tracking-widest font-medium">Teléfono</label>
-                <input
-                  placeholder="4271234567"
-                  inputMode="numeric"
-                  {...register("phone")}
-                  className="bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-all"
-                />
+                <div className="flex gap-2">
+                  <select
+                    value={dialCode}
+                    onChange={(e) => setDialCode(e.target.value)}
+                    className="bg-secondary border border-border rounded-xl px-2 py-3 text-foreground text-sm focus:outline-none focus:border-primary transition-all w-[95px]"
+                  >
+                    {COUNTRIES.map((c) => (
+                      <option key={`${c.code}-${c.dial}`} value={c.dial}>{c.flag} +{c.dial}</option>
+                    ))}
+                  </select>
+                  <input
+                    placeholder="4271234567"
+                    inputMode="numeric"
+                    {...register("phone")}
+                    className="flex-1 bg-secondary border border-border rounded-xl px-4 py-3 text-foreground text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary transition-all"
+                  />
+                </div>
                 {errors.phone && <span className="text-xs text-destructive">{errors.phone.message}</span>}
               </div>
             </div>

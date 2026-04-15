@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Pencil, Save, X, Minus, Plus, MoreHorizontal, Loader2 } from "lucide-react";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const methodLabel: Record<string, string> = {
@@ -284,7 +285,7 @@ const ClientDetail = () => {
                   </div>
                   <div className="space-y-1">
                     <Label>Teléfono</Label>
-                    <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                    <PhoneInput value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
                   </div>
                   <div className="space-y-1">
                     <Label>Fecha de nacimiento</Label>
