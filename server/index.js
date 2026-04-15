@@ -913,14 +913,24 @@ async function ensureSchema() {
     await pool.query(`
       ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0;
     `).catch(() => { });
-    // ── Reconcile cancellations_used with actual cancelled bookings ────────
+    // ── bookings: track who cancelled (user | admin | system) ─────────────
+    // This prevents startup reconciliation from counting admin-initiated
+    // cancellations against the client's cancellation limit.
+    await pool.query(`
+      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(10) DEFAULT NULL;
+    `).catch(() => { });
+    // ── Reconcile cancellations_used — only count USER-initiated cancels ──
+    // Admin cancellations (cancelled_by = 'admin') restore credits and should
+    // NOT count against the client's limit of 2 cancellations per membership.
     await pool.query(`
       UPDATE memberships m
       SET cancellations_used = sub.cnt
       FROM (
         SELECT b.membership_id, COUNT(*) AS cnt
         FROM bookings b
-        WHERE b.status = 'cancelled' AND b.membership_id IS NOT NULL
+        WHERE b.status = 'cancelled'
+          AND b.membership_id IS NOT NULL
+          AND (b.cancelled_by IS NULL OR b.cancelled_by = 'user')
         GROUP BY b.membership_id
       ) sub
       WHERE m.id = sub.membership_id AND m.cancellations_used != sub.cnt;
@@ -2740,9 +2750,10 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       : 999; // if we can't determine, assume on-time
     const isLate = minutesUntilClass < 120; // less than 2 hours
 
-    // Cancel the booking
+    // Cancel the booking (mark as user-initiated so startup reconciliation
+    // correctly counts this against the client's cancellation limit)
     await pool.query(
-      "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1",
+      "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = 'user' WHERE id = $1",
       [req.params.id]
     );
 
@@ -8826,7 +8837,7 @@ app.put("/api/admin/bookings/:id/cancel", adminMiddleware, async (req, res) => {
     if (b.status === "cancelled") return res.status(400).json({ message: "Ya está cancelada" });
 
     await pool.query(
-      "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1",
+      "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = 'admin' WHERE id = $1",
       [req.params.id]
     );
 

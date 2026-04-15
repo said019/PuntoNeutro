@@ -58,6 +58,15 @@ const MembershipsTab = ({ userId }: { userId: string }) => {
     },
   });
 
+  const reactivateMem = useMutation({
+    mutationFn: (memId: string) => api.put(`/memberships/${memId}/activate`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["client-memberships", userId] });
+      toast({ title: "Membresía reactivada" });
+    },
+    onError: () => toast({ title: "Error al reactivar", variant: "destructive" }),
+  });
+
   const openEdit = (m: any) => {
     setCredits(m.classesRemaining ?? 0);
     setEditingMem(m);
@@ -95,10 +104,18 @@ const MembershipsTab = ({ userId }: { userId: string }) => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem onClick={() => openEdit(m)}>Ajustar créditos</DropdownMenuItem>
+                    {m.status === "cancelled" && (
+                      <DropdownMenuItem
+                        className="text-emerald-600"
+                        onClick={() => { if (window.confirm("¿Reactivar esta membresía?")) reactivateMem.mutate(m.id); }}
+                      >
+                        Reactivar membresía
+                      </DropdownMenuItem>
+                    )}
                     {m.status === "active" && (
                       <DropdownMenuItem
                         className="text-destructive"
-                        onClick={() => { if (window.confirm("¿Cancelar esta membresía?")) cancelMem.mutate(m.id); }}
+                        onClick={() => { if (window.confirm("¿Cancelar esta membresía? Esta acción es difícil de revertir.")) cancelMem.mutate(m.id); }}
                       >
                         Cancelar membresía
                       </DropdownMenuItem>

@@ -156,7 +156,16 @@ const MembershipTable = ({ status, title }: { status?: string; title: string }) 
                             <DropdownMenuItem onClick={() => activateMutation.mutate(m.id)}>Activar</DropdownMenuItem>
                           )}
                           {m.status !== "cancelled" && (
-                            <DropdownMenuItem className="text-destructive" onClick={() => cancelMutation.mutate(m.id)}>Cancelar</DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => {
+                                if (window.confirm(`¿Cancelar la membresía de ${m.userName ?? "esta alumna"}? Esta acción no se puede deshacer fácilmente.`)) {
+                                  cancelMutation.mutate(m.id);
+                                }
+                              }}
+                            >
+                              Cancelar
+                            </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
