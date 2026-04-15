@@ -11371,10 +11371,15 @@ function scheduleEmailCrons() {
       runRenewalReminderCron();
     }
 
-    // Class reminder: every hour, sends WhatsApp for classes in the next N hours
-    // Runs every hour; the function itself checks the configured reminder window
-    console.log("[Cron] Checking class reminders...");
-    runClassReminderCron();
+    // Class reminder: every hour, but only during quiet-safe hours.
+    // Do NOT send WhatsApp messages between 10 PM and 7 AM Mexico City time.
+    const isQuietHour = mexicoHour < 7 || mexicoHour >= 22;
+    if (!isQuietHour) {
+      console.log("[Cron] Checking class reminders...");
+      runClassReminderCron();
+    } else {
+      console.log(`[Cron] Class reminder skipped — quiet hours (Mexico hour: ${mexicoHour})`);
+    }
   }, 60 * 60 * 1000); // every 1 hour
 }
 
