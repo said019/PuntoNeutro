@@ -8303,13 +8303,15 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
       const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [userId]);
       if (uRes.rows[0]) {
         const u = uRes.rows[0];
+        const startDisplay = startStr ? new Date(startStr).toLocaleDateString("es-MX") : "";
+        const endDisplay = endStr ? new Date(endStr).toLocaleDateString("es-MX") : "";
         if (await areEmailNotificationsEnabled()) {
           sendMembershipActivated({
             to: u.email,
             name: u.display_name || "Alumna",
             planName: plan.name,
-            startDate: start.toISOString(),
-            endDate: end.toISOString(),
+            startDate: startStr,
+            endDate: endStr,
             classLimit: plan.class_limit ?? null,
           }).catch((e) => console.error("[Email] membership activated:", e.message));
         }
@@ -8319,10 +8321,10 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
           vars: {
             name: u.display_name || "Alumna",
             plan: plan.name || "tu plan",
-            startDate: start.toLocaleDateString("es-MX"),
-            endDate: end.toLocaleDateString("es-MX"),
+            startDate: startDisplay,
+            endDate: endDisplay,
           },
-          fallbackMessage: `Hola ${u.display_name || "Alumna"}, tu membresía ${plan.name || ""} ya está activa. Vigencia: ${start.toLocaleDateString("es-MX")} al ${end.toLocaleDateString("es-MX")}.`,
+          fallbackMessage: `Hola ${u.display_name || "Alumna"}, tu membresía ${plan.name || ""} ya está activa. Vigencia: ${startDisplay} al ${endDisplay}.`,
         }).catch((e) => console.error("[WA] membership activated:", e.message));
       }
     } catch (emailErr) {
@@ -9066,6 +9068,9 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
 
     // 2. Assign membership if plan selected
     let membership = null;
+    let notifyPlan = null;
+    let notifyStartStr = null;
+    let notifyEndStr = null;
     if (planId) {
       const planRes = await client.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
       if (!planRes.rows.length) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Plan no encontrado" }); }
@@ -9086,6 +9091,9 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         (complementType ? `${notes || "Alta manual por admin"} | Complemento: ${complementType}` : notes || `Alta manual por admin`)]
       );
       membership = camelRow(memRes.rows[0]);
+      notifyPlan = plan;
+      notifyStartStr = startStr;
+      notifyEndStr = endStr;
 
       // Create consultation if complement was selected
       const compInfo = complementType ? COMPLEMENT_MAP[complementType] : null;
@@ -9119,6 +9127,39 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
     if (membership?.userId || user?.id) {
       triggerWalletPassSync(membership?.userId || user.id, membership ? "admin_client_manual_with_membership" : "admin_client_manual_created");
     }
+
+    // ── WhatsApp + email: membership activated (alta manual con plan) ─────
+    if (membership && notifyPlan) {
+      try {
+        const startDisplay = notifyStartStr ? new Date(notifyStartStr).toLocaleDateString("es-MX") : "";
+        const endDisplay = notifyEndStr ? new Date(notifyEndStr).toLocaleDateString("es-MX") : "";
+        const uName = user.display_name || "Alumna";
+        if (await areEmailNotificationsEnabled()) {
+          sendMembershipActivated({
+            to: user.email,
+            name: uName,
+            planName: notifyPlan.name,
+            startDate: notifyStartStr,
+            endDate: notifyEndStr,
+            classLimit: notifyPlan.class_limit ?? null,
+          }).catch((e) => console.error("[Email] manual client membership:", e.message));
+        }
+        sendConfiguredWhatsAppTemplate({
+          templateKey: "membership_activated",
+          phone,
+          vars: {
+            name: uName,
+            plan: notifyPlan.name || "tu plan",
+            startDate: startDisplay,
+            endDate: endDisplay,
+          },
+          fallbackMessage: `Hola ${uName}, tu paquete ${notifyPlan.name || ""} ya está activo. Vigencia: ${startDisplay} al ${endDisplay}.`,
+        }).catch((e) => console.error("[WA] manual client membership:", e.message));
+      } catch (notifyErr) {
+        console.error("[Notify] manual client membership:", notifyErr.message);
+      }
+    }
+
     const linkMsg = walkinLinks.ordersLinked > 0
       ? ` · Se vincularon ${walkinLinks.ordersLinked} compra(s) previa(s) como invitada`
       : "";
@@ -9284,7 +9325,10 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
     // Email: membership activated
     if (justApproved && order.user_id && plan) {
       try {
-        const emailEndStr = calcMembershipEndDate(new Date().toISOString().slice(0, 10), plan);
+        const emailStartStr = new Date().toISOString().slice(0, 10);
+        const emailEndStr = calcMembershipEndDate(emailStartStr, plan);
+        const startDisplay = new Date(emailStartStr).toLocaleDateString("es-MX");
+        const endDisplay = emailEndStr ? new Date(emailEndStr).toLocaleDateString("es-MX") : "";
         const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [order.user_id]);
         if (uRes.rows[0]) {
           const u = uRes.rows[0];
@@ -9293,7 +9337,7 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
               to: u.email,
               name: u.display_name || "Alumna",
               planName: plan.name,
-              startDate: new Date().toISOString().slice(0, 10),
+              startDate: emailStartStr,
               endDate: emailEndStr,
               classLimit: plan.class_limit ?? null,
             }).catch((e) => console.error("[Email] admin order verify:", e.message));
@@ -9304,10 +9348,10 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
             vars: {
               name: u.display_name || "Alumna",
               plan: plan.name || "tu plan",
-              startDate: new Date().toLocaleDateString("es-MX"),
-              endDate: end.toLocaleDateString("es-MX"),
+              startDate: startDisplay,
+              endDate: endDisplay,
             },
-            fallbackMessage: `Hola ${u.display_name || "Alumna"}, tu membresía ${plan.name || ""} ya está activa.`,
+            fallbackMessage: `Hola ${u.display_name || "Alumna"}, tu membresía ${plan.name || ""} ya está activa. Vigencia: ${startDisplay} al ${endDisplay}.`,
           }).catch((e) => console.error("[WA] admin order verify:", e.message));
         }
       } catch (emailErr) {
@@ -11186,6 +11230,9 @@ async function runWeeklyReminderCron() {
  */
 async function runRenewalReminderCron() {
   try {
+    // Renovación: SOLO cuando realmente le queda 1 clase sin tomar
+    // (classes_remaining se decrementa al reservar, así que =1 garantiza que no está reservada/tomada).
+    // Para planes ilimitados (classes_remaining NULL) avisamos si vence en ≤7 días.
     const res = await pool.query(`
       SELECT u.email, u.phone, COALESCE(u.display_name, 'Alumna') AS name,
              m.classes_remaining, m.end_date,
@@ -11197,7 +11244,11 @@ async function runRenewalReminderCron() {
         AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
         AND (
           m.classes_remaining = 1
-          OR (m.end_date IS NOT NULL AND m.end_date <= CURRENT_DATE + INTERVAL '7 days')
+          OR (
+            m.classes_remaining IS NULL
+            AND m.end_date IS NOT NULL
+            AND m.end_date <= CURRENT_DATE + INTERVAL '7 days'
+          )
         )
     `);
     console.log(`[Cron] Renewal reminder — ${res.rows.length} members`);
@@ -11273,9 +11324,12 @@ async function runClassReminderCron(mode = "morning") {
       JOIN class_types ct ON c.class_type_id = ct.id
       JOIN users u ON b.user_id = u.id
       WHERE b.status = 'confirmed'
+        AND b.checked_in_at IS NULL
         AND c.status = 'scheduled'
         AND c.date = ${targetDate}
         AND ${timeFilter}
+        AND ((c.date + c.start_time) AT TIME ZONE 'America/Mexico_City')
+            > (CURRENT_TIMESTAMP AT TIME ZONE 'America/Mexico_City')
         AND u.phone IS NOT NULL
         AND u.receive_reminders IS NOT FALSE
       ORDER BY c.start_time ASC, b.created_at ASC
