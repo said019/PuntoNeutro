@@ -2393,6 +2393,13 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
          WHEN 'pending_payment'     THEN 3
          ELSE 4 END,
          CASE
+           WHEN m.status = 'active'
+            AND m.classes_remaining IS NOT NULL
+            AND m.classes_remaining < 9999
+            AND m.classes_remaining <= 0 THEN 1
+           ELSE 0
+         END ASC,
+         CASE
            WHEN m.status = 'active' AND (m.classes_remaining IS NULL OR m.classes_remaining >= 9999) THEN 1
            ELSE 0
          END ASC,
