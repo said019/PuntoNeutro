@@ -935,6 +935,22 @@ async function ensureSchema() {
       ) sub
       WHERE m.id = sub.membership_id AND m.cancellations_used != sub.cnt;
     `).catch(() => { });
+    // ── membership_credit_log: audit trail for every classes_remaining change ──
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS membership_credit_log (
+        id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        membership_id UUID NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+        old_value     INTEGER,
+        new_value     INTEGER,
+        delta         INTEGER,
+        reason        VARCHAR(40) NOT NULL,
+        actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        booking_id    UUID REFERENCES bookings(id) ON DELETE SET NULL,
+        notes         TEXT,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_credit_log_membership ON membership_credit_log(membership_id, created_at DESC)`).catch(() => { });
     // ── Reconcile current_bookings counter with actual confirmed bookings ──
     await pool.query(`
       UPDATE classes c
@@ -1519,6 +1535,34 @@ function isTrialPlan(membership) {
   const rk = String(membership?.repeat_key ?? "").toLowerCase();
   const name = String(membership?.plan_name ?? "").toLowerCase();
   return rk.startsWith("trial_single_session") || name.includes("muestra");
+}
+
+// Audit-log any change to memberships.classes_remaining. Never throws — logging
+// failure must not break the caller. Caller passes the locked membership id and
+// the final new value; we read old value via the same transaction client so the
+// reading sees the pre-change state.
+async function logCreditChange({
+  client,
+  membershipId,
+  oldValue,
+  newValue,
+  reason,
+  actorUserId = null,
+  bookingId = null,
+  notes = null,
+}) {
+  try {
+    const q = client ?? pool;
+    const delta = (newValue ?? 0) - (oldValue ?? 0);
+    await q.query(
+      `INSERT INTO membership_credit_log
+         (membership_id, old_value, new_value, delta, reason, actor_user_id, booking_id, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [membershipId, oldValue, newValue, delta, reason, actorUserId, bookingId, notes]
+    );
+  } catch (err) {
+    console.error("[credit-log] insert failed:", err.message);
+  }
 }
 
 function isClassAllowedForTrial(classDate, classStartTime) {
@@ -2636,10 +2680,21 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
         [classId]
       );
       if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
+        const oldVal = Number(lockedMembership.classes_remaining);
+        const newVal = Math.max(0, oldVal - 1);
         await client.query(
-          "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
-          [membership.id]
+          "UPDATE memberships SET classes_remaining = $1, updated_at = NOW() WHERE id = $2",
+          [newVal, membership.id]
         );
+        await logCreditChange({
+          client,
+          membershipId: membership.id,
+          oldValue: oldVal,
+          newValue: newVal,
+          reason: "booking_created",
+          actorUserId: req.userId,
+          bookingId: result.rows[0].id,
+        });
       }
     }
     await client.query("COMMIT");
@@ -2823,10 +2878,19 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
 
         // On-time cancellation: restore credit only if membership has a counted limit
         if (membership.classes_remaining !== null && membership.classes_remaining < 9999) {
+          const oldVal = Number(membership.classes_remaining);
           await pool.query(
             "UPDATE memberships SET classes_remaining = classes_remaining + 1 WHERE id = $1",
             [membership.id]
           );
+          await logCreditChange({
+            membershipId: membership.id,
+            oldValue: oldVal,
+            newValue: oldVal + 1,
+            reason: "booking_cancelled_ontime",
+            actorUserId: req.userId,
+            bookingId: booking.id,
+          });
         }
       }
     }
@@ -8426,10 +8490,113 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/memberships/:id/credit-reconcile — recalculate classes_remaining from bookings
+// ?apply=true  →  write the corrected value back (and log it)
+app.get("/api/memberships/:id/credit-reconcile", adminMiddleware, async (req, res) => {
+  try {
+    const memId = req.params.id;
+    const memRes = await pool.query(
+      `SELECT m.id, m.user_id, m.classes_remaining,
+              COALESCE(p.class_limit, m.class_limit_override) AS class_limit
+         FROM memberships m
+         LEFT JOIN plans p ON p.id = m.plan_id
+        WHERE m.id = $1`,
+      [memId]
+    );
+    if (!memRes.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
+    const mem = memRes.rows[0];
+    if (mem.class_limit === null || mem.class_limit === undefined || Number(mem.class_limit) >= 9999) {
+      return res.status(400).json({ message: "Membresía ilimitada — no aplica reconciliación" });
+    }
+
+    // Count bookings that consumed a credit against this membership
+    const consumedRes = await pool.query(
+      `SELECT COUNT(*)::INT AS consumed
+         FROM bookings b
+         JOIN classes c ON c.id = b.class_id
+        WHERE b.membership_id = $1
+          AND (
+            b.status IN ('confirmed','checked_in','no_show')
+            OR (
+              b.status = 'cancelled'
+              AND COALESCE(b.cancelled_by, 'user') = 'user'
+              AND b.cancelled_at IS NOT NULL
+              AND EXTRACT(EPOCH FROM (
+                ((c.date + c.start_time::time) AT TIME ZONE 'America/Mexico_City') - b.cancelled_at
+              )) < 7200
+            )
+          )`,
+      [memId]
+    );
+    const consumed = consumedRes.rows[0].consumed;
+    const expected = Math.max(0, Number(mem.class_limit) - consumed);
+    const current = mem.classes_remaining === null ? null : Number(mem.classes_remaining);
+    const diff = current === null ? null : expected - current;
+
+    const apply = String(req.query.apply || "").toLowerCase() === "true";
+    let applied = false;
+    if (apply && current !== null && diff !== 0) {
+      await pool.query(
+        "UPDATE memberships SET classes_remaining = $1, updated_at = NOW() WHERE id = $2",
+        [expected, memId]
+      );
+      await logCreditChange({
+        membershipId: memId,
+        oldValue: current,
+        newValue: expected,
+        reason: "reconcile_from_bookings",
+        actorUserId: req.userId,
+        notes: `${consumed} bookings consumed; class_limit=${mem.class_limit}`,
+      });
+      applied = true;
+    }
+
+    return res.json({
+      data: {
+        membershipId: memId,
+        classLimit: Number(mem.class_limit),
+        bookingsConsumed: consumed,
+        currentClassesRemaining: current,
+        expectedClassesRemaining: expected,
+        diff,
+        applied,
+      },
+    });
+  } catch (err) {
+    console.error("[GET /memberships/:id/credit-reconcile]", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// GET /api/memberships/:id/credit-log — audit trail of classes_remaining changes
+app.get("/api/memberships/:id/credit-log", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT l.*, u.display_name AS actor_name, u.email AS actor_email
+         FROM membership_credit_log l
+         LEFT JOIN users u ON u.id = l.actor_user_id
+        WHERE l.membership_id = $1
+        ORDER BY l.created_at DESC
+        LIMIT 500`,
+      [req.params.id]
+    );
+    return res.json({ data: camelRows(r.rows) });
+  } catch (err) {
+    console.error("[GET /memberships/:id/credit-log]", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
 // PUT /api/memberships/:id — update any field
 app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
   try {
-    const { status, classesRemaining, endDate, paymentMethod } = req.body;
+    const { status, classesRemaining, endDate, paymentMethod, adjustReason } = req.body;
+    const beforeRes = await pool.query(
+      "SELECT classes_remaining FROM memberships WHERE id = $1",
+      [req.params.id]
+    );
+    if (!beforeRes.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
+    const oldCredits = beforeRes.rows[0].classes_remaining;
     const r = await pool.query(
       `UPDATE memberships SET
          status = COALESCE($1, status),
@@ -8440,10 +8607,21 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
        WHERE id = $5 RETURNING *`,
       [status || null, classesRemaining ?? null, endDate || null, paymentMethod || null, req.params.id]
     );
-    if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
+    if (classesRemaining !== undefined && classesRemaining !== null &&
+        Number(classesRemaining) !== Number(oldCredits)) {
+      await logCreditChange({
+        membershipId: req.params.id,
+        oldValue: oldCredits === null ? null : Number(oldCredits),
+        newValue: Number(classesRemaining),
+        reason: "admin_manual_adjust",
+        actorUserId: req.userId,
+        notes: adjustReason || null,
+      });
+    }
     triggerWalletPassSync(r.rows[0].user_id, "membership_updated");
     return res.json({ data: r.rows[0] });
   } catch (err) {
+    console.error("[PUT /memberships/:id]", err);
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -8720,10 +8898,22 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         [classId]
       );
       if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
+        const oldVal = Number(lockedMembership.classes_remaining);
+        const newVal = Math.max(0, oldVal - 1);
         await client.query(
-          "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
-          [membership.id]
+          "UPDATE memberships SET classes_remaining = $1, updated_at = NOW() WHERE id = $2",
+          [newVal, membership.id]
         );
+        await logCreditChange({
+          client,
+          membershipId: membership.id,
+          oldValue: oldVal,
+          newValue: newVal,
+          reason: "admin_booking_assigned",
+          actorUserId: req.userId,
+          bookingId: result.rows[0].id,
+          notes: `assigned to user ${userId}`,
+        });
       }
     }
     await client.query("COMMIT");
@@ -8860,11 +9050,25 @@ app.put("/api/admin/bookings/:id/cancel", adminMiddleware, async (req, res) => {
 
     // Restore credit if membership has counted limit
     if (b.membership_id && (b.status === "confirmed" || b.status === "checked_in")) {
-      await pool.query(
-        `UPDATE memberships SET classes_remaining = classes_remaining + 1
-         WHERE id = $1 AND classes_remaining IS NOT NULL AND classes_remaining < 9999`,
+      const beforeRes = await pool.query(
+        "SELECT classes_remaining FROM memberships WHERE id = $1",
         [b.membership_id]
       );
+      const oldVal = beforeRes.rows[0]?.classes_remaining;
+      if (oldVal !== null && oldVal !== undefined && Number(oldVal) < 9999) {
+        await pool.query(
+          "UPDATE memberships SET classes_remaining = classes_remaining + 1 WHERE id = $1",
+          [b.membership_id]
+        );
+        await logCreditChange({
+          membershipId: b.membership_id,
+          oldValue: Number(oldVal),
+          newValue: Number(oldVal) + 1,
+          reason: "admin_booking_cancelled",
+          actorUserId: req.userId,
+          bookingId: b.id,
+        });
+      }
     }
 
     triggerWalletPassSync(b.user_id, "booking_cancelled_by_admin");
