@@ -935,6 +935,15 @@ async function ensureSchema() {
       ) sub
       WHERE m.id = sub.membership_id AND m.cancellations_used != sub.cnt;
     `).catch(() => { });
+    // ── Drop legacy Postgres triggers that duplicate what the app already does ──
+    // `trigger_decrement_classes` subtracted 1 from classes_remaining on every
+    // transition to checked_in, but index.js already deducts at booking creation.
+    // Result: every checked-in booking consumed 2 credits instead of 1.
+    // `trigger_update_booking_count` did the same with classes.current_bookings.
+    await pool.query(`DROP TRIGGER IF EXISTS trigger_decrement_classes ON bookings`).catch(() => { });
+    await pool.query(`DROP FUNCTION IF EXISTS decrement_membership_classes() CASCADE`).catch(() => { });
+    await pool.query(`DROP TRIGGER IF EXISTS trigger_update_booking_count ON bookings`).catch(() => { });
+    await pool.query(`DROP FUNCTION IF EXISTS update_class_booking_count() CASCADE`).catch(() => { });
     // ── membership_credit_log: audit trail for every classes_remaining change ──
     await pool.query(`
       CREATE TABLE IF NOT EXISTS membership_credit_log (
