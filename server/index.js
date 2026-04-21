@@ -1546,6 +1546,32 @@ function isTrialPlan(membership) {
   return rk.startsWith("trial_single_session") || name.includes("muestra");
 }
 
+// Auto-expire an active membership whose credits hit 0 (and is not unlimited),
+// or reactivate an auto-expired one whose credits came back above 0 and whose
+// end_date is still in the future. Silent-fail — caller must not break on this.
+async function syncExhaustedMembershipStatus({ client, membershipId }) {
+  try {
+    const q = client ?? pool;
+    const r = await q.query(
+      `SELECT status, classes_remaining, end_date FROM memberships WHERE id = $1`,
+      [membershipId]
+    );
+    if (!r.rows.length) return;
+    const m = r.rows[0];
+    const rem = m.classes_remaining;
+    const isUnlimited = rem === null || Number(rem) >= 9999;
+    const isExhausted = !isUnlimited && Number(rem) <= 0;
+    const endOk = !m.end_date || new Date(m.end_date) >= new Date(new Date().toISOString().slice(0, 10));
+    if (m.status === "active" && isExhausted) {
+      await q.query(`UPDATE memberships SET status = 'expired', updated_at = NOW() WHERE id = $1`, [membershipId]);
+    } else if (m.status === "expired" && !isExhausted && endOk) {
+      await q.query(`UPDATE memberships SET status = 'active', updated_at = NOW() WHERE id = $1`, [membershipId]);
+    }
+  } catch (err) {
+    console.error("[syncExhaustedMembershipStatus]", err.message);
+  }
+}
+
 // Audit-log any change to memberships.classes_remaining. Never throws — logging
 // failure must not break the caller. Caller passes the locked membership id and
 // the final new value; we read old value via the same transaction client so the
@@ -2704,6 +2730,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
           actorUserId: req.userId,
           bookingId: result.rows[0].id,
         });
+        await syncExhaustedMembershipStatus({ client, membershipId: membership.id });
       }
     }
     await client.query("COMMIT");
@@ -2900,6 +2927,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
             actorUserId: req.userId,
             bookingId: booking.id,
           });
+          await syncExhaustedMembershipStatus({ membershipId: membership.id });
         }
       }
     }
@@ -8828,6 +8856,7 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
         actorUserId: req.userId,
         notes: adjustReason || null,
       });
+      await syncExhaustedMembershipStatus({ membershipId: req.params.id });
     }
     triggerWalletPassSync(r.rows[0].user_id, "membership_updated");
     return res.json({ data: r.rows[0] });
@@ -9125,6 +9154,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
           bookingId: result.rows[0].id,
           notes: `assigned to user ${userId}`,
         });
+        await syncExhaustedMembershipStatus({ client, membershipId: membership.id });
       }
     }
     await client.query("COMMIT");
@@ -9279,6 +9309,7 @@ app.put("/api/admin/bookings/:id/cancel", adminMiddleware, async (req, res) => {
           actorUserId: req.userId,
           bookingId: b.id,
         });
+        await syncExhaustedMembershipStatus({ membershipId: b.membership_id });
       }
     }
 
