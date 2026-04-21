@@ -8499,6 +8499,120 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/admin/memberships/owner-corrections
+// Apply a hand-provided list of {nameQuery, classesRemaining} from the studio
+// owner. For each entry: find the user by name (case-insensitive partial match),
+// find their newest active membership, set classes_remaining, log the change.
+// Body: { corrections: [{ nameQuery: "María Guadalupe", classesRemaining: 9 }, ...] }
+// ?dryRun=true  →  preview only.
+app.post("/api/admin/memberships/owner-corrections", adminMiddleware, async (req, res) => {
+  const dryRun = String(req.query.dryRun || req.body?.dryRun || "").toLowerCase() === "true";
+  const corrections = Array.isArray(req.body?.corrections) ? req.body.corrections : [];
+  if (!corrections.length) {
+    return res.status(400).json({ message: "corrections array requerido" });
+  }
+  const results = [];
+  for (const entry of corrections) {
+    const nameQuery = String(entry?.nameQuery || "").trim();
+    const target = Number(entry?.classesRemaining);
+    if (!nameQuery || !Number.isFinite(target) || target < 0) {
+      results.push({ nameQuery, status: "error", message: "entrada inválida" });
+      continue;
+    }
+    try {
+      const matches = await pool.query(
+        `SELECT u.id, u.display_name
+           FROM users u
+          WHERE unaccent(lower(u.display_name)) LIKE unaccent(lower($1))
+          LIMIT 5`,
+        [`%${nameQuery}%`]
+      ).catch(async () => {
+        // Fallback if unaccent extension missing
+        return pool.query(
+          `SELECT u.id, u.display_name
+             FROM users u
+            WHERE lower(u.display_name) LIKE lower($1)
+            LIMIT 5`,
+          [`%${nameQuery}%`]
+        );
+      });
+
+      if (!matches.rows.length) {
+        results.push({ nameQuery, status: "not_found" });
+        continue;
+      }
+      if (matches.rows.length > 1) {
+        results.push({
+          nameQuery,
+          status: "ambiguous",
+          matches: matches.rows.map((u) => u.display_name),
+        });
+        continue;
+      }
+      const user = matches.rows[0];
+
+      const memRes = await pool.query(
+        `SELECT m.id, m.classes_remaining,
+                COALESCE(p.name, m.plan_name_override, 'Membresía') AS plan_name
+           FROM memberships m
+           LEFT JOIN plans p ON p.id = m.plan_id
+          WHERE m.user_id = $1 AND m.status = 'active'
+          ORDER BY m.created_at DESC
+          LIMIT 1`,
+        [user.id]
+      );
+      if (!memRes.rows.length) {
+        results.push({ nameQuery, userName: user.display_name, status: "no_active_membership" });
+        continue;
+      }
+      const mem = memRes.rows[0];
+      const before = mem.classes_remaining === null ? null : Number(mem.classes_remaining);
+
+      if (before === target) {
+        results.push({
+          nameQuery,
+          userName: user.display_name,
+          planName: mem.plan_name,
+          membershipId: mem.id,
+          before,
+          after: target,
+          status: "already_correct",
+        });
+        continue;
+      }
+
+      if (!dryRun) {
+        await pool.query(
+          "UPDATE memberships SET classes_remaining = $1, updated_at = NOW() WHERE id = $2",
+          [target, mem.id]
+        );
+        await logCreditChange({
+          membershipId: mem.id,
+          oldValue: before,
+          newValue: target,
+          reason: "owner_correction",
+          actorUserId: req.userId,
+          notes: `Corrección provista por la dueña del studio tras incidente de double-decrement. Match: "${nameQuery}" → ${user.display_name}`,
+        });
+      }
+
+      results.push({
+        nameQuery,
+        userName: user.display_name,
+        planName: mem.plan_name,
+        membershipId: mem.id,
+        before,
+        after: target,
+        diff: target - (before ?? 0),
+        status: dryRun ? "would_apply" : "applied",
+      });
+    } catch (err) {
+      results.push({ nameQuery, status: "error", message: err.message });
+    }
+  }
+  return res.json({ data: { dryRun, results } });
+});
+
 // POST /api/admin/memberships/credit-reconcile-all
 // Bulk-fix every active membership whose classes_remaining does not match what
 // the bookings table says was actually consumed. Returns the list of changes.
