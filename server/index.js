@@ -8499,6 +8499,94 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/admin/memberships/credit-reconcile-all
+// Bulk-fix every active membership whose classes_remaining does not match what
+// the bookings table says was actually consumed. Returns the list of changes.
+// ?dryRun=true  →  preview only, no writes.
+app.post("/api/admin/memberships/credit-reconcile-all", adminMiddleware, async (req, res) => {
+  const dryRun = String(req.query.dryRun || req.body?.dryRun || "").toLowerCase() === "true";
+  try {
+    const memsRes = await pool.query(
+      `SELECT m.id, m.user_id, m.classes_remaining,
+              COALESCE(p.class_limit, m.class_limit_override) AS class_limit,
+              COALESCE(u.display_name, 'Sin nombre')          AS user_name,
+              COALESCE(p.name, m.plan_name_override, 'Membresía') AS plan_name
+         FROM memberships m
+         LEFT JOIN plans p ON p.id = m.plan_id
+         LEFT JOIN users u ON u.id = m.user_id
+        WHERE m.status = 'active'
+          AND m.classes_remaining IS NOT NULL
+          AND m.classes_remaining < 9999
+          AND COALESCE(p.class_limit, m.class_limit_override) IS NOT NULL
+          AND COALESCE(p.class_limit, m.class_limit_override) < 9999`
+    );
+
+    const changes = [];
+    for (const mem of memsRes.rows) {
+      const consumedRes = await pool.query(
+        `SELECT COUNT(*)::INT AS consumed
+           FROM bookings b
+           JOIN classes c ON c.id = b.class_id
+          WHERE b.membership_id = $1
+            AND (
+              b.status IN ('confirmed','checked_in','no_show')
+              OR (
+                b.status = 'cancelled'
+                AND COALESCE(b.cancelled_by, 'user') = 'user'
+                AND b.cancelled_at IS NOT NULL
+                AND EXTRACT(EPOCH FROM (
+                  ((c.date + c.start_time::time) AT TIME ZONE 'America/Mexico_City') - b.cancelled_at
+                )) < 7200
+              )
+            )`,
+        [mem.id]
+      );
+      const consumed = consumedRes.rows[0].consumed;
+      const expected = Math.max(0, Number(mem.class_limit) - consumed);
+      const current = Number(mem.classes_remaining);
+      if (expected === current) continue;
+
+      changes.push({
+        membershipId: mem.id,
+        userId: mem.user_id,
+        userName: mem.user_name,
+        planName: mem.plan_name,
+        classLimit: Number(mem.class_limit),
+        bookingsConsumed: consumed,
+        before: current,
+        after: expected,
+        diff: expected - current,
+      });
+
+      if (!dryRun) {
+        await pool.query(
+          "UPDATE memberships SET classes_remaining = $1, updated_at = NOW() WHERE id = $2",
+          [expected, mem.id]
+        );
+        await logCreditChange({
+          membershipId: mem.id,
+          oldValue: current,
+          newValue: expected,
+          reason: "bulk_reconcile_trigger_fix",
+          actorUserId: req.userId,
+          notes: `Corregido tras fix de double-decrement trigger. ${consumed} bookings consumed; class_limit=${mem.class_limit}`,
+        });
+      }
+    }
+
+    return res.json({
+      data: {
+        dryRun,
+        totalAffected: changes.length,
+        changes,
+      },
+    });
+  } catch (err) {
+    console.error("[POST /admin/memberships/credit-reconcile-all]", err);
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  }
+});
+
 // GET /api/memberships/:id/credit-reconcile — recalculate classes_remaining from bookings
 // ?apply=true  →  write the corrected value back (and log it)
 app.get("/api/memberships/:id/credit-reconcile", adminMiddleware, async (req, res) => {
