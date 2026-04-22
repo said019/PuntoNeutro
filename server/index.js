@@ -1546,14 +1546,25 @@ function isTrialPlan(membership) {
   return rk.startsWith("trial_single_session") || name.includes("muestra");
 }
 
-// Auto-expire an active membership whose credits hit 0 (and is not unlimited),
-// or reactivate an auto-expired one whose credits came back above 0 and whose
-// end_date is still in the future. Silent-fail — caller must not break on this.
+// Auto-expire an active membership that is truly done: credits at 0 AND no
+// pending bookings (confirmed/waitlist future classes) linked to it. A
+// membership with credits at 0 but 3 future reservations is not expired — the
+// client already booked all her classes, the pack is fully allocated.
+// Reverse path: if credits come back above 0 (e.g. on-time cancellation) or a
+// future booking exists and end_date is still valid, revert to active.
 async function syncExhaustedMembershipStatus({ client, membershipId }) {
   try {
     const q = client ?? pool;
     const r = await q.query(
-      `SELECT status, classes_remaining, end_date FROM memberships WHERE id = $1`,
+      `SELECT m.status, m.classes_remaining, m.end_date,
+              (SELECT COUNT(*) FROM bookings b
+                 JOIN classes c ON c.id = b.class_id
+                WHERE b.membership_id = m.id
+                  AND b.status IN ('confirmed','waitlist')
+                  AND c.date >= CURRENT_DATE
+              )::int AS pending_bookings
+         FROM memberships m
+        WHERE m.id = $1`,
       [membershipId]
     );
     if (!r.rows.length) return;
@@ -1561,10 +1572,11 @@ async function syncExhaustedMembershipStatus({ client, membershipId }) {
     const rem = m.classes_remaining;
     const isUnlimited = rem === null || Number(rem) >= 9999;
     const isExhausted = !isUnlimited && Number(rem) <= 0;
+    const hasPending = Number(m.pending_bookings) > 0;
     const endOk = !m.end_date || new Date(m.end_date) >= new Date(new Date().toISOString().slice(0, 10));
-    if (m.status === "active" && isExhausted) {
+    if (m.status === "active" && isExhausted && !hasPending) {
       await q.query(`UPDATE memberships SET status = 'expired', updated_at = NOW() WHERE id = $1`, [membershipId]);
-    } else if (m.status === "expired" && !isExhausted && endOk) {
+    } else if (m.status === "expired" && endOk && (!isExhausted || hasPending)) {
       await q.query(`UPDATE memberships SET status = 'active', updated_at = NOW() WHERE id = $1`, [membershipId]);
     }
   } catch (err) {
