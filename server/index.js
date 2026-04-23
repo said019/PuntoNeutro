@@ -944,6 +944,22 @@ async function ensureSchema() {
     await pool.query(`DROP FUNCTION IF EXISTS decrement_membership_classes() CASCADE`).catch(() => { });
     await pool.query(`DROP TRIGGER IF EXISTS trigger_update_booking_count ON bookings`).catch(() => { });
     await pool.query(`DROP FUNCTION IF EXISTS update_class_booking_count() CASCADE`).catch(() => { });
+    // ── Membership status is date-driven, not credit-driven ───────────────
+    // A membership can have 0 free credits because the client filled the month
+    // with bookings. It should only show as expired after its end_date passes.
+    await pool.query(`
+      UPDATE memberships
+      SET status = 'expired', updated_at = NOW()
+      WHERE status = 'active'
+        AND end_date IS NOT NULL
+        AND end_date < ((NOW() AT TIME ZONE 'America/Mexico_City')::date);
+    `).catch(() => { });
+    await pool.query(`
+      UPDATE memberships
+      SET status = 'active', updated_at = NOW()
+      WHERE status = 'expired'
+        AND (end_date IS NULL OR end_date >= ((NOW() AT TIME ZONE 'America/Mexico_City')::date));
+    `).catch(() => { });
     // ── membership_credit_log: audit trail for every classes_remaining change ──
     await pool.query(`
       CREATE TABLE IF NOT EXISTS membership_credit_log (
@@ -1546,37 +1562,26 @@ function isTrialPlan(membership) {
   return rk.startsWith("trial_single_session") || name.includes("muestra");
 }
 
-// Auto-expire an active membership that is truly done: credits at 0 AND no
-// pending bookings (confirmed/waitlist future classes) linked to it. A
-// membership with credits at 0 but 3 future reservations is not expired — the
-// client already booked all her classes, the pack is fully allocated.
-// Reverse path: if credits come back above 0 (e.g. on-time cancellation) or a
-// future booking exists and end_date is still valid, revert to active.
+// Keep membership status tied to its date window. A package with 0 available
+// credits may simply be fully booked for the month; it should not expire early.
 async function syncExhaustedMembershipStatus({ client, membershipId }) {
   try {
     const q = client ?? pool;
     const r = await q.query(
-      `SELECT m.status, m.classes_remaining, m.end_date,
-              (SELECT COUNT(*) FROM bookings b
-                 JOIN classes c ON c.id = b.class_id
-                WHERE b.membership_id = m.id
-                  AND b.status IN ('confirmed','waitlist')
-                  AND c.date >= CURRENT_DATE
-              )::int AS pending_bookings
+      `SELECT m.status, m.end_date,
+              ((NOW() AT TIME ZONE 'America/Mexico_City')::date) AS today_mx
          FROM memberships m
         WHERE m.id = $1`,
       [membershipId]
     );
     if (!r.rows.length) return;
     const m = r.rows[0];
-    const rem = m.classes_remaining;
-    const isUnlimited = rem === null || Number(rem) >= 9999;
-    const isExhausted = !isUnlimited && Number(rem) <= 0;
-    const hasPending = Number(m.pending_bookings) > 0;
-    const endOk = !m.end_date || new Date(m.end_date) >= new Date(new Date().toISOString().slice(0, 10));
-    if (m.status === "active" && isExhausted && !hasPending) {
+    const todayMx = String(m.today_mx).slice(0, 10);
+    const endDate = m.end_date ? String(m.end_date).slice(0, 10) : null;
+    const dateExpired = Boolean(endDate && endDate < todayMx);
+    if (m.status === "active" && dateExpired) {
       await q.query(`UPDATE memberships SET status = 'expired', updated_at = NOW() WHERE id = $1`, [membershipId]);
-    } else if (m.status === "expired" && endOk && (!isExhausted || hasPending)) {
+    } else if (m.status === "expired" && !dateExpired) {
       await q.query(`UPDATE memberships SET status = 'active', updated_at = NOW() WHERE id = $1`, [membershipId]);
     }
   } catch (err) {
