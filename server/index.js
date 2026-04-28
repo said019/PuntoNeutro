@@ -1564,21 +1564,24 @@ function isTrialPlan(membership) {
 
 // Keep membership status tied to its date window. A package with 0 available
 // credits may simply be fully booked for the month; it should not expire early.
+// Date comparison is done in SQL so we do not depend on JS Date string formats
+// (which would give us "Fri May 22" vs "Mon Apr 27" — lexicographic comparison
+// of those is wrong because "F" < "M" in ASCII).
 async function syncExhaustedMembershipStatus({ client, membershipId }) {
   try {
     const q = client ?? pool;
     const r = await q.query(
-      `SELECT m.status, m.end_date,
-              ((NOW() AT TIME ZONE 'America/Mexico_City')::date) AS today_mx
+      `SELECT m.status,
+              (m.end_date IS NOT NULL
+                AND m.end_date < ((NOW() AT TIME ZONE 'America/Mexico_City')::date)
+              ) AS date_expired
          FROM memberships m
         WHERE m.id = $1`,
       [membershipId]
     );
     if (!r.rows.length) return;
     const m = r.rows[0];
-    const todayMx = String(m.today_mx).slice(0, 10);
-    const endDate = m.end_date ? String(m.end_date).slice(0, 10) : null;
-    const dateExpired = Boolean(endDate && endDate < todayMx);
+    const dateExpired = Boolean(m.date_expired);
     if (m.status === "active" && dateExpired) {
       await q.query(`UPDATE memberships SET status = 'expired', updated_at = NOW() WHERE id = $1`, [membershipId]);
     } else if (m.status === "expired" && !dateExpired) {
