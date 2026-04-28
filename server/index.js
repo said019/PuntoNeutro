@@ -11915,10 +11915,50 @@ function scheduleEmailCrons() {
   }, 60 * 60 * 1000); // every 1 hour
 }
 
+// Self-healing reconciliation: every 10 minutes, fix any membership whose
+// status doesn't match its end_date. Even if a future bug introduces a wrong
+// status flip, this catches and corrects it within ~10 minutes. SQL-only
+// comparison (no JS Date pitfalls). Logs only when something was actually
+// changed, to keep logs quiet during normal operation.
+async function reconcileMembershipStatusByDate() {
+  try {
+    const expiredRes = await pool.query(`
+      UPDATE memberships
+         SET status = 'expired', updated_at = NOW()
+       WHERE status = 'active'
+         AND end_date IS NOT NULL
+         AND end_date < ((NOW() AT TIME ZONE 'America/Mexico_City')::date)
+      RETURNING id
+    `);
+    const reactivatedRes = await pool.query(`
+      UPDATE memberships
+         SET status = 'active', updated_at = NOW()
+       WHERE status = 'expired'
+         AND (end_date IS NULL
+              OR end_date >= ((NOW() AT TIME ZONE 'America/Mexico_City')::date))
+      RETURNING id
+    `);
+    const expiredCount = expiredRes.rowCount ?? 0;
+    const reactivatedCount = reactivatedRes.rowCount ?? 0;
+    if (expiredCount || reactivatedCount) {
+      console.log(`[reconcile] memberships → expired:${expiredCount} reactivated:${reactivatedCount}`);
+    }
+  } catch (err) {
+    console.error("[reconcile] error:", err.message);
+  }
+}
+
+function scheduleMembershipStatusReconciliation() {
+  // Run once at startup (in addition to ensureSchema's one-time fix), then every 10 min.
+  reconcileMembershipStatusByDate();
+  setInterval(reconcileMembershipStatusByDate, 10 * 60 * 1000).unref();
+}
+
 // ─── Start ───────────────────────────────────────────────────────────────────
 async function bootServer() {
   await ensureSchema();
   scheduleEmailCrons();
+  scheduleMembershipStatusReconciliation();
   // Initialize Google Wallet loyalty class if configured
   ensureGoogleWalletClass().catch(() => { });
   app.listen(PORT, () => {
