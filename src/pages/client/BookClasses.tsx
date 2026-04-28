@@ -7,7 +7,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
-import { safeParse } from "@/lib/utils";
+import { safeParse, formatCalendarDate } from "@/lib/utils";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Button } from "@/components/ui/button";
@@ -91,7 +91,7 @@ const MembershipBanner = ({ membership }: { membership: any }) => {
         {endDate && (
           <div className="text-right">
             <div className="text-xs font-medium text-[#2d2d2d]/70">
-              {new Date(endDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
+              {formatCalendarDate(endDate, { day: "2-digit", month: "short", year: "numeric" })}
             </div>
             <div className="text-[10px] text-[#2d2d2d]/50">vencimiento</div>
           </div>

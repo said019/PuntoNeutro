@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import api from "@/lib/api";
+import { formatCalendarDate } from "@/lib/utils";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -136,7 +137,7 @@ const MembershipTable = ({ status, title }: { status?: string; title: string }) 
                       <Badge variant={STATUS_VARIANTS[m.status]}>{STATUS_LABELS[m.status]}</Badge>
                     </TableCell>
                     <TableCell className="text-sm">
-                      {m.endDate ? new Date(m.endDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                      {formatCalendarDate(m.endDate, { day: "2-digit", month: "short", year: "numeric" })}
                     </TableCell>
                     <TableCell>
                       {m.classesRemaining === null || m.classesRemaining === undefined

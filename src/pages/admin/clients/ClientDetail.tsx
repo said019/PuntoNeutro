@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { formatCalendarDate } from "@/lib/utils";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,7 +96,7 @@ const MembershipsTab = ({ userId }: { userId: string }) => {
                   {m.status === "active" ? "Activa" : m.status === "expired" ? "Expirada" : m.status === "cancelled" ? "Cancelada" : m.status}
                 </Badge>
               </TableCell>
-              <TableCell>{m.endDate ? new Date(m.endDate).toLocaleDateString("es-MX") : "—"}</TableCell>
+              <TableCell>{formatCalendarDate(m.endDate)}</TableCell>
               <TableCell>{m.classesRemaining ?? "∞"}</TableCell>
               <TableCell>
                 <DropdownMenu>
