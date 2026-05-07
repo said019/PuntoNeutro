@@ -6785,12 +6785,88 @@ app.post("/api/classes", adminMiddleware, async (req, res) => {
 });
 
 // PUT /api/classes/:id/cancel
+// Cancels the class AND cascades: every active booking gets cancelled with
+// cancelled_by='admin' and the matching credit is restored to the client's
+// membership (audit-logged). Without this cascade, clients lose credits to
+// classes that never happened.
 app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
+  const client = await pool.connect();
   try {
-    const r = await pool.query("UPDATE classes SET status='cancelled', updated_at=NOW() WHERE id=$1 RETURNING *", [req.params.id]);
-    if (!r.rows.length) return res.status(404).json({ message: "Clase no encontrada" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+    await client.query("BEGIN");
+
+    const classRes = await client.query(
+      "UPDATE classes SET status='cancelled', updated_at=NOW() WHERE id=$1 RETURNING *",
+      [req.params.id]
+    );
+    if (!classRes.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Clase no encontrada" });
+    }
+
+    // Find every booking that still consumed a credit on this class
+    const bookingsRes = await client.query(
+      `SELECT id, user_id, membership_id, status
+         FROM bookings
+        WHERE class_id = $1
+          AND status IN ('confirmed','checked_in','waitlist')`,
+      [req.params.id]
+    );
+
+    const restoredFor = [];
+    for (const b of bookingsRes.rows) {
+      await client.query(
+        `UPDATE bookings
+            SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = 'admin'
+          WHERE id = $1`,
+        [b.id]
+      );
+      // Restore credit only if booking actually consumed one (confirmed/checked_in)
+      // Waitlist bookings did not deduct, so no restore needed.
+      if (b.membership_id && (b.status === "confirmed" || b.status === "checked_in")) {
+        const memRes = await client.query(
+          "SELECT classes_remaining FROM memberships WHERE id = $1 FOR UPDATE",
+          [b.membership_id]
+        );
+        const oldVal = memRes.rows[0]?.classes_remaining;
+        if (oldVal !== null && oldVal !== undefined && Number(oldVal) < 9999) {
+          await client.query(
+            "UPDATE memberships SET classes_remaining = classes_remaining + 1, updated_at = NOW() WHERE id = $1",
+            [b.membership_id]
+          );
+          await logCreditChange({
+            client,
+            membershipId: b.membership_id,
+            oldValue: Number(oldVal),
+            newValue: Number(oldVal) + 1,
+            reason: "class_cancelled_by_admin",
+            actorUserId: req.userId,
+            bookingId: b.id,
+            notes: `Class ${req.params.id} cancelled — credit restored`,
+          });
+          await syncExhaustedMembershipStatus({ client, membershipId: b.membership_id });
+        }
+      }
+      restoredFor.push({ bookingId: b.id, userId: b.user_id, hadMembership: !!b.membership_id });
+    }
+
+    await client.query("COMMIT");
+
+    // Wallet pass refresh for everyone affected (post-commit, fire-and-forget)
+    for (const r of restoredFor) {
+      if (r.userId) triggerWalletPassSync(r.userId, "class_cancelled");
+    }
+
+    return res.json({
+      data: classRes.rows[0],
+      cascadeBookingsCancelled: restoredFor.length,
+    });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[PUT /classes/:id/cancel]", err);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
+  }
 });
 
 // DELETE /api/classes/week — clear classes in date range
