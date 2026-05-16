@@ -3,7 +3,7 @@
 ## Punto Neutro — Estudio de Pilates
 
 ### Página principal (Landing Page)
-Diseño ethereal con tonos tierra y sage. Fotos reales del estudio en San Juan del Río.
+Diseño ethereal con tonos tierra y sage. Fotos reales del estudio en Tequisquiapan.
 
 #### Navegación
 - Logo "Punto Neutro"
