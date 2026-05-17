@@ -1,5 +1,5 @@
-const CACHE_NAME = "punto-neutro-v1";
-const PRECACHE_URLS = ["/", "/icon-192.png", "/icon-512.png", "/punto-neutro-logo.png"];
+const CACHE_NAME = "punto-neutro-v2";
+const PRECACHE_URLS = ["/icon-192.png", "/icon-512.png", "/punto-neutro-logo.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -19,8 +19,20 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  // Skip API calls — only cache static assets
   if (event.request.url.includes("/api/")) return;
+
+  const url = new URL(event.request.url);
+  const isHTML = event.request.mode === "navigate" || event.request.destination === "document";
+  const isHashedAsset = /\/assets\/.+\.[a-f0-9]{8,}\./i.test(url.pathname);
+
+  // HTML and non-hashed assets: always go to network, no cache fallback
+  // (prevents serving stale index.html that points to deleted JS bundles)
+  if (isHTML || (!isHashedAsset && !PRECACHE_URLS.includes(url.pathname))) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // Hashed assets and precached icons: network-first, cache fallback for offline
   event.respondWith(
     fetch(event.request)
       .then((response) => response)
