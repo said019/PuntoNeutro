@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, User, Package, CheckCircle2, CreditCard, Banknote, ArrowRight, ChevronLeft, History, Sparkles, Clock, XCircle, Eye, ImageIcon } from "lucide-react";
+import { Loader2, Search, User, Package, CheckCircle2, CreditCard, Banknote, ArrowRight, ChevronLeft, History, Sparkles, Clock, XCircle, Eye } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 
@@ -536,47 +536,190 @@ const PendingOrders = () => {
 
 // ── Payments History ──────────────────────────────────────
 const PaymentsHistory = () => {
-  const { data } = useQuery<{ data: any[] }>({
-    queryKey: ["payments"],
-    queryFn: async () => (await api.get("/payments")).data,
+  const today = new Date();
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const [startDate, setStartDate] = useState(firstOfMonth);
+  const [endDate, setEndDate] = useState(todayStr);
+  const [methodFilter, setMethodFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+
+  const { data, isLoading } = useQuery<{ data: any[]; total: number }>({
+    queryKey: ["payments", startDate, endDate],
+    queryFn: async () => (
+      await api.get(`/payments?startDate=${startDate}&endDate=${endDate}T23:59:59`)
+    ).data,
   });
-  const payments = Array.isArray(data?.data) ? data.data : [];
+  const allPayments = Array.isArray(data?.data) ? data.data : [];
+
+  const payments = allPayments.filter((p: any) => {
+    if (methodFilter !== "all" && p.method !== methodFilter) return false;
+    if (search) {
+      const s = search.toLowerCase();
+      const hay = `${p.userName ?? ""} ${p.planName ?? ""}`.toLowerCase();
+      if (!hay.includes(s)) return false;
+    }
+    return true;
+  });
+
+  const totalFiltered = payments.reduce((sum: number, p: any) => sum + Number(p.total_amount ?? 0), 0);
+  const countByMethod = payments.reduce((acc: Record<string, { count: number; total: number }>, p: any) => {
+    const m = p.method ?? "otro";
+    acc[m] = acc[m] ?? { count: 0, total: 0 };
+    acc[m].count++;
+    acc[m].total += Number(p.total_amount ?? 0);
+    return acc;
+  }, {});
 
   const methodStyles: Record<string, string> = {
-    cash: "text-[#5a4f46] border-[#94867a]/30 bg-[#94867a]/10",
-    card: "text-[#4a5638] border-[#b5bf9c]/30 bg-[#b5bf9c]/10",
-    transfer: "text-[#5a4f46] border-[#94867a]/30 bg-[#94867a]/10",
+    cash: "text-blue-700 border-blue-400/30 bg-blue-50",
+    card: "text-[#4a5638] border-[#b5bf9c]/40 bg-[#b5bf9c]/15",
+    transfer: "text-amber-700 border-amber-400/30 bg-amber-50",
   };
   const methodLabels: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
+  const methodIcons: Record<string, any> = { cash: Banknote, card: CreditCard, transfer: ArrowRight };
+  const sourceLabels: Record<string, string> = { order: "Orden en línea", membership: "Asignación manual", walkin: "Walk-in" };
+  const sourceStyles: Record<string, string> = {
+    order: "text-[#4a5638] bg-[#b5bf9c]/12 border-[#b5bf9c]/30",
+    membership: "text-[#5a4f46] bg-[#94867a]/12 border-[#94867a]/30",
+    walkin: "text-[#2d2d2d]/55 bg-[#94867a]/[0.06] border-[#94867a]/15",
+  };
 
-  if (!payments.length) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <History size={32} className="text-[#2d2d2d]/10 mb-3" />
-        <p className="text-[#2d2d2d]/30 text-sm">Sin pagos registrados aún</p>
-      </div>
-    );
-  }
+  const fmtFullDate = (raw: any) => {
+    if (!raw) return "—";
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return String(raw);
+    return d.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" });
+  };
+  const fmtTime = (raw: any) => {
+    if (!raw) return "";
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  };
 
   return (
-    <div className="space-y-2">
-      {payments.map((p: any) => (
-        <div key={p.id} className="flex items-center gap-4 p-4 rounded-xl border border-[#94867a]/15 bg-[#94867a]/[0.04] hover:bg-[#94867a]/[0.06] transition-colors">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#94867a]/20 to-[#b5bf9c]/10 border border-[#94867a]/20 flex items-center justify-center shrink-0">
-            <CreditCard size={13} className="text-[#94867a]/70" />
+    <div className="space-y-5">
+      {/* Filters */}
+      <div className="rounded-2xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-[10px] font-semibold uppercase tracking-wider text-[#2d2d2d]/45 mb-1.5 block">Desde</Label>
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+              className="bg-white/60 border-[#94867a]/15 text-sm" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-[#2d2d2d]/85 truncate">{p.userName ?? p.userId ?? "—"}</p>
-            <p className="text-xs text-[#2d2d2d]/30">{p.createdAt ? new Date(p.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className={cn("text-[11px] font-semibold px-2.5 py-1 rounded-full border", methodStyles[p.method] ?? "text-[#2d2d2d]/40 border-[#94867a]/15 bg-[#94867a]/[0.06]")}>
-              {methodLabels[p.method] ?? p.method ?? "—"}
-            </span>
-            <span className="text-sm font-bold text-[#2d2d2d]/90">${Number(p.total_amount ?? p.amount ?? 0).toLocaleString()} MXN</span>
+          <div>
+            <Label className="text-[10px] font-semibold uppercase tracking-wider text-[#2d2d2d]/45 mb-1.5 block">Hasta</Label>
+            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+              className="bg-white/60 border-[#94867a]/15 text-sm" />
           </div>
         </div>
-      ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94867a]/50" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por cliente o plan…"
+              className="pl-9 bg-white/60 border-[#94867a]/15 text-sm" />
+          </div>
+          <Select value={methodFilter} onValueChange={setMethodFilter}>
+            <SelectTrigger className="bg-white/60 border-[#94867a]/15 text-sm">
+              <SelectValue placeholder="Método de pago" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los métodos</SelectItem>
+              <SelectItem value="cash">Efectivo</SelectItem>
+              <SelectItem value="transfer">Transferencia</SelectItem>
+              <SelectItem value="card">Tarjeta</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          {[
+            { label: "Hoy", start: todayStr, end: todayStr },
+            { label: "Este mes", start: firstOfMonth, end: todayStr },
+            { label: "Mes pasado", start: new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().slice(0, 10), end: new Date(today.getFullYear(), today.getMonth(), 0).toISOString().slice(0, 10) },
+            { label: "Últimos 30 días", start: new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10), end: todayStr },
+          ].map((preset) => (
+            <button key={preset.label}
+              onClick={() => { setStartDate(preset.start); setEndDate(preset.end); }}
+              className="text-[11px] font-semibold px-3 py-1 rounded-full border border-[#94867a]/20 bg-white/40 text-[#2d2d2d]/60 hover:bg-[#94867a]/10 hover:text-[#2d2d2d]/90 transition-all">
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Totals summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl border border-[#b5bf9c]/30 bg-gradient-to-br from-[#b5bf9c]/12 to-[#b5bf9c]/4 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#4a5638]/70">Total filtrado</p>
+          <p className="text-xl font-bold text-[#4a5638] mt-0.5">${totalFiltered.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</p>
+          <p className="text-[10px] text-[#2d2d2d]/40 mt-0.5">{payments.length} {payments.length === 1 ? "pago" : "pagos"}</p>
+        </div>
+        {(["cash", "transfer", "card"] as const).map((m) => {
+          const stats = countByMethod[m] ?? { count: 0, total: 0 };
+          const Icon = methodIcons[m];
+          return (
+            <div key={m} className="rounded-xl border border-[#94867a]/15 bg-[#94867a]/[0.04] p-3">
+              <div className="flex items-center gap-1.5">
+                <Icon size={11} className="text-[#94867a]/60" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#2d2d2d]/55">{methodLabels[m]}</p>
+              </div>
+              <p className="text-base font-bold text-[#2d2d2d]/85 mt-0.5">${stats.total.toLocaleString("es-MX", { minimumFractionDigits: 0 })}</p>
+              <p className="text-[10px] text-[#2d2d2d]/40 mt-0.5">{stats.count} {stats.count === 1 ? "pago" : "pagos"}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-[#94867a]/60">
+          <Loader2 className="animate-spin mr-2" size={16} /> Cargando pagos…
+        </div>
+      ) : !payments.length ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <History size={32} className="text-[#2d2d2d]/10 mb-3" />
+          <p className="text-[#2d2d2d]/40 text-sm font-medium">No hay pagos en este rango</p>
+          <p className="text-[#2d2d2d]/25 text-xs mt-1">Cambia las fechas o el filtro para ver más resultados</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {payments.map((p: any) => {
+            const Icon = methodIcons[p.method] ?? CreditCard;
+            return (
+              <div key={`${p.source}-${p.id}`} className="flex items-start gap-3 p-4 rounded-xl border border-[#94867a]/15 bg-white/40 hover:bg-[#94867a]/[0.04] transition-colors">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#94867a]/25 to-[#b5bf9c]/15 border border-[#94867a]/25 flex items-center justify-center text-sm font-bold text-[#94867a] shrink-0">
+                  {(p.userName ?? "?")[0]?.toUpperCase() ?? "?"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <p className="text-sm font-semibold text-[#2d2d2d]/90">{p.userName ?? "Sin nombre"}</p>
+                    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", sourceStyles[p.source] ?? sourceStyles.walkin)}>
+                      {sourceLabels[p.source] ?? p.source}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#2d2d2d]/55 mt-0.5 flex items-center gap-1">
+                    <Package size={11} className="text-[#94867a]/60" /> {p.planName ?? "—"}
+                  </p>
+                  <p className="text-[11px] text-[#2d2d2d]/40 mt-1 flex items-center gap-1">
+                    <Clock size={10} /> {fmtFullDate(p.createdAt)}
+                    <span className="text-[#2d2d2d]/30">·</span>
+                    <span>{fmtTime(p.createdAt)}</span>
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <span className="text-base font-bold text-[#2d2d2d]/90">${Number(p.total_amount ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</span>
+                  <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1", methodStyles[p.method] ?? "text-[#2d2d2d]/45 border-[#94867a]/15 bg-[#94867a]/[0.06]")}>
+                    <Icon size={9} /> {methodLabels[p.method] ?? p.method ?? "—"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
