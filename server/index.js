@@ -2193,9 +2193,21 @@ async function authMiddleware(req, res, next) {
 async function adminMiddleware(req, res, next) {
   authMiddleware(req, res, async () => {
     try {
-      const r = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
+      const r = await pool.query("SELECT role, email FROM users WHERE id = $1", [req.userId]);
       if (!r.rows.length || !["admin", "super_admin", "instructor", "reception"].includes(r.rows[0].role)) {
         return res.status(403).json({ message: "Acceso restringido" });
+      }
+      const lockEnabled = String(process.env.ADMIN_LOCKED ?? "").toLowerCase() === "true";
+      if (lockEnabled) {
+        const bypassList = String(process.env.ADMIN_BYPASS_EMAILS ?? "saidromero19@gmail.com")
+          .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+        const userEmail = String(r.rows[0].email ?? "").toLowerCase();
+        if (!bypassList.includes(userEmail)) {
+          return res.status(503).json({
+            message: process.env.ADMIN_LOCK_MESSAGE
+              ?? "Servicio del panel administrativo temporalmente suspendido. Contacta al desarrollador para reactivarlo.",
+          });
+        }
       }
       next();
     } catch { return res.status(500).json({ message: "Error interno" }); }
